@@ -1,2 +1,60 @@
-# high-mobility-moba
-High-mobility 1v1 action MOBA for Windows.
+# High Mobility MOBA
+
+Windows / Steam向けに開発する、短時間1v1の高機動アクションMOBAです。
+
+## コンセプト
+
+- 1試合の目標時間は約5分
+- 一本道のレーンで、ミニオン・タワー・本拠地を巡って戦う
+- 勝利条件は敵本拠地の破壊
+- 近接キャラクター中心の、派手で操作量の多い対戦ゲーム
+- Eの移動技、Rの決定機、共通Dのカウンター読み合いが核
+
+## 初期キャラクター
+
+| 名前 | 役割 |
+|---|---|
+| ゼルフ | 青の双頭剣士。高機動近接ファイター。 |
+| 朧 | 黒の忍者。高難度の暗殺者。 |
+| ヴォルブラーク | 赤のハンマータンク。初心者向け。 |
+| リネス | 黄の雷メイジ。CCコンボ型。 |
+| リーゼロッテ・ヴァイス | 白の吸血鬼ガンナー。遠距離通常攻撃型。 |
+
+## 開発環境
+
+```text
+Engine: Unity 6 + URP
+Language: C#
+IDE: Visual Studio または VS Code
+Source Control: Git + GitHub
+3D: Blender
+Steam: Steamworks.NET
+Networking: Server-authoritative dedicated server
+```
+
+## ドキュメント
+
+- `GAME_DESIGN.md`：ゲームルール、キャラクター、数値設計
+- `TECHNICAL_DESIGN.md`：Unity構成、コード設計、ネットワーク設計
+- `TASKS.md`：開発タスクと進捗
+- `CHANGELOG.md`：仕様・実装変更の履歴
+
+## 初期マイルストーン
+
+1. Unity上でゼルフの移動・通常攻撃・Q/Eを実装する
+2. ヴォルブラーク、HP、ダメージ、共通Dを実装する
+3. ミニオン、タワー、本拠地、勝敗を実装する
+4. ローカル対戦でゲーム性を検証する
+5. オンライン1v1を実装する
+
+## 開発ルール
+
+- 数値はC#コードに直接書かず、ScriptableObjectで管理する。
+- 1回の変更はできる限り1機能に絞る。
+- 変更前後にUnity Consoleのエラーを確認する。
+- コミット前にプレイテストを行う。
+- 既存仕様を変更した場合はCHANGELOG.mdに記録する。
+
+## 現在の状態
+
+企画・設計段階。最初の目標は、ローカルでゼルフとヴォルブラークが戦える試作版を作ること。
