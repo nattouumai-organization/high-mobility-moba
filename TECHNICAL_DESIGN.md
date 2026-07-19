@@ -108,6 +108,7 @@ CharacterData
 BasicAttackController
 CharacterSkillController
 PlayerTargetSelector
+PlayerBasicAttackController
 Targetable
 ```
 
@@ -117,6 +118,9 @@ Targetable
 - `PlayerTargetSelector` は右クリックによるターゲットの選択・切替・解除を管理し、`Targetable` は選択される側の見た目(選択リング、選択色、被弾フラッシュ)を管理する。
 - 右クリック入力の優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とする。
 - 試作ではレイヤーを GroundLayer(6)、TargetableLayer(7) として使用する。
+- `CharacterStats` は移動速度に加えて、攻撃速度(毎秒の攻撃回数)と攻撃射程(Unity units)の基礎値を管理する。Current Attack Speed = Base Attack Speed × (1 + Bonus Attack Speed Percent / 100)、Attack Interval = 1 / Current Attack Speed。
+- `PlayerBasicAttackController` は選択中のターゲットへの疑似通常攻撃(被弾フラッシュのみ)を管理する。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外では攻撃も自動接近もしない。将来的にダメージ処理を持つBasicAttackControllerへ発展させる。
+- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。
 
 ### Skills
 

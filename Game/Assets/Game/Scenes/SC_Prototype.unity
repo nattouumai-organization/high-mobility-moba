@@ -390,6 +390,7 @@ GameObject:
   - component: {fileID: 968542323}
   - component: {fileID: 968542324}
   - component: {fileID: 968542325}
+  - component: {fileID: 968542326}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -536,6 +537,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _baseMoveSpeed: 6
   _bonusMoveSpeed: 0
+  _baseAttackSpeed: 1
+  _bonusAttackSpeedPercent: 0
+  _baseAttackRange: 2
 --- !u!114 &968542325
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -554,6 +558,20 @@ MonoBehaviour:
   _groundLayer:
     serializedVersion: 2
     m_Bits: 64
+--- !u!114 &968542326
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8b3d6f1a2c74058b9d4e7a1c3f26b85, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _characterStats: {fileID: 968542324}
+  _targetSelector: {fileID: 968542325}
 --- !u!1 &1097403211
 GameObject:
   m_ObjectHideFlags: 0
@@ -865,8 +883,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _selectionRing: {fileID: 1246788907}
+  _selectionRingRenderer: {fileID: 1246788910}
   _bodyRenderer: {fileID: 1246788904}
   _selectedColor: {r: 1, g: 0.45, b: 0.35, a: 1}
+  _inRangeRingColor: {r: 0.35, g: 1, b: 0.35, a: 1}
+  _outOfRangeRingColor: {r: 1, g: 0.5, b: 0.1, a: 1}
   _hitFlashColor: {r: 1, g: 1, b: 1, a: 1}
   _hitFlashDuration: 0.15
 --- !u!1 &1246788907

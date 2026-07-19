@@ -29,6 +29,10 @@
 - SC_Prototypeシーンにテスト用ダミーTrainingDummyを1体設置(TargetableLayer / 赤系仮マテリアル)。
 - 選択中のダミーに、足元の黄色い選択リングと本体色を明るくする視覚フィードバックを追加。
 - 将来の通常攻撃から呼び出す、被弾時に短時間白く点滅する処理をTargetableに用意。
+- 通常攻撃の射程判定を実装。TargetableのColliderの最も近い点との水平距離(XZ平面、高さは含めない)がCurrent Attack Range以下なら射程内とする。
+- 攻撃速度と攻撃間隔を実装。CharacterStatsにBase Attack Speed(毎秒の攻撃回数)、Bonus Attack Speed Percent、Base Attack Rangeを追加し、Attack Interval = 1 / Current Attack Speedとする。
+- PlayerBasicAttackControllerを追加。選択中のターゲットが射程内の場合のみ、攻撃間隔ごとに疑似通常攻撃(被弾フラッシュのみ、ダメージ・HP減少なし)を実行する。射程外では攻撃せず、自動接近もしない。
+- 選択リングの色で射程内外を表示するよう更新(射程内: 明るい緑 / 射程外: オレンジ)。
 
 ### Changed
 
