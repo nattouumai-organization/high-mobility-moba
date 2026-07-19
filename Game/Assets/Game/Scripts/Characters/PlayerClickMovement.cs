@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 /// Ground上を右クリックした地点へ、CharacterController.Moveで滑らかに移動させる。
 /// TASKS.md「右クリック移動を実装する」用の試作スクリプト。
 /// 移動速度はCharacterStatsのCurrent Move Speedから取得する。
+/// TargetableLayerの対象を右クリックした場合は、ターゲット選択を優先しGround移動を開始しない。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -18,6 +19,10 @@ public class PlayerClickMovement : MonoBehaviour
 
     private CharacterController _characterController;
     private CharacterStats _characterStats;
+
+    // 同じPlayer上のターゲット選択(任意)。存在する場合、Targetable対象の右クリック時は移動しない。
+    private PlayerTargetSelector _targetSelector;
+
     private Camera _mainCamera;
     private Vector3 _destination;
     private bool _hasDestination;
@@ -26,6 +31,7 @@ public class PlayerClickMovement : MonoBehaviour
     {
         _characterController = GetComponent<CharacterController>();
         _characterStats = GetComponent<CharacterStats>();
+        _targetSelector = GetComponent<PlayerTargetSelector>();
         _mainCamera = Camera.main;
 
         if (_characterStats == null)
@@ -51,6 +57,13 @@ public class PlayerClickMovement : MonoBehaviour
         }
 
         if (_mainCamera == null)
+        {
+            return;
+        }
+
+        // 入力優先順位: ターゲット選択 > Ground移動。
+        // TargetableLayerの対象を右クリックした場合は、Groundへの移動を開始しない。
+        if (_targetSelector != null && _targetSelector.IsPointingAtTargetable())
         {
             return;
         }

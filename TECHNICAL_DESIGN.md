@@ -107,11 +107,16 @@ CharacterStats
 CharacterData
 BasicAttackController
 CharacterSkillController
+PlayerTargetSelector
+Targetable
 ```
 
 - `CharacterData` はScriptableObject。
 - 基礎ステータスと成長値はデータに保存する。
 - 現在HP、クールダウン、レベル、ポイントなどの実行時状態はComponent側で保持する。
+- `PlayerTargetSelector` は右クリックによるターゲットの選択・切替・解除を管理し、`Targetable` は選択される側の見た目(選択リング、選択色、被弾フラッシュ)を管理する。
+- 右クリック入力の優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とする。
+- 試作ではレイヤーを GroundLayer(6)、TargetableLayer(7) として使用する。
 
 ### Skills
 
