@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 /// 移動速度はCharacterStatsのCurrent Move Speedから取得する。
 /// TargetableLayerの対象を右クリックした場合は、ターゲット選択を優先しGround移動を開始しない。
 /// ターゲット選択時はPlayerTargetSelectorがStopMovement()を呼び、Playerはその場で停止する。
+/// 射程外のターゲットを選択した場合は、PlayerBasicAttackControllerがMoveToPosition()で射程内まで自動接近させる。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -56,6 +57,17 @@ public class PlayerClickMovement : MonoBehaviour
     public void StopMovement()
     {
         _hasDestination = false;
+    }
+
+    /// <summary>
+    /// 指定したワールド座標へ向けた移動を開始する。
+    /// 射程外のターゲットへの自動接近時にPlayerBasicAttackControllerから呼び出される。
+    /// 重力・段差処理は今回実装しないため、高さは現在のY座標を維持する。
+    /// </summary>
+    public void MoveToPosition(Vector3 worldPosition)
+    {
+        _destination = new Vector3(worldPosition.x, transform.position.y, worldPosition.z);
+        _hasDestination = true;
     }
 
     private void UpdateDestinationFromRightClick()

@@ -4,11 +4,13 @@ using UnityEngine;
 /// 選択中のターゲットに対する疑似通常攻撃を管理する。
 /// TASKS.md「通常攻撃の射程判定を実装する」「攻撃速度と攻撃間隔を実装する」用の試作スクリプト。
 /// 選択中のTargetableが攻撃射程内にいる場合のみ、攻撃間隔ごとに被弾フラッシュを呼び出す。
-/// ダメージ・HP減少・死亡・攻撃アニメーション・弾丸・自動接近は今回実装しない。
+/// 射程外のターゲットを選択した場合は、射程内に入るまでPlayerClickMovementで自動接近する。
+/// ダメージ・HP減少・死亡・攻撃アニメーション・弾丸は今回実装しない。
 /// 将来的にダメージ処理を持つBasicAttackControllerへ発展させる想定。
 /// </summary>
 [RequireComponent(typeof(CharacterStats))]
 [RequireComponent(typeof(PlayerTargetSelector))]
+[RequireComponent(typeof(PlayerClickMovement))]
 public class PlayerBasicAttackController : MonoBehaviour
 {
     // 攻撃速度・攻撃射程の取得元。未設定の場合はAwakeで同じGameObjectから取得する。
@@ -17,8 +19,14 @@ public class PlayerBasicAttackController : MonoBehaviour
     // 現在のターゲットの取得元。未設定の場合はAwakeで同じGameObjectから取得する。
     [SerializeField] private PlayerTargetSelector _targetSelector;
 
+    // 射程外のターゲットへの自動接近に使用する移動処理。未設定の場合はAwakeで同じGameObjectから取得する。
+    [SerializeField] private PlayerClickMovement _clickMovement;
+
     // 次に疑似通常攻撃できる時刻(Time.time基準)。攻撃速度以上の頻度で攻撃しないための管理値。
     private float _nextAttackTime;
+
+    // 射程外のターゲットへ自動接近中かどうか。射程内へ入った瞬間に停止するための管理値。
+    private bool _isApproaching;
 
     /// <summary>現在のターゲットが攻撃射程内かどうか。ターゲット未選択・無効時はfalse。</summary>
     public bool IsCurrentTargetInRange { get; private set; }
@@ -34,6 +42,11 @@ public class PlayerBasicAttackController : MonoBehaviour
         {
             _targetSelector = GetComponent<PlayerTargetSelector>();
         }
+
+        if (_clickMovement == null)
+        {
+            _clickMovement = GetComponent<PlayerClickMovement>();
+        }
     }
 
     private void Update()
@@ -41,17 +54,32 @@ public class PlayerBasicAttackController : MonoBehaviour
         Targetable target = GetValidTarget();
         IsCurrentTargetInRange = target != null && IsInAttackRange(target);
 
-        if (target != null)
+        if (target == null)
         {
-            // 射程内外を選択リングの色へ反映する(射程内: 明るい緑 / 射程外: オレンジ)。
-            target.SetInAttackRange(IsCurrentTargetInRange);
+            // ターゲットがいない・無効な場合は攻撃せず、自動接近状態も解除する。
+            _isApproaching = false;
+            return;
         }
+
+        // 射程内外を選択リングの色へ反映する(射程内: 明るい緑 / 射程外: オレンジ)。
+        target.SetInAttackRange(IsCurrentTargetInRange);
 
         if (!IsCurrentTargetInRange)
         {
-            // ターゲットがいない・無効・射程外の場合は攻撃しない。
-            // 射程外でも選択は保持し、自動接近もしない。
+            // 射程外の場合は攻撃せず、射程内に入るまでターゲットへ自動接近する。
+            ApproachTarget(target);
             return;
+        }
+
+        // 自動接近中に射程内へ入ったら、その場で停止して攻撃を開始する。
+        if (_isApproaching)
+        {
+            _isApproaching = false;
+
+            if (_clickMovement != null)
+            {
+                _clickMovement.StopMovement();
+            }
         }
 
         TryAttack(target);
@@ -91,6 +119,22 @@ public class PlayerBasicAttackController : MonoBehaviour
         }
 
         return target;
+    }
+
+    /// <summary>
+    /// 射程外のターゲットへ向けた移動を指示する。
+    /// 射程判定と同じくColliderの最も近い点を目標にし、毎フレーム更新することで
+    /// 将来ターゲットが移動する場合にも追従できるようにする。
+    /// </summary>
+    private void ApproachTarget(Targetable target)
+    {
+        if (_clickMovement == null)
+        {
+            return;
+        }
+
+        _isApproaching = true;
+        _clickMovement.MoveToPosition(target.GetClosestPoint(transform.position));
     }
 
     private void TryAttack(Targetable target)

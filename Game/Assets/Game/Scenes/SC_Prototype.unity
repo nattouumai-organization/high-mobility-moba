@@ -572,6 +572,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _characterStats: {fileID: 968542324}
   _targetSelector: {fileID: 968542325}
+  _clickMovement: {fileID: 968542322}
 --- !u!1 &1097403211
 GameObject:
   m_ObjectHideFlags: 0
