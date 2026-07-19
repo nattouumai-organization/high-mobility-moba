@@ -388,6 +388,7 @@ GameObject:
   - component: {fileID: 968542321}
   - component: {fileID: 968542322}
   - component: {fileID: 968542323}
+  - component: {fileID: 968542324}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -499,7 +500,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b3f1c7d2a9e84f65b0c4d8a2e6f19c73, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _moveSpeed: 6
   _groundLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -521,6 +521,20 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 64
   _minLookDistance: 0.1
+--- !u!114 &968542324
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2a7c5d8e4b1439a86c0d9e3b5f78a21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _baseMoveSpeed: 6
+  _bonusMoveSpeed: 0
 --- !u!1 &1097403211
 GameObject:
   m_ObjectHideFlags: 0
