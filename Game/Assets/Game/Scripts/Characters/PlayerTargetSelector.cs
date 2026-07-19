@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 /// TASKS.md「通常攻撃のターゲット選択を実装する」用の試作スクリプト。
 /// 入力優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とし、
 /// PlayerClickMovementはIsPointingAtTargetable()に問い合わせて移動可否を判断する。
+/// ターゲットを選択した際は、PlayerClickMovement.StopMovement()を呼びPlayerをその場で停止させる。
 /// 自動接近・自動攻撃・ダメージは今回実装しない。
 /// </summary>
 public class PlayerTargetSelector : MonoBehaviour
@@ -19,6 +20,9 @@ public class PlayerTargetSelector : MonoBehaviour
     private Camera _mainCamera;
     private Targetable _currentTarget;
 
+    // 同じPlayer上の移動制御(任意)。ターゲット選択時に移動を停止するために使用する。
+    private PlayerClickMovement _clickMovement;
+
     // 現在選択中のターゲット。未選択時はnull。
     public Targetable CurrentTarget => _currentTarget;
 
@@ -27,6 +31,7 @@ public class PlayerTargetSelector : MonoBehaviour
     private void Awake()
     {
         _mainCamera = Camera.main;
+        _clickMovement = GetComponent<PlayerClickMovement>();
     }
 
     private void Update()
@@ -56,6 +61,12 @@ public class PlayerTargetSelector : MonoBehaviour
         if (TryGetTargetableUnderMouse(out Targetable targetable))
         {
             SelectTarget(targetable);
+
+            // ターゲット選択時は、進行中の移動を中断してその場で停止する。
+            if (_clickMovement != null)
+            {
+                _clickMovement.StopMovement();
+            }
             return;
         }
 

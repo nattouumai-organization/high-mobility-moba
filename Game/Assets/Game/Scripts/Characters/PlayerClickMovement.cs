@@ -6,6 +6,7 @@ using UnityEngine.InputSystem;
 /// TASKS.md「右クリック移動を実装する」用の試作スクリプト。
 /// 移動速度はCharacterStatsのCurrent Move Speedから取得する。
 /// TargetableLayerの対象を右クリックした場合は、ターゲット選択を優先しGround移動を開始しない。
+/// ターゲット選択時はPlayerTargetSelectorがStopMovement()を呼び、Playerはその場で停止する。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -46,6 +47,15 @@ public class PlayerClickMovement : MonoBehaviour
     {
         UpdateDestinationFromRightClick();
         MoveTowardsDestination();
+    }
+
+    /// <summary>
+    /// 現在の移動を中断し、その場に停止する。
+    /// ターゲット選択時(将来的には通常攻撃時)にPlayerTargetSelectorから呼び出される。
+    /// </summary>
+    public void StopMovement()
+    {
+        _hasDestination = false;
     }
 
     private void UpdateDestinationFromRightClick()
