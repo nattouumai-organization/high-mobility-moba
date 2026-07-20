@@ -7,6 +7,7 @@ using UnityEngine;
 /// CharacterStatsを持たない対象(TrainingDummy)はInspectorのMax Healthを使用する。
 /// TakeDamage / Healは、実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、
 /// ダメージを与えた側がゼルフPの与ダメージ回復やダメージ表示に実ダメージ量を使用できるようにする。
+/// Reviveで死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。
 /// HPreg・シールド・ARによるダメージ軽減・確定ダメージは今回実装しない。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
 /// </summary>
@@ -40,6 +41,9 @@ public class HealthController : MonoBehaviour
 
     /// <summary>現在HPが0になり死亡したときに1回だけ通知する。</summary>
     public event Action Died;
+
+    /// <summary>復活して現在HPが全快したときに通知する。死亡時に無効化した見た目・操作の復元に使用する。</summary>
+    public event Action Revived;
 
     private void Awake()
     {
@@ -106,6 +110,24 @@ public class HealthController : MonoBehaviour
         }
 
         return actualHeal;
+    }
+
+    /// <summary>
+    /// 死亡状態から復活し、現在HPを最大HPまで全快する。RespawnControllerから呼び出す。
+    /// HP変化を通知した後、復活イベントを発行し、死亡時に無効化した見た目・操作を各コンポーネントが復元する。
+    /// 死亡していない場合は何もしない。
+    /// </summary>
+    public void Revive()
+    {
+        if (!_isDead)
+        {
+            return;
+        }
+
+        _isDead = false;
+        _currentHealth = MaxHealth;
+        NotifyHealthChanged();
+        Revived?.Invoke();
     }
 
     private void Die()

@@ -20,7 +20,8 @@ public enum TargetClassification
 /// 通常攻撃から呼び出す被弾時の短時間フラッシュを持つ。
 /// ターゲット分類(Character / Minion / Tower / TrainingDummy)をInspectorで設定でき、
 /// 攻撃側(ゼルフPの与ダメージ回復など)が効果量の判定に使用する。
-/// HealthControllerの死亡イベントを受け取り、死亡時は選択不可にして短時間後に非表示化する。
+/// HealthControllerの死亡イベントを受け取り、死亡時は選択不可にして短時間後に本体を非表示化する。
+/// GameObject自体は無効化せず本体Rendererのみ非表示にするため、復活(Revive)イベントを受け取って元の見た目へ復元できる。
 /// </summary>
 public class Targetable : MonoBehaviour
 {
@@ -60,6 +61,7 @@ public class Targetable : MonoBehaviour
     private bool _isSelected;
     private bool _isInAttackRange;
     private Coroutine _hitFlashCoroutine;
+    private Coroutine _deathHideCoroutine;
     private HealthController _healthController;
     private bool _isDead;
 
@@ -99,6 +101,7 @@ public class Targetable : MonoBehaviour
         if (_healthController != null)
         {
             _healthController.Died += HandleDied;
+            _healthController.Revived += HandleRevived;
         }
     }
 
@@ -107,6 +110,7 @@ public class Targetable : MonoBehaviour
         if (_healthController != null)
         {
             _healthController.Died -= HandleDied;
+            _healthController.Revived -= HandleRevived;
         }
     }
 
@@ -183,8 +187,9 @@ public class Targetable : MonoBehaviour
     }
 
     /// <summary>
-    /// 死亡時の処理。選択不可にし、短時間死亡状態を表示した後にGameObjectを非表示にする。
-    /// Destroyは使わず非表示化するため、他コンポーネントからのMissing Referenceは発生しない。
+    /// 死亡時の処理。選択不可にし、短時間死亡状態を表示した後に本体Rendererを非表示にする。
+    /// DestroyもGameObjectの無効化も使わないため、他コンポーネントからのMissing Referenceは発生せず、
+    /// RespawnControllerによる復活イベントも受け取れる。
     /// </summary>
     private void HandleDied()
     {
@@ -207,14 +212,53 @@ public class Targetable : MonoBehaviour
             _selectionRing.SetActive(false);
         }
 
-        // 被弾フラッシュの後、短時間だけ死亡状態を確認できるようにしてから非表示にする。
-        StartCoroutine(DeathHideRoutine());
+        // 被弾フラッシュの後、短時間だけ死亡状態を確認できるようにしてから本体を非表示にする。
+        _deathHideCoroutine = StartCoroutine(DeathHideRoutine());
     }
 
     private IEnumerator DeathHideRoutine()
     {
         yield return new WaitForSeconds(_deathHideDelay);
-        gameObject.SetActive(false);
+
+        // GameObjectは無効化せず、本体Rendererのみ非表示にする(復活イベントを受け取れるようにするため)。
+        if (_bodyRenderer != null)
+        {
+            _bodyRenderer.enabled = false;
+        }
+
+        _deathHideCoroutine = null;
+    }
+
+    /// <summary>
+    /// 復活時の処理。本体Rendererと選択用Colliderを元へ戻し、再びターゲットとして選択できるようにする。
+    /// 復活時は未選択状態のため本体色は通常色へ戻す(再選択はプレイヤーの右クリックで行う)。
+    /// </summary>
+    private void HandleRevived()
+    {
+        if (!_isDead)
+        {
+            return;
+        }
+
+        _isDead = false;
+
+        if (_deathHideCoroutine != null)
+        {
+            StopCoroutine(_deathHideCoroutine);
+            _deathHideCoroutine = null;
+        }
+
+        if (_bodyRenderer != null)
+        {
+            _bodyRenderer.enabled = true;
+        }
+
+        if (_collider != null)
+        {
+            _collider.enabled = true;
+        }
+
+        ApplyCurrentColor();
     }
 
     private void ApplyCurrentColor()

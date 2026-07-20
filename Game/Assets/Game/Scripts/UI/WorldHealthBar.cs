@@ -6,7 +6,7 @@ using UnityEngine.UI;
 /// TASKS.md「HPバーを実装する」用の試作スクリプト。
 /// HealthControllerのHP変化を購読してUI ImageのFill Amountを更新し、
 /// 毎フレームMain Cameraと同じ向きに揃えることで、常にカメラ方向を向き裏返らない。
-/// 対象が死亡した場合はHPバーを非表示にする。HP数値のテキスト表示は今回実装しない。
+/// 対象が死亡した場合はHPバーを非表示にし、復活した場合は再表示する。HP数値のテキスト表示は今回実装しない。
 /// World Space Canvasの子(Background / Fill)と合わせて使用する。
 /// </summary>
 public class WorldHealthBar : MonoBehaviour
@@ -18,6 +18,7 @@ public class WorldHealthBar : MonoBehaviour
     [SerializeField] private Image _fillImage;
 
     private Camera _mainCamera;
+    private Canvas _canvas;
 
     private void Awake()
     {
@@ -27,6 +28,7 @@ public class WorldHealthBar : MonoBehaviour
         }
 
         _mainCamera = Camera.main;
+        _canvas = GetComponent<Canvas>();
     }
 
     private void OnEnable()
@@ -38,6 +40,7 @@ public class WorldHealthBar : MonoBehaviour
 
         _healthController.HealthChanged += HandleHealthChanged;
         _healthController.Died += HandleDied;
+        _healthController.Revived += HandleRevived;
     }
 
     private void OnDisable()
@@ -49,6 +52,7 @@ public class WorldHealthBar : MonoBehaviour
 
         _healthController.HealthChanged -= HandleHealthChanged;
         _healthController.Died -= HandleDied;
+        _healthController.Revived -= HandleRevived;
     }
 
     private void Start()
@@ -94,7 +98,22 @@ public class WorldHealthBar : MonoBehaviour
 
     private void HandleDied()
     {
-        // 死亡時はHPバーごと非表示にする。
-        gameObject.SetActive(false);
+        // 死亡時はHPバーを非表示にする。GameObjectは無効化せずCanvasのみ無効化することで、
+        // 復活イベントを受け取ってHPバーを再表示できる。
+        if (_canvas != null)
+        {
+            _canvas.enabled = false;
+        }
+    }
+
+    private void HandleRevived()
+    {
+        // 復活時はHPバーを再表示し、全快した現在HPを反映する。
+        if (_canvas != null)
+        {
+            _canvas.enabled = true;
+        }
+
+        HandleHealthChanged(_healthController.CurrentHealth, _healthController.MaxHealth);
     }
 }

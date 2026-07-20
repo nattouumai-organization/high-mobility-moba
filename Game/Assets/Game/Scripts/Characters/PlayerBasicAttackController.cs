@@ -176,9 +176,8 @@ public class PlayerBasicAttackController : MonoBehaviour
 
             if (actualDamage > 0f)
             {
-                // 与ダメージ(赤)を自分の頭上、被ダメージ(青)を対象の頭上に表示する。
-                CombatTextManager.ShowDamageDealt(transform.position, actualDamage);
-                CombatTextManager.ShowDamageTaken(target.transform.position, actualDamage);
+                // プレイヤー視点の与ダメージ表示: 攻撃対象の頭上に赤色で1つだけ表示する(二重表示しない)。
+                CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);
 
                 // ゼルフP: 実ダメージ量とターゲット分類を通知し、分類ごとの回復率で与ダメージ回復を行う。
                 if (_passiveHeal != null)

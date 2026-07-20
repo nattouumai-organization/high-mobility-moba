@@ -3,8 +3,9 @@ using UnityEngine.UI;
 
 /// <summary>
 /// フローティング戦闘テキスト(FloatingCombatText)の生成と管理を行うマネージャー。
-/// 与ダメージ(赤・例: 60)、被ダメージ(青・例: -60)、回復(緑・例: +3)の表示要求をstatic関数で受け取り、
+/// プレイヤー視点の与ダメージ(赤・例: 60)、被ダメージ(黄・例: -10)、回復(緑・例: +3)の表示要求をstatic関数で受け取り、
 /// 対象の頭上のワールド空間にWorld Space Canvasの整数テキストを生成する。
+/// 与ダメージは攻撃対象の頭上、被ダメージは受けた側の頭上に表示し、1回のダメージで表示は1つだけとする(二重表示しない)。
 /// 表示色・高さ・移動速度・表示時間などはInspectorで設定し、C#コードへ直接書かない。
 /// 現在はPlayerとTrainingDummyの通常攻撃・ゼルフP回復で使用するが、
 /// 将来のキャラクター・ミニオン・タワーからも同じ関数で共通利用できる。
@@ -15,11 +16,11 @@ public class CombatTextManager : MonoBehaviour
 {
     private static CombatTextManager _instance;
 
-    // 与ダメージ表示の色(攻撃した側の頭上に表示する赤)。
+    // 与ダメージ表示の色(攻撃対象の頭上に表示する赤)。
     [SerializeField] private Color _damageDealtColor = new Color(1f, 0.3f, 0.25f, 1f);
 
-    // 被ダメージ表示の色(ダメージを受けた側の頭上に表示する青)。
-    [SerializeField] private Color _damageTakenColor = new Color(0.3f, 0.55f, 1f, 1f);
+    // 被ダメージ表示の色(ダメージを受けた側の頭上に表示する黄)。
+    [SerializeField] private Color _damageTakenColor = new Color(1f, 0.85f, 0.25f, 1f);
 
     // 回復表示の色(回復した側の頭上に表示する緑)。
     [SerializeField] private Color _healColor = new Color(0.35f, 1f, 0.4f, 1f);
@@ -64,14 +65,14 @@ public class CombatTextManager : MonoBehaviour
         }
     }
 
-    /// <summary>攻撃した側の頭上に、与えたダメージ量を赤色で表示する(例: 60)。</summary>
-    public static void ShowDamageDealt(Vector3 ownerPosition, float amount)
+    /// <summary>攻撃対象の頭上に、与えたダメージ量を赤色で表示する(例: 60)。</summary>
+    public static void ShowDamageDealt(Vector3 targetPosition, float amount)
     {
         CombatTextManager instance = GetOrCreateInstance();
-        instance.Spawn(ownerPosition, ToDisplayAmount(amount).ToString(), instance._damageDealtColor);
+        instance.Spawn(targetPosition, ToDisplayAmount(amount).ToString(), instance._damageDealtColor);
     }
 
-    /// <summary>ダメージを受けた側の頭上に、受けたダメージ量を青色で表示する(例: -60)。</summary>
+    /// <summary>ダメージを受けた側の頭上に、受けたダメージ量を黄色で表示する(例: -10)。</summary>
     public static void ShowDamageTaken(Vector3 ownerPosition, float amount)
     {
         CombatTextManager instance = GetOrCreateInstance();
