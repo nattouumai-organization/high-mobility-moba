@@ -3,9 +3,10 @@ using UnityEngine;
 
 /// <summary>
 /// 現在HPを管理し、被ダメージ・回復・死亡処理の起点となるコンポーネント。
-/// TASKS.md「ダメージと死亡処理を実装する」用の試作スクリプト。
 /// CharacterStatsを持つ対象(Player)はCurrent Max Healthを最大HPとして使用し、
 /// CharacterStatsを持たない対象(TrainingDummy)はInspectorのMax Healthを使用する。
+/// TakeDamage / Healは、実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、
+/// ダメージを与えた側がゼルフPの与ダメージ回復やダメージ表示に実ダメージ量を使用できるようにする。
 /// HPreg・シールド・ARによるダメージ軽減・確定ダメージは今回実装しない。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
 /// </summary>
@@ -56,35 +57,55 @@ public class HealthController : MonoBehaviour
     /// ダメージを受けて現在HPを減らす。HPは0未満にならず、0になったら死亡処理を開始する。
     /// ARによる軽減・確定ダメージの区別は今回実装しない。
     /// </summary>
-    public void TakeDamage(float damage)
+    /// <returns>
+    /// 実際に減少したHP量(実ダメージ)。残りHPを超えた過剰ダメージ分は含まない。
+    /// 死亡済み・無効な値の場合は0を返す。
+    /// </returns>
+    public float TakeDamage(float damage)
     {
         if (_isDead || damage <= 0f)
         {
-            return;
+            return 0f;
         }
 
+        float previousHealth = _currentHealth;
         _currentHealth = Mathf.Max(0f, _currentHealth - damage);
+        float actualDamage = previousHealth - _currentHealth;
         NotifyHealthChanged();
 
         if (_currentHealth <= 0f)
         {
             Die();
         }
+
+        return actualDamage;
     }
 
     /// <summary>
-    /// 現在HPを回復する。最大HPは超えない。
-    /// 将来の回復スキル・HPreg用の土台で、今回はどこからも呼び出さない。
+    /// 現在HPを回復する。最大HPは超えない。ゼルフPの与ダメージ回復などから呼び出す。
     /// </summary>
-    public void Heal(float amount)
+    /// <returns>
+    /// 実際に増加したHP量(実回復量)。最大HPを超えた過剰回復分は含まない。
+    /// 死亡済み・無効な値・最大HPで回復量0の場合は0を返す。
+    /// </returns>
+    public float Heal(float amount)
     {
         if (_isDead || amount <= 0f)
         {
-            return;
+            return 0f;
         }
 
+        float previousHealth = _currentHealth;
         _currentHealth = Mathf.Min(MaxHealth, _currentHealth + amount);
-        NotifyHealthChanged();
+        float actualHeal = _currentHealth - previousHealth;
+
+        // 最大HPで実際にはHPが増えなかった場合は、通知もしない。
+        if (actualHeal > 0f)
+        {
+            NotifyHealthChanged();
+        }
+
+        return actualHeal;
     }
 
     private void Die()

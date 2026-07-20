@@ -393,6 +393,7 @@ GameObject:
   - component: {fileID: 968542326}
   - component: {fileID: 968542327}
   - component: {fileID: 968542328}
+  - component: {fileID: 968542330}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -545,7 +546,7 @@ MonoBehaviour:
   _baseAttackRange: 2
   _baseMaxHealth: 100
   _bonusMaxHealth: 0
-  _baseAttackDamage: 20
+  _baseAttackDamage: 60
   _bonusAttackDamage: 0
 --- !u!114 &968542325
 MonoBehaviour:
@@ -580,6 +581,7 @@ MonoBehaviour:
   _characterStats: {fileID: 968542324}
   _targetSelector: {fileID: 968542325}
   _clickMovement: {fileID: 968542322}
+  _passiveHeal: {fileID: 968542330}
 --- !u!114 &968542327
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -606,6 +608,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9f3b6e2a5d1478c8b0e4d7a2f65c318, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &968542330
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2f5a8c1b4e7469d83a6c9e0b2f51d74, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _healthController: {fileID: 968542327}
+  _characterHealPercent: 5
+  _minionHealPercent: 2.5
+  _towerHealPercent: 0
+  _trainingDummyHealPercent: 5
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1156,6 +1175,7 @@ MonoBehaviour:
   _hitFlashColor: {r: 1, g: 1, b: 1, a: 1}
   _hitFlashDuration: 0.15
   _deathHideDelay: 0.6
+  _classification: 0
 --- !u!114 &1246788920
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1168,8 +1188,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a7c2e5f8d1b3462f90a4c8e6b2d75f19, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _maxHealth: 100
-  _currentHealth: 100
+  _maxHealth: 300
+  _currentHealth: 300
 --- !u!1 &1246788921
 GameObject:
   m_ObjectHideFlags: 0
@@ -1482,6 +1502,60 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!1 &1357900001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1357900002}
+  - component: {fileID: 1357900003}
+  m_Layer: 0
+  m_Name: CombatTextManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1357900002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1357900001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1357900003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1357900001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1b4d7e0a3c6485f05c8e1b4d6f97a32, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _damageDealtColor: {r: 1, g: 0.3, b: 0.25, a: 1}
+  _damageTakenColor: {r: 0.3, g: 0.55, b: 1, a: 1}
+  _healColor: {r: 0.35, g: 1, b: 0.4, a: 1}
+  _headHeightOffset: 2
+  _randomHorizontalOffset: 0.4
+  _moveSpeed: 1.2
+  _lifetime: 0.8
+  _fontSize: 60
+  _canvasScale: 0.01
+  _canvasSize: {x: 300, y: 100}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1491,3 +1565,4 @@ SceneRoots:
   - {fileID: 1519420801}
   - {fileID: 968542318}
   - {fileID: 1246788902}
+  - {fileID: 1357900002}

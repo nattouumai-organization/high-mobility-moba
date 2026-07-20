@@ -1,14 +1,15 @@
 using UnityEngine;
 
 /// <summary>
-/// 選択中のターゲットに対する通常攻撃を管理する。
-/// TASKS.md「通常攻撃の射程判定を実装する」「攻撃速度と攻撃間隔を実装する」
-/// 「ダメージと死亡処理を実装する」用の試作スクリプト。
-/// 選択中のTargetableが攻撃射程内にいる場合のみ、攻撃間隔ごとに通常攻撃を実行し、
+/// 選択中のターゲットに対するゼルフの通常攻撃を管理する。
+/// TASKS.md「ゼルフの通常攻撃を実装する」用のスクリプト。
+/// 選択中のTargetableが攻撃射程内にいる場合のみ、攻撃間隔(Current Attack Speed)ごとに通常攻撃を実行し、
 /// CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与えて被弾フラッシュを発生させる。
+/// HealthControllerが返す実ダメージ量(残りHPを超えない値)を使って、
+/// ダメージ表示(CombatTextManager)とゼルフPの与ダメージ回復(ZelfPassiveHeal)へ通知する。
 /// 射程外のターゲットを選択した場合は、射程内に入るまでPlayerClickMovementで自動接近する。
-/// ターゲットが死亡した場合は攻撃を停止する。
-/// 攻撃アニメーション・弾丸・投射物・ヒットスキャンは今回実装しない。
+/// ターゲットが死亡した場合は攻撃を停止する(選択の解除はPlayerTargetSelectorが行う)。
+/// 弾丸・投射物・ヒットスキャン・攻撃アニメーションは今回実装しない。
 /// 将来的にミニオンなども扱うBasicAttackControllerへ発展させる想定。
 /// </summary>
 [RequireComponent(typeof(CharacterStats))]
@@ -24,6 +25,9 @@ public class PlayerBasicAttackController : MonoBehaviour
 
     // 射程外のターゲットへの自動接近に使用する移動処理。未設定の場合はAwakeで同じGameObjectから取得する。
     [SerializeField] private PlayerClickMovement _clickMovement;
+
+    // ゼルフPの与ダメージ回復。未設定の場合はAwakeで同じGameObjectから取得する(任意)。
+    [SerializeField] private ZelfPassiveHeal _passiveHeal;
 
     // 次に通常攻撃できる時刻(Time.time基準)。攻撃速度以上の頻度で攻撃しないための管理値。
     private float _nextAttackTime;
@@ -49,6 +53,11 @@ public class PlayerBasicAttackController : MonoBehaviour
         if (_clickMovement == null)
         {
             _clickMovement = GetComponent<PlayerClickMovement>();
+        }
+
+        if (_passiveHeal == null)
+        {
+            _passiveHeal = GetComponent<ZelfPassiveHeal>();
         }
     }
 
@@ -157,12 +166,26 @@ public class PlayerBasicAttackController : MonoBehaviour
             return;
         }
 
-        // 通常攻撃: CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与える。
+        // 通常攻撃: CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え、
+        // 実際に減少させたHP量(実ダメージ。残りHPを超えた過剰ダメージ分は含まない)を受け取る。
         // 弾丸・投射物は使わず、ダメージは即時に届く。
         HealthController targetHealth = target.Health;
         if (targetHealth != null)
         {
-            targetHealth.TakeDamage(_characterStats.CurrentAttackDamage);
+            float actualDamage = targetHealth.TakeDamage(_characterStats.CurrentAttackDamage);
+
+            if (actualDamage > 0f)
+            {
+                // 与ダメージ(赤)を自分の頭上、被ダメージ(青)を対象の頭上に表示する。
+                CombatTextManager.ShowDamageDealt(transform.position, actualDamage);
+                CombatTextManager.ShowDamageTaken(target.transform.position, actualDamage);
+
+                // ゼルフP: 実ダメージ量とターゲット分類を通知し、分類ごとの回復率で与ダメージ回復を行う。
+                if (_passiveHeal != null)
+                {
+                    _passiveHeal.NotifyDamageDealt(actualDamage, target.Classification);
+                }
+            }
         }
 
         // 既存の被弾フラッシュを発生させる。

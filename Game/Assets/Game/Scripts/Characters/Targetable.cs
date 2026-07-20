@@ -2,14 +2,32 @@ using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// ターゲット選択される側(TrainingDummyなど)の見た目を管理する。
+/// ターゲットの分類。ゼルフPの与ダメージ回復など、対象の種類によって効果が変わる処理で使用する。
+/// 将来のキャラクター・ミニオン・タワーでも同じ分類を再利用する。
+/// </summary>
+public enum TargetClassification
+{
+    Character = 0,
+    Minion = 1,
+    Tower = 2,
+    TrainingDummy = 3,
+}
+
+/// <summary>
+/// ターゲット選択される側(TrainingDummyなど)の分類と見た目を管理する。
 /// 選択リングの表示・非表示、選択中の本体色の変更、
 /// 攻撃射程内外に応じた選択リングの色の切替、
 /// 通常攻撃から呼び出す被弾時の短時間フラッシュを持つ。
+/// ターゲット分類(Character / Minion / Tower / TrainingDummy)をInspectorで設定でき、
+/// 攻撃側(ゼルフPの与ダメージ回復など)が効果量の判定に使用する。
 /// HealthControllerの死亡イベントを受け取り、死亡時は選択不可にして短時間後に非表示化する。
 /// </summary>
 public class Targetable : MonoBehaviour
 {
+    // このターゲットの分類。ゼルフPの回復率などの判定に使用する。
+    // TrainingDummyは初期状態ではCharacter扱いとし、InspectorでMinionやTowerへ変更できる。
+    [SerializeField] private TargetClassification _classification = TargetClassification.Character;
+
     // 選択中だけ表示する足元の選択リング。
     [SerializeField] private GameObject _selectionRing;
 
@@ -46,6 +64,9 @@ public class Targetable : MonoBehaviour
     private bool _isDead;
 
     public bool IsSelected => _isSelected;
+
+    /// <summary>このターゲットの分類。攻撃側(ゼルフPなど)が効果量の判定に使用する。</summary>
+    public TargetClassification Classification => _classification;
 
     /// <summary>攻撃射程内として表示中かどうか。PlayerBasicAttackControllerが毎フレーム更新する。</summary>
     public bool IsInAttackRange => _isInAttackRange;

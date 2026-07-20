@@ -99,7 +99,7 @@ CooldownController
 - 通常ダメージはARで軽減する。
 - 確定ダメージは朧Rの処刑とヴォルブラークRの反射のみ。
 - ダメージ計算式：`FinalDamage = RawDamage * 100 / (100 + AR)`。
-- 試作では `HealthController`(Scripts/Combat)が現在HP・被ダメージ・回復の土台・HP変化通知・死亡イベントを管理する。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象(TrainingDummy)はInspectorのMax Healthを最大HPとして使用する。ARによる軽減は未実装で、将来的にHealthComponent / DamageSystemへ発展させる。
+- 試作では `HealthController`(Scripts/Combat)が現在HP・被ダメージ・回復の土台・HP変化通知・死亡イベントを管理する。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象(TrainingDummy)はInspectorのMax Healthを最大HPとして使用する。TakeDamage / Healは実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、ダメージを与えた側が実ダメージ量を取得できる。ARによる軽減は未実装で、将来的にHealthComponent / DamageSystemへ発展させる。
 
 ### Characters
 
@@ -113,6 +113,7 @@ PlayerTargetSelector
 PlayerBasicAttackController
 PlayerDeathHandler
 Targetable
+ZelfPassiveHeal
 CharacterSelectionManager
 CharacterSelectionUI
 ```
@@ -124,10 +125,12 @@ CharacterSelectionUI
 - 右クリック入力の優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とする。
 - 試作ではレイヤーを GroundLayer(6)、TargetableLayer(7) として使用する。
 - `CharacterStats` は移動速度に加えて、攻撃速度(毎秒の攻撃回数)と攻撃射程(Unity units)の基礎値を管理する。Current Attack Speed = Base Attack Speed × (1 + Bonus Attack Speed Percent / 100)、Attack Interval = 1 / Current Attack Speed。最大HP(Current Max Health = Base + Bonus、1未満にならない)と攻撃力(Current Attack Damage = Base + Bonus、0未満にならない)の基礎値も管理する。現在HPはHealthControllerが保持する。
-- `PlayerBasicAttackController` は選択中のターゲットへの通常攻撃を管理する。攻撃間隔ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え、被弾フラッシュを発生させる。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外のターゲットを選択した場合はPlayerClickMovementのMoveToPosition()で射程内まで自動接近してから攻撃する。ターゲットが死亡した場合は攻撃を停止し、PlayerTargetSelectorが選択を解除する。将来的にミニオンなども扱うBasicAttackControllerへ発展させる。
-- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後にGameObjectを非表示化する。
+- `PlayerBasicAttackController` は選択中のターゲットへの通常攻撃を管理する。攻撃間隔ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え、被弾フラッシュを発生させる。HealthControllerが返す実ダメージ量を使って、ダメージ表示(CombatTextManager)とゼルフPの与ダメージ回復(ZelfPassiveHeal)へ通知する。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外のターゲットを選択した場合はPlayerClickMovementのMoveToPosition()で射程内まで自動接近してから攻撃する。ターゲットが死亡した場合は攻撃を停止し、PlayerTargetSelectorが選択を解除する。将来的にミニオンなども扱うBasicAttackControllerへ発展させる。
+- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後にGameObjectを非表示化する。また、ターゲット分類(TargetClassification: Character / Minion / Tower / TrainingDummy)をInspectorで保持し、攻撃側(ゼルフPなど)が効果量の判定に使用する。
 - `PlayerDeathHandler` はPlayerの死亡イベントを受け取り、PlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerと見た目(Renderer)を無効化する。リスポーンは未実装。
 - `WorldHealthBar`(Scripts/UI)はHealthControllerのHP変化・死亡イベントを購読し、World Space Canvas上のUI ImageのFill AmountでHPバーを表示する。バーは毎フレームMain Cameraの向きに揃え、対象の死亡時は非表示になる。
+- `ZelfPassiveHeal`(Scripts/Characters)はゼルフP(与ダメージ回復)を管理する。通常攻撃から実ダメージ量とターゲット分類を受け取り、Character 5% / Minion 2.5% / Tower 0%(テスト用のTrainingDummy分類はCharacterと同じ5%。いずれもInspector設定)で自身のHealthControllerを回復する。死亡中は回復せず、最大HPを超えない。実際にHPが増えた場合のみ緑色の回復表示を要求する。
+- `FloatingCombatText` / `CombatTextManager`(Scripts/UI)は再利用可能なフローティング戦闘テキスト。CombatTextManagerがShowDamageDealt(赤・例: 60) / ShowDamageTaken(青・例: -60) / ShowHeal(緑・例: +3)のstatic APIで表示要求を受け取り、対象の頭上のワールド空間にWorld Space Canvas+標準Text(LegacyRuntimeフォント)の整数テキストを生成する(重なり軽減のランダム横方向オフセット付き)。FloatingCombatTextは上方向移動・フェードアウト・Main Cameraへの向き揃え(裏返らない)を行い、表示終了後に自身を安全に削除する。プール処理は未実装だが生成箇所を集約してあり、将来プールへ置き換えやすい。将来のキャラクター・ミニオン・タワーからも共通利用できる。
 - `CharacterData`(Scripts/Characters)はキャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータス・成長値、P/Q/W/E/Rのスキル説明を保持するScriptableObject。第1弾としてData/Characters/ZelfData.assetを作成済み。SC_PrototypeのPlayerへはまだ適用しない。
 - `CharacterSelectionManager` は選択中のCharacterDataを保持する常駐マネージャー。DontDestroyOnLoadでシーン遷移後も参照でき、二重生成時は後から生成された方を破棄する(セーブデータ化はしない)。
 - `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。
@@ -205,7 +208,7 @@ Client Role: 入力送信、予測、補間、描画
 Server Role: 移動、スキル、ダメージ、CC、ポイント、勝敗の最終判定
 ```
 
-サーバーで必ず検証するもの：
+サーバーで必ず検証するもの��
 
 ```text
 移動速度
