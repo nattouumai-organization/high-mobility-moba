@@ -7,6 +7,8 @@ using UnityEngine.InputSystem;
 /// 入力優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とし、
 /// PlayerClickMovementはIsPointingAtTargetable()に問い合わせて移動可否を判断する。
 /// ターゲットを選択した際は、PlayerClickMovement.StopMovement()を呼びPlayerをその場で停止させる。
+/// 右クリック長押し中にTargetableを指した場合はターゲット選択を優先し、その対象を選択・切替する。
+/// 右クリック長押し中にGroundを指している間はターゲットを解除し続け、長押し移動へ切り替える。
 /// ターゲットが死亡・破棄・無効化された場合は、選択を安全に解除する。
 /// </summary>
 public class PlayerTargetSelector : MonoBehaviour
@@ -52,25 +54,29 @@ public class PlayerTargetSelector : MonoBehaviour
     private void HandleRightClick()
     {
         Mouse mouse = Mouse.current;
-        if (mouse == null || !mouse.rightButton.wasPressedThisFrame)
+        if (mouse == null || !mouse.rightButton.isPressed)
         {
             return;
         }
 
-        // 優先1: Targetableの対象を右クリックした場合は選択(選択中なら新しい対象へ切替)する。
+        // 優先1: Targetableの対象を右クリック(長押し中に指している場合を含む)した場合は、
+        // ターゲット選択を優先し、選択(選択中なら新しい対象へ切替)する。
         if (TryGetTargetableUnderMouse(out Targetable targetable))
         {
+            bool isNewSelection = _currentTarget != targetable;
             SelectTarget(targetable);
 
-            // ターゲット選択時は、進行中の移動を中断してその場で停止する。
-            if (_clickMovement != null)
+            // 新しくターゲットを選択・切替した時のみ、進行中の移動を中断してその場で停止する。
+            // 長押しで同じターゲットを指し続けている間は、射程外からの自動接近を妨げない。
+            if (isNewSelection && _clickMovement != null)
             {
                 _clickMovement.StopMovement();
             }
             return;
         }
 
-        // 優先2: Groundを右クリックした場合はターゲットを解除する(移動処理はPlayerClickMovementが行う)。
+        // 優先2: Groundを右クリックしている場合はターゲットを解除する(移動処理はPlayerClickMovementが行う)。
+        // 長押し中も解除し続けることで、長押しによるGround移動とターゲットへの自動接近が競合しないようにする。
         if (IsPointingAtGround())
         {
             ClearTarget();

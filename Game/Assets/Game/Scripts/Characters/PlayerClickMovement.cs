@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Ground上を右クリックした地点へ、CharacterController.Moveで滑らかに移動させる。
+/// 右クリックを長押ししている間は、カーソル下のGround地点へ移動先を毎フレーム更新し続ける。
 /// TASKS.md「右クリック移動を実装する」用の試作スクリプト。
 /// 移動速度はCharacterStatsのCurrent Move Speedから取得する。
 /// TargetableLayerの対象を右クリックした場合は、ターゲット選択を優先しGround移動を開始しない。
@@ -73,7 +74,10 @@ public class PlayerClickMovement : MonoBehaviour
     private void UpdateDestinationFromRightClick()
     {
         Mouse mouse = Mouse.current;
-        if (mouse == null || !mouse.rightButton.wasPressedThisFrame)
+
+        // 長押し中は常にカーソル下の地点へ移動する仕様のため、
+        // 押した瞬間だけでなく、右ボタンが押されている間は毎フレーム移動先を更新する。
+        if (mouse == null || !mouse.rightButton.isPressed)
         {
             return;
         }
@@ -84,7 +88,7 @@ public class PlayerClickMovement : MonoBehaviour
         }
 
         // 入力優先順位: ターゲット選択 > Ground移動。
-        // TargetableLayerの対象を右クリックした場合は、Groundへの移動を開始しない。
+        // TargetableLayerの対象を右クリック(長押し中に指している場合を含む)した場合は、移動先を更新しない。
         if (_targetSelector != null && _targetSelector.IsPointingAtTargetable())
         {
             return;

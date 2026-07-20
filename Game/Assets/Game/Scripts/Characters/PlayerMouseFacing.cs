@@ -3,6 +3,8 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// 最後に右クリックしたGround上の地点の方向を、PlayerがY軸のみ回転して向くようにする。
+/// 右クリックを長押ししている間は、カーソル下のGround地点が「最後に右クリックされた場所」として
+/// 毎フレーム更新されるため、Playerはカーソル方向を向き続ける。
 /// TASKS.md「マウス方向へキャラクターが向く処理を実装する」用の試作スクリプト。
 /// 移動はPlayerClickMovementの責務であり、本スクリプトは回転のみを担う。
 /// </summary>
@@ -41,8 +43,9 @@ public class PlayerMouseFacing : MonoBehaviour
             return;
         }
 
-        // 最後に右クリックした方向を向く仕様のため、右クリックした瞬間だけ目標回転を更新する。
-        if (!mouse.rightButton.wasPressedThisFrame)
+        // 最後に右クリックした方向を向く仕様のため、右クリック入力があったフレームだけ目標回転を更新する。
+        // 長押し中は毎フレームが右クリック入力として扱われ、カーソル方向を向き続ける。
+        if (!mouse.rightButton.isPressed)
         {
             return;
         }
