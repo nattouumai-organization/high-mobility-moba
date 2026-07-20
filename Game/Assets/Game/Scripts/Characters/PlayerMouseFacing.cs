@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 public class PlayerMouseFacing : MonoBehaviour
 {
     // 試作用の回転速度(毎秒度数)。Inspectorから変更できる。
-    [SerializeField] private float _rotationSpeed = 720f;
+    [SerializeField] private float _rotationSpeed = 1440f;
 
     // Ground判定に使用するLayerMask。InspectorでGroundLayerを設定する。
     [SerializeField] private LayerMask _groundLayer;

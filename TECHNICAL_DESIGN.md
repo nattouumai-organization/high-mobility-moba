@@ -88,6 +88,7 @@ GameTick
 
 ```text
 HealthComponent
+HealthController
 DamageSystem
 DamageEvent
 DamageType
@@ -98,6 +99,7 @@ CooldownController
 - 通常ダメージはARで軽減する。
 - 確定ダメージは朧Rの処刑とヴォルブラークRの反射のみ。
 - ダメージ計算式：`FinalDamage = RawDamage * 100 / (100 + AR)`。
+- 試作では `HealthController`(Scripts/Combat)が現在HP・被ダメージ・回復の土台・HP変化通知・死亡イベントを管理する。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象(TrainingDummy)はInspectorのMax Healthを最大HPとして使用する。ARによる軽減は未実装で、将来的にHealthComponent / DamageSystemへ発展させる。
 
 ### Characters
 
@@ -109,6 +111,7 @@ BasicAttackController
 CharacterSkillController
 PlayerTargetSelector
 PlayerBasicAttackController
+PlayerDeathHandler
 Targetable
 ```
 
@@ -118,9 +121,11 @@ Targetable
 - `PlayerTargetSelector` は右クリックによるターゲットの選択・切替・解除を管理し、`Targetable` は選択される側の見た目(選択リング、選択色、被弾フラッシュ)を管理する。
 - 右クリック入力の優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とする。
 - 試作ではレイヤーを GroundLayer(6)、TargetableLayer(7) として使用する。
-- `CharacterStats` は移動速度に加えて、攻撃速度(毎秒の攻撃回数)と攻撃射程(Unity units)の基礎値を管理する。Current Attack Speed = Base Attack Speed × (1 + Bonus Attack Speed Percent / 100)、Attack Interval = 1 / Current Attack Speed。
-- `PlayerBasicAttackController` は選択中のターゲットへの疑似通常攻撃(被弾フラッシュのみ)を管理する。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外のターゲットを選択した場合はPlayerClickMovementのMoveToPosition()で射程内まで自動接近してから攻撃する。将来的にダメージ処理を持つBasicAttackControllerへ発展させる。
-- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。
+- `CharacterStats` は移動速度に加えて、攻撃速度(毎秒の攻撃回数)と攻撃射程(Unity units)の基礎値を管理する。Current Attack Speed = Base Attack Speed × (1 + Bonus Attack Speed Percent / 100)、Attack Interval = 1 / Current Attack Speed。最大HP(Current Max Health = Base + Bonus、1未満にならない)と攻撃力(Current Attack Damage = Base + Bonus、0未満にならない)の基礎値も管理する。現在HPはHealthControllerが保持する。
+- `PlayerBasicAttackController` は選択中のターゲットへの通常攻撃を管理する。攻撃間隔ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え、被弾フラッシュを発生させる。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外のターゲットを選択した場合はPlayerClickMovementのMoveToPosition()で射程内まで自動接近してから攻撃する。ターゲットが死亡した場合は攻撃を停止し、PlayerTargetSelectorが選択を解除する。将来的にミニオンなども扱うBasicAttackControllerへ発展させる。
+- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後にGameObjectを非表示化する。
+- `PlayerDeathHandler` はPlayerの死亡イベントを受け取り、PlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerと見た目(Renderer)を無効化する。リスポーンは未実装。
+- `WorldHealthBar`(Scripts/UI)はHealthControllerのHP変化・死亡イベントを購読し、World Space Canvas上のUI ImageのFill AmountでHPバーを表示する。バーは毎フレームMain Cameraの向きに揃え、対象の死亡時は非表示になる。
 
 ### Skills
 

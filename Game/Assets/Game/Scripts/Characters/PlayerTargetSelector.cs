@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 /// 入力優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とし、
 /// PlayerClickMovementはIsPointingAtTargetable()に問い合わせて移動可否を判断する。
 /// ターゲットを選択した際は、PlayerClickMovement.StopMovement()を呼びPlayerをその場で停止させる。
-/// 自動接近・自動攻撃・ダメージは今回実装しない。
+/// ターゲットが死亡・破棄・無効化された場合は、選択を安全に解除する。
 /// </summary>
 public class PlayerTargetSelector : MonoBehaviour
 {
@@ -143,14 +143,14 @@ public class PlayerTargetSelector : MonoBehaviour
 
     private void ClearTargetIfInvalid()
     {
-        // Destroy済みの対象(Unity上のnull)は参照を破棄し、無効化された対象は選択を安全に解除する。
+        // Destroy済みの対象(Unity上のnull)は参照を破棄し、死亡・無効化された対象は選択を安全に解除する。
         if (_currentTarget == null)
         {
             _currentTarget = null;
             return;
         }
 
-        if (!_currentTarget.isActiveAndEnabled)
+        if (_currentTarget.IsDead || !_currentTarget.isActiveAndEnabled)
         {
             ClearTarget();
         }

@@ -20,6 +20,22 @@
 - 削除した要素
 ```
 
+## 2026-07-21
+
+### Added
+
+- HPと通常攻撃ダメージの基本ステータスを実装。CharacterStatsにBase Max Health / Bonus Max Health(合計がCurrent Max Health、1未満にならない)とBase Attack Damage / Bonus Attack Damage(合計がCurrent Attack Damage、0未満にならない)を追加。
+- HealthControllerを追加(Scripts/Combat)。現在HPの管理、被ダメージ、回復用の土台(今回未使用)、HP変化通知、死亡イベントを持つ。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象はInspectorのMax Healthを最大HPとして使用する。
+- WorldHealthBarを追加(Scripts/UI)。PlayerとTrainingDummyの頭上にWorld Space CanvasのHPバーを表示し、HP割合に応じてUI ImageのFill Amountを更新する。バーは常にMain Cameraの方向を向き、裏返らない。背景色でPlayer(暗い青系)とTrainingDummy(暗い赤系)を区別する。
+- 通常攻撃のダメージ処理を実装。射程内のターゲットへ攻撃間隔ごとにCurrent Attack Damage(Player初期値20)を即時に与え、既存の被弾フラッシュを発生させる。
+- TrainingDummyの死亡処理を実装。HP 0でCollider無効化・選択不可・ターゲット解除・攻撃停止・HPバー非表示となり、短時間死亡状態を表示した後にGameObjectを非表示化する(Destroy不使用でMissing Referenceを防止)。
+- Playerの死亡処理を実装(PlayerDeathHandler)。HP 0でPlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerを無効化し、見た目とHPバーを非表示にする。リスポーンは未実装。
+
+### Changed
+
+- 疑似通常攻撃(被弾フラッシュのみ)を、実ダメージを与える通常攻撃へ更新。
+- PlayerMouseFacingの回転速度を毎秒720度から毎秒1440度へ変更(2倍)。
+
 ## 2026-07-20
 
 ### Added

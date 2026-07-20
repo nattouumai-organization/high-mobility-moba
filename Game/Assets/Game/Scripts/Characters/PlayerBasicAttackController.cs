@@ -1,12 +1,15 @@
 using UnityEngine;
 
 /// <summary>
-/// 選択中のターゲットに対する疑似通常攻撃を管理する。
-/// TASKS.md「通常攻撃の射程判定を実装する」「攻撃速度と攻撃間隔を実装する」用の試作スクリプト。
-/// 選択中のTargetableが攻撃射程内にいる場合のみ、攻撃間隔ごとに被弾フラッシュを呼び出す。
+/// 選択中のターゲットに対する通常攻撃を管理する。
+/// TASKS.md「通常攻撃の射程判定を実装する」「攻撃速度と攻撃間隔を実装する」
+/// 「ダメージと死亡処理を実装する」用の試作スクリプト。
+/// 選択中のTargetableが攻撃射程内にいる場合のみ、攻撃間隔ごとに通常攻撃を実行し、
+/// CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与えて被弾フラッシュを発生させる。
 /// 射程外のターゲットを選択した場合は、射程内に入るまでPlayerClickMovementで自動接近する。
-/// ダメージ・HP減少・死亡・攻撃アニメーション・弾丸は今回実装しない。
-/// 将来的にダメージ処理を持つBasicAttackControllerへ発展させる想定。
+/// ターゲットが死亡した場合は攻撃を停止する。
+/// 攻撃アニメーション・弾丸・投射物・ヒットスキャンは今回実装しない。
+/// 将来的にミニオンなども扱うBasicAttackControllerへ発展させる想定。
 /// </summary>
 [RequireComponent(typeof(CharacterStats))]
 [RequireComponent(typeof(PlayerTargetSelector))]
@@ -22,7 +25,7 @@ public class PlayerBasicAttackController : MonoBehaviour
     // 射程外のターゲットへの自動接近に使用する移動処理。未設定の場合はAwakeで同じGameObjectから取得する。
     [SerializeField] private PlayerClickMovement _clickMovement;
 
-    // 次に疑似通常攻撃できる時刻(Time.time基準)。攻撃速度以上の頻度で攻撃しないための管理値。
+    // 次に通常攻撃できる時刻(Time.time基準)。攻撃速度以上の頻度で攻撃しないための管理値。
     private float _nextAttackTime;
 
     // 射程外のターゲットへ自動接近中かどうか。射程内へ入った瞬間に停止するための管理値。
@@ -56,8 +59,18 @@ public class PlayerBasicAttackController : MonoBehaviour
 
         if (target == null)
         {
-            // ターゲットがいない・無効な場合は攻撃せず、自動接近状態も解除する。
-            _isApproaching = false;
+            // ターゲットがいない・無効・死亡した場合は攻撃を停止する。
+            // 自動接近の途中だった場合は、その場で移動も停止する。
+            if (_isApproaching)
+            {
+                _isApproaching = false;
+
+                if (_clickMovement != null)
+                {
+                    _clickMovement.StopMovement();
+                }
+            }
+
             return;
         }
 
@@ -112,8 +125,8 @@ public class PlayerBasicAttackController : MonoBehaviour
 
         Targetable target = _targetSelector.CurrentTarget;
 
-        // 破棄・無効化された対象へは攻撃しない(選択の解除自体はPlayerTargetSelectorが行う)。
-        if (target == null || !target.isActiveAndEnabled)
+        // 破棄・無効化・死亡した対象へは攻撃しない(選択の解除自体はPlayerTargetSelectorが行う)。
+        if (target == null || !target.isActiveAndEnabled || target.IsDead)
         {
             return null;
         }
@@ -144,7 +157,15 @@ public class PlayerBasicAttackController : MonoBehaviour
             return;
         }
 
-        // 疑似通常攻撃: 被弾フラッシュのみ発生させる。ダメージ・HP減少はない。
+        // 通常攻撃: CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与える。
+        // 弾丸・投射物は使わず、ダメージは即時に届く。
+        HealthController targetHealth = target.Health;
+        if (targetHealth != null)
+        {
+            targetHealth.TakeDamage(_characterStats.CurrentAttackDamage);
+        }
+
+        // 既存の被弾フラッシュを発生させる。
         target.PlayHitFlash();
 
         // 攻撃間隔はCharacterStatsから毎回取得するため、Inspectorでの攻撃速度変更が次の攻撃から反映される。

@@ -5,8 +5,8 @@ using UnityEngine;
 /// ターゲット選択される側(TrainingDummyなど)の見た目を管理する。
 /// 選択リングの表示・非表示、選択中の本体色の変更、
 /// 攻撃射程内外に応じた選択リングの色の切替、
-/// 通常攻撃(現時点では疑似通常攻撃)から呼び出す被弾時の短時間フラッシュを持つ。
-/// HP・ダメージ・死亡処理は今回実装しない。
+/// 通常攻撃から呼び出す被弾時の短時間フラッシュを持つ。
+/// HealthControllerの死亡イベントを受け取り、死亡時は選択不可にして短時間後に非表示化する。
 /// </summary>
 public class Targetable : MonoBehaviour
 {
@@ -34,20 +34,32 @@ public class Targetable : MonoBehaviour
     // 被弾フラッシュの表示時間(秒)。
     [SerializeField] private float _hitFlashDuration = 0.15f;
 
+    // 死亡後、死亡状態を確認できる時間(秒)。経過後にGameObjectを非表示にする。
+    [SerializeField] private float _deathHideDelay = 0.6f;
+
     private Collider _collider;
     private Color _defaultColor;
     private bool _isSelected;
     private bool _isInAttackRange;
     private Coroutine _hitFlashCoroutine;
+    private HealthController _healthController;
+    private bool _isDead;
 
     public bool IsSelected => _isSelected;
 
     /// <summary>攻撃射程内として表示中かどうか。PlayerBasicAttackControllerが毎フレーム更新する。</summary>
     public bool IsInAttackRange => _isInAttackRange;
 
+    /// <summary>死亡済みかどうか。死亡後はターゲットとして選択・攻撃できない。</summary>
+    public bool IsDead => _isDead;
+
+    /// <summary>自身のHealthController。持たない場合はnull。通常攻撃のダメージ処理から使用する。</summary>
+    public HealthController Health => _healthController;
+
     private void Awake()
     {
         _collider = GetComponent<Collider>();
+        _healthController = GetComponent<HealthController>();
 
         if (_bodyRenderer != null)
         {
@@ -58,6 +70,22 @@ public class Targetable : MonoBehaviour
         if (_selectionRing != null)
         {
             _selectionRing.SetActive(false);
+        }
+    }
+
+    private void OnEnable()
+    {
+        if (_healthController != null)
+        {
+            _healthController.Died += HandleDied;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (_healthController != null)
+        {
+            _healthController.Died -= HandleDied;
         }
     }
 
@@ -107,7 +135,7 @@ public class Targetable : MonoBehaviour
 
     /// <summary>
     /// 被弾時の視覚フィードバック。短時間だけフラッシュ色で点灯し、選択状態に応じた通常の色へ戻る。
-    /// 現時点では疑似通常攻撃(PlayerBasicAttackController)から呼び出す。
+    /// 通常攻撃(PlayerBasicAttackController)から呼び出す。
     /// </summary>
     public void PlayHitFlash()
     {
@@ -131,6 +159,41 @@ public class Targetable : MonoBehaviour
 
         ApplyCurrentColor();
         _hitFlashCoroutine = null;
+    }
+
+    /// <summary>
+    /// 死亡時の処理。選択不可にし、短時間死亡状態を表示した後にGameObjectを非表示にする。
+    /// Destroyは使わず非表示化するため、他コンポーネントからのMissing Referenceは発生しない。
+    /// </summary>
+    private void HandleDied()
+    {
+        if (_isDead)
+        {
+            return;
+        }
+
+        _isDead = true;
+
+        // 以後はクリックで選択できないよう、Colliderを無効化する。
+        if (_collider != null)
+        {
+            _collider.enabled = false;
+        }
+
+        // 選択リングを非表示にする(選択自体の解除はPlayerTargetSelectorが行う)。
+        if (_selectionRing != null)
+        {
+            _selectionRing.SetActive(false);
+        }
+
+        // 被弾フラッシュの後、短時間だけ死亡状態を確認できるようにしてから非表示にする。
+        StartCoroutine(DeathHideRoutine());
+    }
+
+    private IEnumerator DeathHideRoutine()
+    {
+        yield return new WaitForSeconds(_deathHideDelay);
+        gameObject.SetActive(false);
     }
 
     private void ApplyCurrentColor()
