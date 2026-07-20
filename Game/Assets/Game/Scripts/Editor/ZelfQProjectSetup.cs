@@ -40,6 +40,7 @@ public static class ZelfQProjectSetup
         SetObjectReference(serializedController, "_healthController", player.GetComponent<HealthController>());
         SetLayerMask(serializedController, "_groundLayer", 6);
         SetLayerMask(serializedController, "_targetableLayer", 7);
+        SetBoolean(serializedController, "_logCastResults", true);
         serializedController.ApplyModifiedPropertiesWithoutUndo();
 
         GameObject trainingDummy = GameObject.Find("TrainingDummy");
@@ -127,6 +128,12 @@ public static class ZelfQProjectSetup
     {
         SerializedProperty property = serializedObject.FindProperty(propertyName);
         if (property != null) property.floatValue = value;
+    }
+
+    private static void SetBoolean(SerializedObject serializedObject, string propertyName, bool value)
+    {
+        SerializedProperty property = serializedObject.FindProperty(propertyName);
+        if (property != null) property.boolValue = value;
     }
 }
 #endif

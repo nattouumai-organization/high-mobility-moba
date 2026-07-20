@@ -670,7 +670,7 @@ MonoBehaviour:
   _characterController: {fileID: 968542321}
   _characterStats: {fileID: 968542324}
   _targetSelector: {fileID: 968542325}
-  _healthController: {fileID: 968542327}
+  _clickMovement: {fileID: 968542322}
   _targetRange: 4.5
   _blinkStopDistance: 0.75
   _groundLayer:
@@ -684,10 +684,14 @@ MonoBehaviour:
   _cooldown: 6
   _sameTargetLockout: 1.25
   _minionCooldownReductionPercent: 0.5
-  _logCastResults: 0
+  _circleSegments: 64
+  _circleWidth: 0.035
+  _rangeCircleColor: {r: 1, g: 1, b: 1, a: 1}
+  _lockCircleColor: {r: 1, g: 1, b: 1, a: 0.95}
   _isQAvailable: 1
   _remainingCooldown: 0
   _isCurrentTargetLocked: 0
+  _isApproachingQTarget: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0

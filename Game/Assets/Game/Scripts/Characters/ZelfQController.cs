@@ -4,10 +4,6 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-/// <summary>
-/// ゼルフQの対象ブリンク、ダメージ、同一対象ロック、クールダウンを管理する。
-/// Input System Package の Keyboard.current を使用し、旧 Input Manager は使用しない。
-/// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
 [RequireComponent(typeof(PlayerTargetSelector))]
@@ -17,7 +13,7 @@ public sealed class ZelfQController : MonoBehaviour
     [SerializeField] private CharacterController _characterController;
     [SerializeField] private CharacterStats _characterStats;
     [SerializeField] private PlayerTargetSelector _targetSelector;
-    [SerializeField] private HealthController _healthController;
+    [SerializeField] private PlayerClickMovement _clickMovement;
 
     [Header("Targeting")]
     [SerializeField, Min(0f)] private float _targetRange = 4.5f;
@@ -34,284 +30,404 @@ public sealed class ZelfQController : MonoBehaviour
     [SerializeField, Min(0f)] private float _sameTargetLockout = 1.25f;
     [SerializeField, Range(0f, 1f)] private float _minionCooldownReductionPercent = 0.5f;
 
+    [Header("Circles")]
+    [SerializeField, Min(12)] private int _circleSegments = 64;
+    [SerializeField, Min(0.005f)] private float _circleWidth = 0.035f;
+    [SerializeField] private Color _rangeCircleColor = Color.white;
+    [SerializeField] private Color _lockCircleColor = new Color(0.2f, 0.7f, 1f, 0.95f);
+
     [Header("Debug (Runtime)")]
-    [SerializeField] private bool _logCastResults;
     [SerializeField] private bool _isQAvailable = true;
     [SerializeField] private float _remainingCooldown;
     [SerializeField] private bool _isCurrentTargetLocked;
+    [SerializeField] private bool _isApproachingQTarget;
 
-    private readonly Dictionary<Targetable, float> _targetLockExpiryTimes = new Dictionary<Targetable, float>();
+    private readonly Dictionary<Targetable, float> _locks = new Dictionary<Targetable, float>();
+    private readonly Dictionary<Targetable, LineRenderer> _lockCircles = new Dictionary<Targetable, LineRenderer>();
+    private Targetable _pendingTarget;
     private float _cooldownEndTime;
+    private bool _movementSuppressedUntilRightRelease;
+    private LineRenderer _rangeCircle;
+    private Material _rangeMaterial;
+    private Material _lockMaterial;
 
     public bool IsQAvailable => _isQAvailable;
     public float RemainingCooldown => _remainingCooldown;
     public bool IsCurrentTargetLocked => _isCurrentTargetLocked;
+    public bool IsApproachingQTarget => _isApproachingQTarget;
 
     private void Awake()
     {
-        if (_characterController == null) _characterController = GetComponent<CharacterController>();
-        if (_characterStats == null) _characterStats = GetComponent<CharacterStats>();
-        if (_targetSelector == null) _targetSelector = GetComponent<PlayerTargetSelector>();
-        if (_healthController == null) _healthController = GetComponent<HealthController>();
+        _characterController = _characterController != null ? _characterController : GetComponent<CharacterController>();
+        _characterStats = _characterStats != null ? _characterStats : GetComponent<CharacterStats>();
+        _targetSelector = _targetSelector != null ? _targetSelector : GetComponent<PlayerTargetSelector>();
+        _clickMovement = _clickMovement != null ? _clickMovement : GetComponent<PlayerClickMovement>();
+        CreateRangeCircle();
+    }
+
+    private void OnDestroy()
+    {
+        if (_rangeCircle != null) Destroy(_rangeCircle.gameObject);
+        foreach (LineRenderer circle in _lockCircles.Values) if (circle != null) Destroy(circle.gameObject);
+        if (_rangeMaterial != null) Destroy(_rangeMaterial);
+        if (_lockMaterial != null) Destroy(_lockMaterial);
     }
 
     private void Update()
     {
-        UpdateRuntimeState();
+        RestoreMovementAfterRightClickRelease();
+        UpdateCooldownAndLocks();
+        UpdateRangeCircle();
+        UpdateLockCircles();
 
         if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
         {
-            TryCast();
+            HandleQPressed();
         }
+        UpdatePendingCast();
     }
 
-    private void UpdateRuntimeState()
+    private void HandleQPressed()
     {
-        _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
-        _isQAvailable = _remainingCooldown <= 0f;
-
-        Targetable currentTarget = _targetSelector != null ? _targetSelector.CurrentTarget : null;
-        _isCurrentTargetLocked = IsTargetLocked(currentTarget);
-
-        if (_targetLockExpiryTimes.Count == 0) return;
-
-        List<Targetable> expiredTargets = null;
-        foreach (KeyValuePair<Targetable, float> pair in _targetLockExpiryTimes)
-        {
-            if (pair.Key == null || !pair.Key.isActiveAndEnabled || pair.Key.IsDead || Time.time >= pair.Value)
-            {
-                if (expiredTargets == null) expiredTargets = new List<Targetable>();
-                expiredTargets.Add(pair.Key);
-            }
-        }
-
-        if (expiredTargets == null) return;
-        foreach (Targetable target in expiredTargets) _targetLockExpiryTimes.Remove(target);
-    }
-
-    private void TryCast()
-    {
+        CancelPendingCast(false);
         if (!_isQAvailable)
         {
             Log("Zelf Q: クールダウン中です。");
             return;
         }
 
-        Targetable target = _targetSelector != null ? _targetSelector.CurrentTarget : null;
-        if (!IsValidCastTarget(target))
+        Targetable target = GetQTarget();
+        if (!CanCastAt(target, true)) return;
+        if (IsInRange(target))
         {
-            Log("Zelf Q: 有効なターゲットが選択されていません。");
+            Cast(target);
             return;
         }
 
-        if (target.Classification == TargetClassification.Tower)
+        _pendingTarget = target;
+        _isApproachingQTarget = true;
+        if (_clickMovement != null) _clickMovement.StopMovement();
+        Log("Zelf Q: 射程外のため自動接近を開始します。");
+    }
+
+    private void UpdatePendingCast()
+    {
+        if (_pendingTarget == null) return;
+        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
         {
-            Log("Zelf Q: Tower分類の対象には発動できません。");
+            CancelPendingCast(false);
+            Log("Zelf Q: 右クリック入力により自動接近を中止しました。");
             return;
         }
-
-        if (IsTargetLocked(target))
+        if (!_isQAvailable || !CanCastAt(_pendingTarget, false))
         {
-            Log("Zelf Q: この対象は同一対象ロック中です。");
+            CancelPendingCast(false);
             return;
         }
-
-        if (!IsInTargetRange(target))
+        if (!IsInRange(_pendingTarget))
         {
-            Log("Zelf Q: ターゲットが射程外です。");
-            return;
-        }
-
-        BlinkToTarget(target);
-        float actualDamage = ApplyDamage(target);
-        AddTargetLock(target);
-        StartCooldown();
-        ApplyHitCooldownResult(target.Classification);
-
-        Log($"Zelf Q: 発動成功。実ダメージ {actualDamage:0.##}。残りクールダウン {RemainingCooldown:0.##} 秒。");
-    }
-
-    private bool IsValidCastTarget(Targetable target)
-    {
-        return target != null
-            && target.isActiveAndEnabled
-            && !target.IsDead
-            && target.Health != null
-            && !target.Health.IsDead;
-    }
-
-    private bool IsInTargetRange(Targetable target)
-    {
-        Vector3 nearestPoint = target.GetClosestPoint(transform.position);
-        nearestPoint.y = transform.position.y;
-        Vector3 horizontalOffset = nearestPoint - transform.position;
-        horizontalOffset.y = 0f;
-        return horizontalOffset.sqrMagnitude <= _targetRange * _targetRange;
-    }
-
-    private void BlinkToTarget(Targetable target)
-    {
-        Vector3 nearestPoint = target.GetClosestPoint(transform.position);
-        Vector3 awayFromTarget = transform.position - nearestPoint;
-        awayFromTarget.y = 0f;
-
-        if (awayFromTarget.sqrMagnitude < 0.0001f)
-        {
-            awayFromTarget = transform.forward;
-            awayFromTarget.y = 0f;
-        }
-
-        awayFromTarget.Normalize();
-        Vector3 destination = nearestPoint + awayFromTarget * _blinkStopDistance;
-        destination.y = GetGroundedY(destination, transform.position.y);
-
-        // CharacterControllerが有効なままTransformを変更するとUnityの警告を出すため、
-        // 一時的に無効化してから安全に移動する。
-        bool wasEnabled = _characterController != null && _characterController.enabled;
-        if (wasEnabled) _characterController.enabled = false;
-        transform.position = destination;
-        if (wasEnabled) _characterController.enabled = true;
-    }
-
-    private float GetGroundedY(Vector3 position, float fallbackY)
-    {
-        if (_groundLayer.value == 0) return fallbackY;
-
-        const float rayStartHeight = 10f;
-        const float rayLength = 30f;
-        Vector3 rayStart = new Vector3(position.x, fallbackY + rayStartHeight, position.z);
-        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, rayLength, _groundLayer, QueryTriggerInteraction.Ignore))
-        {
-            return hit.point.y;
-        }
-
-        return fallbackY;
-    }
-
-    private float ApplyDamage(Targetable target)
-    {
-        float damage = _baseDamage + _characterStats.CurrentAttackDamage * _adRatio;
-        float actualDamage = target.Health.TakeDamage(damage);
-        if (actualDamage <= 0f) return 0f;
-
-        target.PlayHitFlash();
-        NotifyExistingCombatSystems(actualDamage, target);
-        return actualDamage;
-    }
-
-    // 既存のダメージ表示とゼルフPをQでも共通利用するため、実装側の公開メソッドを呼び出す。
-    // 互換性のため候補名を順番に解決し、対象メソッドが存在しない場合もQ本体は安全に動作する。
-    private void NotifyExistingCombatSystems(float actualDamage, Targetable target)
-    {
-        foreach (MonoBehaviour component in GetComponents<MonoBehaviour>())
-        {
-            if (component == null) continue;
-            if (component.GetType().Name == "ZelfPassiveHeal")
+            Vector3 direction = _pendingTarget.GetClosestPoint(transform.position) - transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.0001f)
             {
-                InvokeDamageReceiver(component, actualDamage, target);
+                _characterController.Move(direction.normalized * _characterStats.CurrentMoveSpeed * Time.deltaTime);
             }
-        }
-
-        Type combatTextManagerType = FindType("CombatTextManager");
-        if (combatTextManagerType == null) return;
-
-        InvokeCombatText(combatTextManagerType, "ShowDamageDealt", actualDamage, target.transform);
-        InvokeCombatText(combatTextManagerType, "ShowDamageTaken", actualDamage, target.transform);
-    }
-
-    private static void InvokeDamageReceiver(MonoBehaviour receiver, float damage, Targetable target)
-    {
-        string[] candidateNames = { "HandleDamageDealt", "OnDamageDealt", "NotifyDamageDealt" };
-        foreach (string methodName in candidateNames)
-        {
-            MethodInfo method = receiver.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (method == null) continue;
-
-            ParameterInfo[] parameters = method.GetParameters();
-            if (parameters.Length == 2 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == typeof(TargetClassification))
-            {
-                method.Invoke(receiver, new object[] { damage, target.Classification });
-                return;
-            }
-        }
-    }
-
-    private static void InvokeCombatText(Type managerType, string methodName, float damage, Transform targetTransform)
-    {
-        MethodInfo[] methods = managerType.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-        foreach (MethodInfo method in methods)
-        {
-            if (method.Name != methodName) continue;
-            ParameterInfo[] parameters = method.GetParameters();
-            object[] arguments = BuildCombatTextArguments(parameters, damage, targetTransform);
-            if (arguments == null) continue;
-            method.Invoke(null, arguments);
             return;
         }
+
+        Targetable target = _pendingTarget;
+        CancelPendingCast(true);
+        Cast(target);
     }
 
-    private static object[] BuildCombatTextArguments(ParameterInfo[] parameters, float damage, Transform targetTransform)
+    private void Cast(Targetable target)
     {
-        object[] result = new object[parameters.Length];
-        for (int index = 0; index < parameters.Length; index++)
+        if (!CanCastAt(target, true) || !IsInRange(target)) return;
+        BlinkTo(target);
+        StopMovementAfterQCast();
+
+        HealthController health = GetHealth(target);
+        float actualDamage = health.TakeDamage(_baseDamage + _characterStats.CurrentAttackDamage * _adRatio);
+        if (actualDamage > 0f)
         {
-            Type parameterType = parameters[index].ParameterType;
-            if (parameterType == typeof(float)) result[index] = damage;
-            else if (parameterType == typeof(int)) result[index] = Mathf.RoundToInt(damage);
-            else if (parameterType == typeof(Transform)) result[index] = targetTransform;
-            else if (parameterType == typeof(Vector3)) result[index] = targetTransform.position;
-            else if (parameterType == typeof(GameObject)) result[index] = targetTransform.gameObject;
-            else return null;
+            target.PlayHitFlash();
+            NotifyCombatSystems(actualDamage, target);
         }
-        return result;
+
+        _locks[target] = Time.time + _sameTargetLockout;
+        CreateLockCircle(target);
+        _cooldownEndTime = Time.time + _cooldown;
+        if (target.Classification == TargetClassification.Character || target.Classification == TargetClassification.TrainingDummy)
+        {
+            _cooldownEndTime = Time.time;
+        }
+        else if (target.Classification == TargetClassification.Minion)
+        {
+            _cooldownEndTime = Time.time + Mathf.Max(0f, _cooldownEndTime - Time.time) * (1f - _minionCooldownReductionPercent);
+        }
+        Log("Zelf Q: 発動成功。");
     }
 
-    private static Type FindType(string typeName)
+    private void StopMovementAfterQCast()
     {
-        foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+        if (_clickMovement == null) return;
+        _clickMovement.StopMovement();
+        if (Mouse.current != null && Mouse.current.rightButton.isPressed)
         {
-            Type type = assembly.GetType(typeName);
-            if (type != null) return type;
+            _clickMovement.enabled = false;
+            _movementSuppressedUntilRightRelease = true;
+        }
+    }
+
+    private void RestoreMovementAfterRightClickRelease()
+    {
+        if (!_movementSuppressedUntilRightRelease) return;
+        if (Mouse.current != null && Mouse.current.rightButton.isPressed) return;
+        if (_clickMovement != null) _clickMovement.enabled = true;
+        _movementSuppressedUntilRightRelease = false;
+    }
+
+    private void CancelPendingCast(bool stopMovement)
+    {
+        _pendingTarget = null;
+        _isApproachingQTarget = false;
+        if (stopMovement && _clickMovement != null) _clickMovement.StopMovement();
+    }
+
+    private Targetable GetQTarget()
+    {
+        if (TryGetTargetUnderMouse(out Targetable mouseTarget)) return mouseTarget;
+        if (_targetSelector != null && _targetSelector.CurrentTarget != null) return _targetSelector.CurrentTarget;
+        foreach (Targetable candidate in FindObjectsByType<Targetable>(FindObjectsSortMode.None))
+        {
+            if (candidate != null && candidate.isActiveAndEnabled && candidate.IsSelected) return candidate;
         }
         return null;
     }
 
-    private void AddTargetLock(Targetable target)
+    private bool TryGetTargetUnderMouse(out Targetable target)
     {
-        _targetLockExpiryTimes[target] = Time.time + _sameTargetLockout;
+        target = null;
+        if (Mouse.current == null || Camera.main == null || _targetableLayer.value == 0) return false;
+        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+        if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _targetableLayer, QueryTriggerInteraction.Ignore)) return false;
+        target = hit.collider.GetComponentInParent<Targetable>();
+        return target != null;
     }
 
-    private bool IsTargetLocked(Targetable target)
+    private bool CanCastAt(Targetable target, bool log)
     {
-        return target != null
-            && _targetLockExpiryTimes.TryGetValue(target, out float expiresAt)
-            && Time.time < expiresAt;
-    }
-
-    private void StartCooldown()
-    {
-        _cooldownEndTime = Time.time + _cooldown;
-        _remainingCooldown = _cooldown;
-        _isQAvailable = _cooldown <= 0f;
-    }
-
-    private void ApplyHitCooldownResult(TargetClassification classification)
-    {
-        if (classification == TargetClassification.Character || classification == TargetClassification.TrainingDummy)
+        if (target == null)
         {
-            _cooldownEndTime = Time.time;
+            if (log) Log("Zelf Q: マウスを有効な敵に合わせてQを押してください。");
+            return false;
         }
-        else if (classification == TargetClassification.Minion)
+        HealthController health = GetHealth(target);
+        if (!target.isActiveAndEnabled || target.IsDead || health == null || health.IsDead)
         {
-            float remaining = Mathf.Max(0f, _cooldownEndTime - Time.time);
-            _cooldownEndTime = Time.time + remaining * (1f - _minionCooldownReductionPercent);
+            if (log) Log("Zelf Q: 対象が無効または死亡済みです。");
+            return false;
         }
+        if (target.Classification == TargetClassification.Tower)
+        {
+            if (log) Log("Zelf Q: Tower分類の対象には発動できません。");
+            return false;
+        }
+        if (IsLocked(target))
+        {
+            if (log) Log("Zelf Q: この対象は同一対象ロック中です。");
+            return false;
+        }
+        return true;
+    }
 
-        UpdateRuntimeState();
+    private static HealthController GetHealth(Targetable target)
+    {
+        return target == null ? null : target.Health != null ? target.Health : target.GetComponent<HealthController>();
+    }
+
+    private bool IsInRange(Targetable target)
+    {
+        Vector3 difference = target.GetClosestPoint(transform.position) - transform.position;
+        difference.y = 0f;
+        return difference.sqrMagnitude <= _targetRange * _targetRange;
+    }
+
+    private void BlinkTo(Targetable target)
+    {
+        Vector3 closest = target.GetClosestPoint(transform.position);
+        Vector3 away = transform.position - closest;
+        away.y = 0f;
+        if (away.sqrMagnitude < 0.0001f) away = transform.forward;
+        away.y = 0f;
+        away.Normalize();
+
+        Vector3 destination = closest + away * _blinkStopDistance;
+        if (_groundLayer.value != 0 && Physics.Raycast(new Vector3(destination.x, transform.position.y + 20f, destination.z), Vector3.down, out RaycastHit hit, 50f, _groundLayer, QueryTriggerInteraction.Ignore))
+        {
+            destination.y = hit.point.y + _characterController.height * 0.5f - _characterController.center.y + _characterController.skinWidth;
+        }
+        else destination.y = transform.position.y;
+
+        bool enabled = _characterController.enabled;
+        _characterController.enabled = false;
+        transform.position = destination;
+        _characterController.enabled = enabled;
+        FaceTargetImmediately(target);
+    }
+
+    // ブリンク完了と同じフレームに、Playerを対象の水平方向へ向ける。
+    // PlayerMouseFacingの内部ターゲット回転も更新し、次フレームに以前の右クリック方向へ戻さない。
+    private void FaceTargetImmediately(Targetable target)
+    {
+        if (target == null) return;
+        Vector3 direction = target.transform.position - transform.position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.0001f) return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        transform.rotation = targetRotation;
+
+        PlayerMouseFacing mouseFacing = GetComponent<PlayerMouseFacing>();
+        if (mouseFacing == null) return;
+
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        FieldInfo rotationField = typeof(PlayerMouseFacing).GetField("_targetRotation", flags);
+        FieldInfo hasRotationField = typeof(PlayerMouseFacing).GetField("_hasTargetRotation", flags);
+        if (rotationField != null) rotationField.SetValue(mouseFacing, targetRotation);
+        if (hasRotationField != null) hasRotationField.SetValue(mouseFacing, true);
+    }
+
+    private void UpdateCooldownAndLocks()
+    {
+        _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
+        _isQAvailable = _remainingCooldown <= 0f;
+        _isCurrentTargetLocked = IsLocked(GetQTarget());
+        List<Targetable> remove = null;
+        foreach (KeyValuePair<Targetable, float> pair in _locks)
+        {
+            if (pair.Key == null || !pair.Key.isActiveAndEnabled || pair.Key.IsDead || Time.time >= pair.Value)
+            {
+                if (remove == null) remove = new List<Targetable>();
+                remove.Add(pair.Key);
+            }
+        }
+        if (remove == null) return;
+        foreach (Targetable target in remove)
+        {
+            _locks.Remove(target);
+            if (_lockCircles.TryGetValue(target, out LineRenderer circle) && circle != null) Destroy(circle.gameObject);
+            _lockCircles.Remove(target);
+        }
+    }
+
+    private bool IsLocked(Targetable target)
+    {
+        return target != null && _locks.TryGetValue(target, out float expiry) && Time.time < expiry;
+    }
+
+    private void CreateRangeCircle()
+    {
+        GameObject objectForCircle = new GameObject("Zelf Q Range Circle");
+        objectForCircle.transform.SetParent(transform, false);
+        _rangeCircle = objectForCircle.AddComponent<LineRenderer>();
+        _rangeMaterial = CreateMaterial(_rangeCircleColor);
+        ConfigureCircle(_rangeCircle, _rangeMaterial, _rangeCircleColor);
+        _rangeCircle.enabled = false;
+    }
+
+    private void UpdateRangeCircle()
+    {
+        bool visible = Keyboard.current != null && Keyboard.current.qKey.isPressed;
+        _rangeCircle.enabled = visible;
+        if (!visible) return;
+        _rangeCircle.transform.localPosition = new Vector3(0f, _characterController.center.y - _characterController.height * 0.5f + 0.025f, 0f);
+        DrawCircle(_rangeCircle, _targetRange, 1f, true);
+    }
+
+    private void CreateLockCircle(Targetable target)
+    {
+        if (_lockCircles.TryGetValue(target, out LineRenderer oldCircle) && oldCircle != null) Destroy(oldCircle.gameObject);
+        GameObject objectForCircle = new GameObject("Zelf Q Same Target Lock");
+        objectForCircle.transform.SetParent(target.transform, false);
+        LineRenderer circle = objectForCircle.AddComponent<LineRenderer>();
+        if (_lockMaterial == null) _lockMaterial = CreateMaterial(_lockCircleColor);
+        ConfigureCircle(circle, _lockMaterial, _lockCircleColor);
+        _lockCircles[target] = circle;
+    }
+
+    private void UpdateLockCircles()
+    {
+        foreach (KeyValuePair<Targetable, LineRenderer> pair in _lockCircles)
+        {
+            if (pair.Key == null || pair.Value == null || !_locks.TryGetValue(pair.Key, out float expiry)) continue;
+            Collider collider = pair.Key.GetComponent<Collider>();
+            float y = collider == null ? 0f : collider.bounds.min.y - pair.Key.transform.position.y + 0.03f;
+            float radius = collider == null ? 0.6f : Mathf.Max(0.45f, Mathf.Max(collider.bounds.size.x, collider.bounds.size.z) * 0.65f);
+            pair.Value.transform.localPosition = new Vector3(0f, y, 0f);
+            DrawCircle(pair.Value, radius, Mathf.Clamp01((expiry - Time.time) / _sameTargetLockout), false);
+        }
+    }
+
+    private void ConfigureCircle(LineRenderer line, Material material, Color color)
+    {
+        line.useWorldSpace = false;
+        line.material = material;
+        line.startColor = color;
+        line.endColor = color;
+        line.startWidth = _circleWidth;
+        line.endWidth = _circleWidth;
+        line.numCornerVertices = 4;
+        line.numCapVertices = 4;
+        line.alignment = LineAlignment.View;
+        line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        line.receiveShadows = false;
+    }
+
+    private void DrawCircle(LineRenderer line, float radius, float amount, bool loop)
+    {
+        int segments = Mathf.Max(12, _circleSegments);
+        int count = loop ? segments + 1 : Mathf.Max(2, Mathf.CeilToInt(segments * Mathf.Clamp01(amount)) + 1);
+        line.loop = loop;
+        line.positionCount = count;
+        float angleLimit = loop ? Mathf.PI * 2f : Mathf.PI * 2f * Mathf.Clamp01(amount);
+        for (int i = 0; i < count; i++)
+        {
+            float angle = angleLimit * i / (count - 1);
+            line.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius));
+        }
+    }
+
+    private static Material CreateMaterial(Color color)
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Sprites/Default");
+        Material material = new Material(shader);
+        material.color = color;
+        return material;
+    }
+
+    private void NotifyCombatSystems(float damage, Targetable target)
+    {
+        foreach (MonoBehaviour component in GetComponents<MonoBehaviour>())
+        {
+            if (component == null || component.GetType().Name != "ZelfPassiveHeal") continue;
+            foreach (string name in new[] { "HandleDamageDealt", "OnDamageDealt", "NotifyDamageDealt" })
+            {
+                MethodInfo method = component.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (method == null) continue;
+                ParameterInfo[] parameters = method.GetParameters();
+                if (parameters.Length == 2 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == typeof(TargetClassification))
+                {
+                    method.Invoke(component, new object[] { damage, target.Classification });
+                    break;
+                }
+            }
+        }
     }
 
     private void Log(string message)
     {
-        if (_logCastResults) Debug.Log(message, this);
+        Debug.Log(message, this);
     }
 }
