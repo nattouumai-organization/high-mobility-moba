@@ -30,6 +30,11 @@
 - 通常攻撃のダメージ処理を実装。射程内のターゲットへ攻撃間隔ごとにCurrent Attack Damage(Player初期値20)を即時に与え、既存の被弾フラッシュを発生させる。
 - TrainingDummyの死亡処理を実装。HP 0でCollider無効化・選択不可・ターゲット解除・攻撃停止・HPバー非表示となり、短時間死亡状態を表示した後にGameObjectを非表示化する(Destroy不使用でMissing Referenceを防止)。
 - Playerの死亡処理を実装(PlayerDeathHandler)。HP 0でPlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerを無効化し、見た目とHPバーを非表示にする。リスポーンは未実装。
+- CharacterData ScriptableObjectを追加(Scripts/Characters)。キャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータスと成長値、P/Q/W/E/Rのスキル説明を保持する。実行中の現在ステータスは従来どおりCharacterStats / HealthControllerが扱い、SC_PrototypeのPlayerへはまだ適用しない。
+- ゼルフのCharacterData(Data/Characters/ZelfData.asset)を追加。基礎ステータス(HP650・HP成長105・HP自動回復3.5/+0.35・AD60/+4.5・AS0.80/+3.0%・AR28/+4.0・MS360・射程200)とP/Q/W/E/Rのスキル説明を設定。
+- キャラクター選択画面SC_CharacterSelectを追加。タイトル・サブタイトルと、5キャラクター分のカード(名前・イメージカラー・役割・利用可能状態)を表示する。Availableのゼルフのみ選択可能で、朧・ヴォルブラーク・リネス・リーゼロッテ・ヴァイスはComing Soon表示の半透明・選択不可。選択中のカードは明るい枠線とカードの明度上昇で表示し、画面下部に選択中キャラクター名を表示する。
+- ゼルフ詳細パネルを追加。名前・役割・Short Description・イメージカラーの大きな仮プレースホルダー・基礎ステータス(HP/AD/AS/AR/MS/AA Range)・P〜Rの短いスキル一覧を表示する。スキルの詳細説明はCharacterDataが保持し、将来ツールチップや別パネルとして表示できる(今回は未実装)。
+- 「プロトタイプを開始」ボタンを追加。選択したCharacterDataをCharacterSelectionManager(DontDestroyOnLoad・二重生成防止)が保持したままSC_Prototypeを読み込む。SC_CharacterSelectとSC_PrototypeをBuild SettingsのScene Listへ登録し、起動時はSC_CharacterSelectから始まる。
 
 ### Changed
 

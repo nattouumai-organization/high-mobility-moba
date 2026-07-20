@@ -113,6 +113,8 @@ PlayerTargetSelector
 PlayerBasicAttackController
 PlayerDeathHandler
 Targetable
+CharacterSelectionManager
+CharacterSelectionUI
 ```
 
 - `CharacterData` はScriptableObject。
@@ -126,6 +128,10 @@ Targetable
 - `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後にGameObjectを非表示化する。
 - `PlayerDeathHandler` はPlayerの死亡イベントを受け取り、PlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerと見た目(Renderer)を無効化する。リスポーンは未実装。
 - `WorldHealthBar`(Scripts/UI)はHealthControllerのHP変化・死亡イベントを購読し、World Space Canvas上のUI ImageのFill AmountでHPバーを表示する。バーは毎フレームMain Cameraの向きに揃え、対象の死亡時は非表示になる。
+- `CharacterData`(Scripts/Characters)はキャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータス・成長値、P/Q/W/E/Rのスキル説明を保持するScriptableObject。第1弾としてData/Characters/ZelfData.assetを作成済み。SC_PrototypeのPlayerへはまだ適用しない。
+- `CharacterSelectionManager` は選択中のCharacterDataを保持する常駐マネージャー。DontDestroyOnLoadでシーン遷移後も参照でき、二重生成時は後から生成された方を破棄する(セーブデータ化はしない)。
+- `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。
+- 起動シーンはSC_CharacterSelectとし、「プロトタイプを開始」ボタンでSC_Prototypeを読み込む(Build SettingsのScene Listへ両シーンを登録)。
 
 ### Skills
 

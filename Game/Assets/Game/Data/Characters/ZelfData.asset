@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a8b2c7e9f14360a7b3c1d8e2f65a90, type: 3}
+  m_Name: ZelfData
+  m_EditorClassIdentifier: 
+  _characterId: Zelf
+  _displayName: ゼルフ
+  _roleName: 高機動近接ファイター
+  _shortDescription: 双頭剣で敵を切り裂き、連続ブリンクで戦場を駆ける青の剣士。
+  _themeColor: {r: 0.2, g: 0.45, b: 1, a: 1}
+  _characterStatus: 0
+  _baseHp: 650
+  _hpGrowth: 105
+  _baseHpRegeneration: 3.5
+  _hpRegenerationGrowth: 0.35
+  _baseAttackDamage: 60
+  _attackDamageGrowth: 4.5
+  _baseAttackSpeed: 0.8
+  _attackSpeedGrowthPercent: 3
+  _baseArmor: 28
+  _armorGrowth: 4
+  _baseMoveSpeed: 360
+  _baseAttackRange: 200
+  _passiveDescription: 敵ヒーローに与えたダメージの5%を回復する。ミニオンに対する回復量は半減。
+  _qDescription: ミニオンまたは敵ヒーローへブリンクしてダメージを与える。同じ対象には短時間連続して使用できない。他のスキルを当てると再使用可能になる。
+  _wDescription: 双頭剣を回転させ、短時間だけ前方から受ける通常ダメージを軽減する。
+  _eDescription: 指定方向へダッシュし、経路と少し先の敵へダメージを与える。敵ヒーローに命中するとQを即時再使用可能にする。
+  _rDescription: 敵を中心に決闘エリアを作る。周囲の敵とミニオンを外へ押し出し、エリア内の敵をスロウする。共通Dで弾かれた場合は不発。
