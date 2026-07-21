@@ -172,7 +172,8 @@ public class PlayerBasicAttackController : MonoBehaviour
         HealthController targetHealth = target.Health;
         if (targetHealth != null)
         {
-            float actualDamage = targetHealth.TakeDamage(_characterStats.CurrentAttackDamage);
+            // 攻撃者としてPlayerのTransformを渡す(通常ダメージ)。受けた側のダメージ軽減(ゼルフWなど)が前方判定に使用する。
+            float actualDamage = targetHealth.TakeDamage(_characterStats.CurrentAttackDamage, transform);
 
             if (actualDamage > 0f)
             {

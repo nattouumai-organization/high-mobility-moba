@@ -5,6 +5,7 @@ using UnityEngine;
 /// Playerの被ダメージ表示(黄)とHP減少をテストするために使用する。
 /// 攻撃対象(PlayerのHealthController)が攻撃射程内にいる場合のみ、攻撃間隔ごとに即時ダメージを与え、
 /// 実際に与えたダメージ量を受けた側(Player)の頭上に黄色で表示する。
+/// 攻撃者として自身のTransformを渡すため、PlayerのゼルフW(前方ダメージ軽減)の前方判定対象になる。
 /// 攻撃力・攻撃速度・攻撃射程はInspectorで設定し、C#コードへ直接書かない。
 /// 自身が死亡している間(復活待ち)、または対象が死亡している間は攻撃しない。
 /// 移動・回転・追跡・弾丸・投射物・攻撃アニメーション・敵AIは今回実装しない。
@@ -81,11 +82,12 @@ public class DummyAutoAttack : MonoBehaviour
     private void Attack()
     {
         // 即時ダメージを与え、実際に減少させたHP量(実ダメージ)を受け取る(弾丸・投射物は使わない)。
-        float actualDamage = _targetHealth.TakeDamage(_attackDamage);
+        // 攻撃者として自身のTransformを渡す(通常ダメージ)。PlayerのゼルフWが前方判定に使用する。
+        float actualDamage = _targetHealth.TakeDamage(_attackDamage, transform);
 
         if (actualDamage > 0f)
         {
-            // プレイヤー視点の被ダメージ表示: 受けた側(Player)の頭上に黄色で表示する。
+            // プレイヤー視点の被ダメージ表示: 受けた側(Player)の頭上に黄色で表示する(軽減後の実ダメージ量)。
             CombatTextManager.ShowDamageTaken(_targetHealth.transform.position, actualDamage);
         }
 

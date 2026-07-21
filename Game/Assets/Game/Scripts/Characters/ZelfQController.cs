@@ -56,6 +56,36 @@ public sealed class ZelfQController : MonoBehaviour
     public bool IsCurrentTargetLocked => _isCurrentTargetLocked;
     public bool IsApproachingQTarget => _isApproachingQTarget;
 
+    /// <summary>InspectorのGround用LayerMask。ゼルフEなど他スキルが同じレイヤー設定を共有するために公開する。</summary>
+    public LayerMask GroundLayerMask => _groundLayer;
+
+    /// <summary>InspectorのTargetable用LayerMask。ゼルフEなど他スキルが同じレイヤー設定を共有するために公開する。</summary>
+    public LayerMask TargetableLayerMask => _targetableLayer;
+
+    /// <summary>
+    /// Qの残りクールダウンだけを即時0にする(ゼルフEのCharacter分類命中時などから呼び出す)。
+    /// Same Target Lockoutは解除・削除せず、Q自動接近中の状態も変更しない。Reflectionは使用しない。
+    /// </summary>
+    public void ResetCooldown()
+    {
+        _cooldownEndTime = Time.time;
+        _remainingCooldown = 0f;
+        _isQAvailable = true;
+    }
+
+    /// <summary>
+    /// Q射程外の自動接近中であれば中止する(ゼルフEの発動時などから呼び出す)。自動接近中でなければ何もしない。
+    /// </summary>
+    public void CancelPendingApproach()
+    {
+        if (_pendingTarget == null)
+        {
+            return;
+        }
+
+        CancelPendingCast(false);
+    }
+
     private void Awake()
     {
         _characterController = _characterController != null ? _characterController : GetComponent<CharacterController>();
@@ -155,7 +185,9 @@ public sealed class ZelfQController : MonoBehaviour
         StopMovementAfterQCast();
 
         HealthController health = GetHealth(target);
-        float actualDamage = health.TakeDamage(_baseDamage + _characterStats.CurrentAttackDamage * _adRatio);
+
+        // 攻撃者としてPlayerのTransformを渡す(通常ダメージ)。受けた側のダメージ軽減(ゼルフWなど)が前方判定に使用する。
+        float actualDamage = health.TakeDamage(_baseDamage + _characterStats.CurrentAttackDamage * _adRatio, transform);
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

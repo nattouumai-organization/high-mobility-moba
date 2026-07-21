@@ -25,6 +25,11 @@
 ### Added
 
 - PlayerMouseFacingへ、外部スクリプトから安全に目標回転を更新できるpublicメソッドを追加(SetLookTarget: ワールド座標指定 / SetLookDirection: 方向ベクトル指定)。Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。実際の回転は従来どおり毎フレームInspectorのRotation Speed設定で行われ、右クリックによる回転仕様は変更しない。
+- ゼルフWの前方ダメージ軽減を実装(ZelfWController、Scripts/Characters)。Wキー(Input System)で0.75秒間、前方120度から受ける通常ダメージだけを55%軽減する(Duration / Cooldown 10秒 / Front Angle / Damage ReductionはいずれもInspector設定)。前方判定はダメージを受けた瞬間のPlayerのtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で被ダメージごとに行い、背後・側面からのダメージ、攻撃者情報が取得できないダメージ、確定ダメージ(将来用)は軽減しない。Wは攻撃技ではなくダメージ・ノックバック・スロウ・スタン・スネアを与えず、CC無効化・無敵・対象指定不可・シールドも持たない。W中も右クリック移動・マウス方向への回転・通常攻撃・Q・Eは制限しない。発動中の再入力では持続時間の延長・再発動をせず、クールダウン中は発動しない。持続中はPlayer前方に青い扇形のLineRenderer防御エフェクトを表示し(Playerの回転に追従)、W終了時に非表示になる。軽減発生時はDebug.Logで確認でき、軽減後の実ダメージは既存の被ダメージ表示で表示される。
+- ゼルフEの方向ダッシュを実装(ZelfEController、Scripts/Characters)。Eキー(Input System)でマウスカーソルが指すGround上の地点の方向へ、Dash Distance 4.0 Unity unitsをDash Duration 0.18秒かけてダッシュする(Cooldown 8秒、いずれもInspector設定)。マウスがGroundを指していない場合・マウス地点が近すぎる場合・クールダウン中は発動しない。ブリンクではなく時間をかけた移動で、ダッシュ中は地面へ傾かず、Y座標はGroundへのレイキャストで適切な高さを維持する。発動時にPlayerClickMovementの通常移動を停止し、ゼルフQの自動接近中であれば中止する。ダッシュ中は右クリック移動・通常攻撃の自動接近を一時停止するため中断されず、CharacterControllerを無効化して位置を直接更新するため対象のColliderに引っかかって止まり続けない(終了時に対象と重なったままの場合はダッシュ方向へ押し出して安全な位置へ補正)。E終了後は右クリック移動・通常攻撃・Q・Wが通常どおり動き、Playerはダッシュ方向を向く(PlayerMouseFacingのpublic APIで目標回転も更新)。ダッシュ中は青いTrailRendererの残像を表示し、終了後短時間で消える。NavMesh / NavMeshAgentは使用しない。
+- ゼルフEの経路命中判定を実装。ダッシュ開始地点から終点までと、終点からEnd Extension 0.75 Unity units先までを、Hit Radius 0.60のカプセル判定でTargetableLayerのみ判定し、有効なTargetableへ E Damage = Base Damage 20 + Current Attack Damage × AD Ratio 50%(AD60で50)の通常ダメージをHealthController経由・攻撃者情報付きで与える。同じTargetableにはE 1回につき1回だけダメージを与え、死亡・無効化・破棄された対象には与えない(Tower分類にも今回のEダメージは与える)。命中対象ごとに、HPバー・被弾フラッシュ・赤色の与ダメージ表示・死亡処理・ゼルフPの与ダメージ回復が既存どおり発生する。
+- ゼルフE命中時のQ即時再使用を実装。EがCharacter分類のTargetable(Character分類のTrainingDummyを含む)へ1体以上命中した場合、ZelfQController.ResetCooldown()でQの残りクールダウンを即時0にする(Debug.Logで確認できる)。Minion分類だけ・Tower分類だけへの命中、または誰にも命中しなかった場合はQをリセットしない。Qを即時再使用可能にしても既存のSame Target Lockoutは解除せず、Qの対象ルール・射程外自動接近仕様も変更しない。
+- ダメージ処理へ攻撃者情報と通常ダメージ分類を追加(Scripts/Combat/DamageInfo.cs: DamageType / DamageContext / IIncomingDamageModifier)。HealthController.TakeDamageが攻撃者のTransformとダメージ種別(Normal / True)を受け取れるようになり、HPへ適用する直前に同じGameObject上のIIncomingDamageModifier(ゼルフWなど)がDamageContext(攻撃者・ダメージ種別・元ダメージ)を使ってダメージ量を変更できる。通常ダメージ(Normal)だけが軽減対象で、確定ダメージ(True)は将来の朧R処刑・ヴォルブラークR反射用の分類のみ用意し今回は使用しない。通常攻撃(PlayerBasicAttackController)・ゼルフQ・ゼルフE・DummyAutoAttackは攻撃者情報を渡すよう更新し、従来のTakeDamage(ダメージ量のみ)も攻撃者なしの通常ダメージとして互換動作する。与ダメージ表示・被ダメージ表示・ゼルフP回復・HPバー・死亡処理の既存経路は変更しない。
 
 ### Changed
 
@@ -35,6 +40,7 @@
 - 視点仕様を整理: Playerは移動している方向へ視点が向き、ブリンクした場合はブリンクした方向を向くことを基本とする。Q射程外の自動接近中に視点が移動方向へ向かない問題を修正(接近中は毎フレームPlayerMouseFacing.SetLookDirection()へ移動方向を渡し、回転自体は従来どおりRotation Speed設定で行う)。
 - Qブリンク後の向きを「対象の方向」から「ブリンクした方向」へ変更(通常は同じ方向。ブリンク移動量がほぼゼロの場合のみ対象の方向へフォールバック)。視点方向は各スキル・移動処理がPlayerMouseFacingのpublic APIへ明示的に方向を渡して指定する構成のため、将来の「ブリンク方向と視点方向が異なるスキル」は別の方向を渡すだけで実装できる。
 - ゼルフQ実装時にCHANGELOG.md先頭の形式例(コードブロック)内へ自動挿入されていた2026-07-21のQ実装記録を、正しい2026-07-21のAdded節へ移動(形式例は元のYYYY-MM-DDテンプレートへ復元)。
+- ZelfQControllerへスキル間連携用のpublic APIを追加: ResetCooldown()(Qの残りクールダウンだけを即時0にする。Same Target Lockout・Q自動接近中の状態は変更しない)/ CancelPendingApproach()(Q射程外の自動接近中であれば中止する)/ GroundLayerMask・TargetableLayerMask(他スキルがInspectorのLayerMask設定を共有するための読み取り専用プロパティ。ZelfEControllerはLayerMask未設定時にこれを自動使用する)。スキル間の連携はReflectionではなくpublicメソッドの直接呼び出しで行う。ゼルフQ本体の対象ルール・同一対象ロック・分類別クールダウン処理は変更なし(Q・通常攻撃・DummyAutoAttackのTakeDamage呼び出しへ攻撃者情報を追加)。
 
 ### Removed
 
@@ -111,7 +117,7 @@
   - リネス
   - リーゼロッテ・ヴァイス
 - Windows / Steam向け、基本プレイ無料、CGアニメ調の方針を決定。
-- ���本拠地破壊を勝利条件として決定。
+- 敵本拠地破壊を勝利条件として決定。
 - 1レーン、各陣営タワー1本・本拠地1つのマップ構成を決定。
 - ゴールドと経験値を統合したポイント制を決定。
 - レベル上限を6とする案を決定。
