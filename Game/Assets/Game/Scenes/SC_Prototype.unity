@@ -711,7 +711,7 @@ MonoBehaviour:
   _frontAngle: 120
   _damageReduction: 0.55
   _shieldColor: {r: 0.25, g: 0.6, b: 1, a: 0.9}
-  _shieldRadius: 1.1
+  _shieldRadius: 1.5
   _shieldWidth: 0.06
   _shieldSegments: 24
   _isWActive: 0
@@ -733,11 +733,13 @@ MonoBehaviour:
   _clickMovement: {fileID: 968542322}
   _basicAttackController: {fileID: 968542326}
   _qController: {fileID: 968542333}
+  _wController: {fileID: 0}
   _dashDistance: 4
   _dashDuration: 0.18
   _hitRadius: 0.6
-  _endExtension: 0.75
   _minCastDistance: 0.1
+  _waveDistance: 3
+  _waveSpeed: 10
   _baseDamage: 20
   _adRatio: 0.5
   _cooldown: 8
