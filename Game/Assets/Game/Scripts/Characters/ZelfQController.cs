@@ -1,6 +1,4 @@
-using System;
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -50,6 +48,8 @@ public sealed class ZelfQController : MonoBehaviour
     private LineRenderer _rangeCircle;
     private Material _rangeMaterial;
     private Material _lockMaterial;
+    private PlayerMouseFacing _mouseFacing;
+    private ZelfPassiveHeal _passiveHeal;
 
     public bool IsQAvailable => _isQAvailable;
     public float RemainingCooldown => _remainingCooldown;
@@ -62,6 +62,8 @@ public sealed class ZelfQController : MonoBehaviour
         _characterStats = _characterStats != null ? _characterStats : GetComponent<CharacterStats>();
         _targetSelector = _targetSelector != null ? _targetSelector : GetComponent<PlayerTargetSelector>();
         _clickMovement = _clickMovement != null ? _clickMovement : GetComponent<PlayerClickMovement>();
+        _mouseFacing = GetComponent<PlayerMouseFacing>();
+        _passiveHeal = GetComponent<ZelfPassiveHeal>();
         CreateRangeCircle();
     }
 
@@ -194,15 +196,12 @@ public sealed class ZelfQController : MonoBehaviour
         if (stopMovement && _clickMovement != null) _clickMovement.StopMovement();
     }
 
+    // Qの対象決定: マウス下の有効なTargetableのみを対象とする。
+    // PlayerTargetSelectorで選択している対象は、Qの対象決定には使用しない。
+    // マウス下に有効なTargetableがいない場合、Qは発動しない。
     private Targetable GetQTarget()
     {
-        if (TryGetTargetUnderMouse(out Targetable mouseTarget)) return mouseTarget;
-        if (_targetSelector != null && _targetSelector.CurrentTarget != null) return _targetSelector.CurrentTarget;
-        foreach (Targetable candidate in FindObjectsByType<Targetable>(FindObjectsSortMode.None))
-        {
-            if (candidate != null && candidate.isActiveAndEnabled && candidate.IsSelected) return candidate;
-        }
-        return null;
+        return TryGetTargetUnderMouse(out Targetable mouseTarget) ? mouseTarget : null;
     }
 
     private bool TryGetTargetUnderMouse(out Targetable target)
@@ -277,7 +276,8 @@ public sealed class ZelfQController : MonoBehaviour
     }
 
     // ブリンク完了と同じフレームに、Playerを対象の水平方向へ向ける。
-    // PlayerMouseFacingの内部ターゲット回転も更新し、次フレームに以前の右クリック方向へ戻さない。
+    // PlayerMouseFacingの目標回転もpublicメソッド(SetLookTarget)経由で更新し、
+    // 次フレームに以前の右クリック方向へ不自然に戻らないようにする(Reflectionは使用しない)。
     private void FaceTargetImmediately(Targetable target)
     {
         if (target == null) return;
@@ -285,17 +285,12 @@ public sealed class ZelfQController : MonoBehaviour
         direction.y = 0f;
         if (direction.sqrMagnitude <= 0.0001f) return;
 
-        Quaternion targetRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
-        transform.rotation = targetRotation;
+        transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
 
-        PlayerMouseFacing mouseFacing = GetComponent<PlayerMouseFacing>();
-        if (mouseFacing == null) return;
-
-        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        FieldInfo rotationField = typeof(PlayerMouseFacing).GetField("_targetRotation", flags);
-        FieldInfo hasRotationField = typeof(PlayerMouseFacing).GetField("_hasTargetRotation", flags);
-        if (rotationField != null) rotationField.SetValue(mouseFacing, targetRotation);
-        if (hasRotationField != null) hasRotationField.SetValue(mouseFacing, true);
+        if (_mouseFacing != null)
+        {
+            _mouseFacing.SetLookTarget(target.transform.position);
+        }
     }
 
     private void UpdateCooldownAndLocks()
@@ -407,22 +402,16 @@ public sealed class ZelfQController : MonoBehaviour
         return material;
     }
 
+    // Q命中時の共通通知。与ダメージ表示(プレイヤー視点: 攻撃対象の頭上に赤色で1つだけ)と、
+    // ゼルフPの与ダメージ回復(実ダメージ量とターゲット分類)を、通常攻撃と同じ経路で直接呼び出す。
+    // 文字列によるメソッド名検索(Reflection)は使用しない。
     private void NotifyCombatSystems(float damage, Targetable target)
     {
-        foreach (MonoBehaviour component in GetComponents<MonoBehaviour>())
+        CombatTextManager.ShowDamageDealt(target.transform.position, damage);
+
+        if (_passiveHeal != null)
         {
-            if (component == null || component.GetType().Name != "ZelfPassiveHeal") continue;
-            foreach (string name in new[] { "HandleDamageDealt", "OnDamageDealt", "NotifyDamageDealt" })
-            {
-                MethodInfo method = component.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (method == null) continue;
-                ParameterInfo[] parameters = method.GetParameters();
-                if (parameters.Length == 2 && parameters[0].ParameterType == typeof(float) && parameters[1].ParameterType == typeof(TargetClassification))
-                {
-                    method.Invoke(component, new object[] { damage, target.Classification });
-                    break;
-                }
-            }
+            _passiveHeal.NotifyDamageDealt(damage, target.Classification);
         }
     }
 

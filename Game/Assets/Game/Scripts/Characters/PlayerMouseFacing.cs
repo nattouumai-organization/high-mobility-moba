@@ -7,6 +7,8 @@ using UnityEngine.InputSystem;
 /// 毎フレーム更新されるため、Playerはカーソル方向を向き続ける。
 /// TASKS.md「マウス方向へキャラクターが向く処理を実装する」用の試作スクリプト。
 /// 移動はPlayerClickMovementの責務であり、本スクリプトは回転のみを担う。
+/// ZelfQControllerなどの外部スクリプトは、publicメソッドのSetLookTarget / SetLookDirectionで
+/// 目標回転を安全に更新できる(privateフィールドは本スクリプト内部だけで管理する)。
 /// </summary>
 public class PlayerMouseFacing : MonoBehaviour
 {
@@ -33,6 +35,34 @@ public class PlayerMouseFacing : MonoBehaviour
     {
         UpdateTargetRotationFromRightClick();
         RotateTowardsTarget();
+    }
+
+    /// <summary>
+    /// 指定したワールド座標の方向をPlayerが向くように、内部の目標回転を更新する。
+    /// ZelfQControllerのブリンク後など、外部スクリプトから安全に呼び出すためのpublicメソッド。
+    /// Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。
+    /// 実際の回転は毎フレームのRotateTowardsTargetが行うため、InspectorのRotation Speed設定は維持される。
+    /// </summary>
+    public void SetLookTarget(Vector3 worldPosition)
+    {
+        SetLookDirection(worldPosition - transform.position);
+    }
+
+    /// <summary>
+    /// 指定した方向ベクトルをPlayerが向くように、内部の目標回転を更新する。
+    /// 方向ベクトルの水平成分(Y成分を除く)のみを使い、ほぼゼロベクトルの場合は安全に何もしない。
+    /// </summary>
+    public void SetLookDirection(Vector3 direction)
+    {
+        direction.y = 0f;
+
+        if (direction.sqrMagnitude < _minLookDistance * _minLookDistance)
+        {
+            return;
+        }
+
+        _targetRotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        _hasTargetRotation = true;
     }
 
     private void UpdateTargetRotationFromRightClick()
