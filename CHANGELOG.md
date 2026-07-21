@@ -20,6 +20,26 @@
 - 削除した要素
 ```
 
+## 2026-07-22
+
+### Added
+
+- PlayerMouseFacingへ、外部スクリプトから安全に目標回転を更新できるpublicメソッドを追加(SetLookTarget: ワールド座標指定 / SetLookDirection: 方向ベクトル指定)。Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。実際の回転は従来どおり毎フレームInspectorのRotation Speed設定で行われ、右クリックによる回転仕様は変更しない。
+
+### Changed
+
+- ZelfQControllerからReflection依存(System.Reflectionのusing / FieldInfo / BindingFlags / privateフィールド名・メソッド名を文字列で参照する処理)を全て削除。ブリンク後の向き更新はPlayerMouseFacingのpublicメソッド、ゼルフP回復への通知はZelfPassiveHeal.NotifyDamageDealt()の直接呼び出しへ変更。PlayerMouseFacingのprivateフィールドはPlayerMouseFacing内部だけで管理する。
+- ゼルフQの対象決定を正しい仕様へ修正。Qの対象はマウス下の有効なTargetableのみとし、PlayerTargetSelectorで選択中の対象はQの対象決定に使用しない(従来はマウス下に対象がいない場合、選択中の対象へフォールバックしていた)。マウス下に有効な対象がいない場合、またはマウス下の対象がTower分類の場合、Qは発動しない。
+- ゼルフQの射程外処理の正しい仕様を記録: マウス下の対象がQ射程外の場合、Playerは対象へ自動接近し、Q射程内に入った時点でQを自動発動する。自動接近中に右クリック入力があった場合、または対象が死亡・無効化・破棄・Tower分類へ変化した場合は自動接近を中止する(挙動は従来どおり)。
+- QダメージをQ命中時に攻撃対象の頭上へ赤色で表示するよう修正(通常攻撃と同じCombatTextManager.ShowDamageDealtのプレイヤー視点表示経路。従来のZelfQControllerは与ダメージ表示を呼び出していなかった)。
+- 視点仕様を整理: Playerは移動している方向へ視点が向き、ブリンクした場合はブリンクした方向を向くことを基本とする。Q射程外の自動接近中に視点が移動方向へ向かない問題を修正(接近中は毎フレームPlayerMouseFacing.SetLookDirection()へ移動方向を渡し、回転自体は従来どおりRotation Speed設定で行う)。
+- Qブリンク後の向きを「対象の方向」から「ブリンクした方向」へ変更(通常は同じ方向。ブリンク移動量がほぼゼロの場合のみ対象の方向へフォールバック)。視点方向は各スキル・移動処理がPlayerMouseFacingのpublic APIへ明示的に方向を渡して指定する構成のため、将来の「ブリンク方向と視点方向が異なるスキル」は別の方向を渡すだけで実装できる。
+- ゼルフQ実装時にCHANGELOG.md先頭の形式例(コードブロック)内へ自動挿入されていた2026-07-21のQ実装記録を、正しい2026-07-21のAdded節へ移動(形式例は元のYYYY-MM-DDテンプレートへ復元)。
+
+### Removed
+
+- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換えする仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な参照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
+
 ## 2026-07-21
 
 ### Added
@@ -41,6 +61,12 @@
 - ダメージ表示システムを追加(FloatingCombatText / CombatTextManager、Scripts/UI)。攻撃した側の頭上に与ダメージを赤(例: 60)、受けた側の頭上に被ダメージを青(例: -60)、ゼルフPで実際にHPが増えた場合のみ回復量を緑(例: +3)で表示する。ワールド空間のWorld Space Canvas+標準Text(LegacyRuntimeフォント)による整数表示で、短時間上方向へ移動しながらフェードアウトし、常にMain Cameraの方向を向いて裏返らず、ランダムな横方向オフセットで重なりを軽減する。表示終了後は安全に削除され、プール処理は未実装だが将来プールへ置き換えやすい構造。将来のキャラクター・ミニオン・タワーからも共通利用できる。
 - 攻撃ダミー(AttackDummy)をSC_Prototypeへ1体追加(DummyAutoAttack、Scripts/Characters)。攻撃射程内のPlayerへ攻撃間隔ごとに即時ダメージを与え(攻撃力10・攻撃速度1・射程2、いずれもInspector設定)、実際に与えたダメージ量をPlayerの頭上に黄色で表示する。自身または対象の死亡中は攻撃しない。本体はTrainingDummyと同構成(HP300・Character分類・被弾フラッシュ・選択リング・HPバー付き)。移動・追跡・弾丸・攻撃アニメーション・敵AIは未実装。
 - 復活処理を追加(RespawnController、Scripts/Combat)。Player・TrainingDummy・AttackDummyが死亡から1秒後(Inspector設定)に初期位置・初期向きでHP全快で復活する。HealthControllerにRevive(全快)と復活イベントを追加し、Targetable(本体・Collider)、PlayerDeathHandler(操作系・見た目)、WorldHealthBar(HPバー)がそれぞれ復元する。復活したダミーの再選択は右クリックで行う。
+- ゼルフQの対象ブリンク、対象指定ダメージ、同一対象ロック、分類別クールダウン処理を実装。
+- ZelfQControllerを追加。Qキーで選択中の有効なCharacter / Minion / TrainingDummyへ、Collider最寄り点を基準に安全な停止距離でブリンクする。
+- Qダメージを `Base Damage + Current Attack Damage × AD Ratio` としてHealthController経由で適用する。
+- Q成功対象へSame Target Lockoutを設定し、ロック中の同一対象にはブリンク・ダメージ・クールダウン消費を発生させない。
+- Character / TrainingDummy分類へのQ命中時はQクールダウンを即時リセットし、Minion分類への命中時は残りクールダウンを50%短縮する。Tower分類には発動しない。
+- Qダメージでも既存の被弾フラッシュ、ダメージ表示、ゼルフP回復の通知経路を利用する。
 
 ### Changed
 

@@ -133,6 +133,12 @@ public sealed class ZelfQController : MonoBehaviour
             if (direction.sqrMagnitude > 0.0001f)
             {
                 _characterController.Move(direction.normalized * _characterStats.CurrentMoveSpeed * Time.deltaTime);
+
+                // 移動している方向へ視点を向ける(回転自体は従来どおりPlayerMouseFacingがRotation Speedで行う)。
+                if (_mouseFacing != null)
+                {
+                    _mouseFacing.SetLookDirection(direction);
+                }
             }
             return;
         }
@@ -268,28 +274,38 @@ public sealed class ZelfQController : MonoBehaviour
         }
         else destination.y = transform.position.y;
 
+        Vector3 blinkStartPosition = transform.position;
         bool enabled = _characterController.enabled;
         _characterController.enabled = false;
         transform.position = destination;
         _characterController.enabled = enabled;
-        FaceTargetImmediately(target);
+        FaceBlinkDirection(blinkStartPosition, target);
     }
 
-    // ブリンク完了と同じフレームに、Playerを対象の水平方向へ向ける。
-    // PlayerMouseFacingの目標回転もpublicメソッド(SetLookTarget)経由で更新し、
+    // ブリンク完了と同じフレームに、Playerをブリンクした方向(水平)へ即時に向ける。
+    // ブリンク移動量がほぼゼロの場合のみ、対象の方向へフォールバックする(通常はブリンク方向=対象方向)。
+    // PlayerMouseFacingの目標回転もpublicメソッド(SetLookDirection)で同じ方向へ更新し、
     // 次フレームに以前の右クリック方向へ不自然に戻らないようにする(Reflectionは使用しない)。
-    private void FaceTargetImmediately(Targetable target)
+    // 視点方向はスキル側が明示的に渡す構成のため、将来「ブリンク方向と視点方向が異なるスキル」は
+    // 別の方向を渡すだけで実装できる。
+    private void FaceBlinkDirection(Vector3 blinkStartPosition, Targetable target)
     {
-        if (target == null) return;
-        Vector3 direction = target.transform.position - transform.position;
+        Vector3 direction = transform.position - blinkStartPosition;
         direction.y = 0f;
+
+        if (direction.sqrMagnitude <= 0.0001f && target != null)
+        {
+            direction = target.transform.position - transform.position;
+            direction.y = 0f;
+        }
+
         if (direction.sqrMagnitude <= 0.0001f) return;
 
         transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
 
         if (_mouseFacing != null)
         {
-            _mouseFacing.SetLookTarget(target.transform.position);
+            _mouseFacing.SetLookDirection(direction);
         }
     }
 
