@@ -405,6 +405,8 @@ GameObject:
   - component: {fileID: 968542330}
   - component: {fileID: 968542332}
   - component: {fileID: 968542333}
+  - component: {fileID: 968542334}
+  - component: {fileID: 968542335}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -692,6 +694,64 @@ MonoBehaviour:
   _remainingCooldown: 0
   _isCurrentTargetLocked: 0
   _isApproachingQTarget: 0
+--- !u!114 &968542334
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1a4e7b2d5f8493ab6c9d2e5f8a1b4c7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _duration: 0.75
+  _cooldown: 10
+  _frontAngle: 120
+  _damageReduction: 0.55
+  _shieldColor: {r: 0.25, g: 0.6, b: 1, a: 0.9}
+  _shieldRadius: 1.1
+  _shieldWidth: 0.06
+  _shieldSegments: 24
+  _isWActive: 0
+  _remainingCooldown: 0
+--- !u!114 &968542335
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4b7a0c3e6f9482cd7a0b3c6e9f2a5d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _characterController: {fileID: 968542321}
+  _characterStats: {fileID: 968542324}
+  _clickMovement: {fileID: 968542322}
+  _basicAttackController: {fileID: 968542326}
+  _qController: {fileID: 968542333}
+  _dashDistance: 4
+  _dashDuration: 0.18
+  _hitRadius: 0.6
+  _endExtension: 0.75
+  _minCastDistance: 0.1
+  _baseDamage: 20
+  _adRatio: 0.5
+  _cooldown: 8
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  _trailColor: {r: 0.25, g: 0.6, b: 1, a: 0.85}
+  _trailTime: 0.25
+  _trailWidth: 0.45
+  _isDashing: 0
+  _remainingCooldown: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0

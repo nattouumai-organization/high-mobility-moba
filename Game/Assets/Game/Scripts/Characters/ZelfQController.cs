@@ -63,8 +63,8 @@ public sealed class ZelfQController : MonoBehaviour
     public LayerMask TargetableLayerMask => _targetableLayer;
 
     /// <summary>
-    /// Qの残りクールダウンだけを即時0にする(ゼルフEのCharacter分類命中時などから呼び出す)。
-    /// Same Target Lockoutは解除・削除せず、Q自動接近中の状態も変更しない。Reflectionは使用しない。
+    /// QのCDだけを即時0にする(ゼルフEのCharacter分類命中時などから呼び出す)。
+    /// Same Target Lockoutは解除・削除せず、Q自動接近中の状態も変更しない。
     /// </summary>
     public void ResetCooldown()
     {
@@ -74,15 +74,26 @@ public sealed class ZelfQController : MonoBehaviour
     }
 
     /// <summary>
+    /// 指定TargetableのSame Target Lockoutを即時解除する(ゼルフEのCharacter分類命中時などから呼び出す)。
+    /// ロックリングも同時に破棄する。指定対象がロック中でなければ何もしない。
+    /// </summary>
+    public void ClearLockout(Targetable target)
+    {
+        if (target == null || !_locks.ContainsKey(target)) return;
+        _locks.Remove(target);
+        if (_lockCircles.TryGetValue(target, out LineRenderer circle) && circle != null)
+        {
+            Destroy(circle.gameObject);
+        }
+        _lockCircles.Remove(target);
+    }
+
+    /// <summary>
     /// Q射程外の自動接近中であれば中止する(ゼルフEの発動時などから呼び出す)。自動接近中でなければ何もしない。
     /// </summary>
     public void CancelPendingApproach()
     {
-        if (_pendingTarget == null)
-        {
-            return;
-        }
-
+        if (_pendingTarget == null) return;
         CancelPendingCast(false);
     }
 
@@ -163,12 +174,7 @@ public sealed class ZelfQController : MonoBehaviour
             if (direction.sqrMagnitude > 0.0001f)
             {
                 _characterController.Move(direction.normalized * _characterStats.CurrentMoveSpeed * Time.deltaTime);
-
-                // 移動している方向へ視点を向ける(回転自体は従来どおりPlayerMouseFacingがRotation Speedで行う)。
-                if (_mouseFacing != null)
-                {
-                    _mouseFacing.SetLookDirection(direction);
-                }
+                if (_mouseFacing != null) _mouseFacing.SetLookDirection(direction);
             }
             return;
         }
@@ -185,8 +191,6 @@ public sealed class ZelfQController : MonoBehaviour
         StopMovementAfterQCast();
 
         HealthController health = GetHealth(target);
-
-        // 攻撃者としてPlayerのTransformを渡す(通常ダメージ)。受けた側のダメージ軽減(ゼルフWなど)が前方判定に使用する。
         float actualDamage = health.TakeDamage(_baseDamage + _characterStats.CurrentAttackDamage * _adRatio, transform);
         if (actualDamage > 0f)
         {
@@ -234,9 +238,6 @@ public sealed class ZelfQController : MonoBehaviour
         if (stopMovement && _clickMovement != null) _clickMovement.StopMovement();
     }
 
-    // Qの対象決定: マウス下の有効なTargetableのみを対象とする。
-    // PlayerTargetSelectorで選択している対象は、Qの対象決定には使用しない。
-    // マウス下に有効なTargetableがいない場合、Qは発動しない。
     private Targetable GetQTarget()
     {
         return TryGetTargetUnderMouse(out Targetable mouseTarget) ? mouseTarget : null;
@@ -314,12 +315,6 @@ public sealed class ZelfQController : MonoBehaviour
         FaceBlinkDirection(blinkStartPosition, target);
     }
 
-    // ブリンク完了と同じフレームに、Playerをブリンクした方向(水平)へ即時に向ける。
-    // ブリンク移動量がほぼゼロの場合のみ、対象の方向へフォールバックする(通常はブリンク方向=対象方向)。
-    // PlayerMouseFacingの目標回転もpublicメソッド(SetLookDirection)で同じ方向へ更新し、
-    // 次フレームに以前の右クリック方向へ不自然に戻らないようにする(Reflectionは使用しない)。
-    // 視点方向はスキル側が明示的に渡す構成のため、将来「ブリンク方向と視点方向が異なるスキル」は
-    // 別の方向を渡すだけで実装できる。
     private void FaceBlinkDirection(Vector3 blinkStartPosition, Targetable target)
     {
         Vector3 direction = transform.position - blinkStartPosition;
@@ -332,13 +327,8 @@ public sealed class ZelfQController : MonoBehaviour
         }
 
         if (direction.sqrMagnitude <= 0.0001f) return;
-
         transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
-
-        if (_mouseFacing != null)
-        {
-            _mouseFacing.SetLookDirection(direction);
-        }
+        if (_mouseFacing != null) _mouseFacing.SetLookDirection(direction);
     }
 
     private void UpdateCooldownAndLocks()
@@ -450,17 +440,10 @@ public sealed class ZelfQController : MonoBehaviour
         return material;
     }
 
-    // Q命中時の共通通知。与ダメージ表示(プレイヤー視点: 攻撃対象の頭上に赤色で1つだけ)と、
-    // ゼルフPの与ダメージ回復(実ダメージ量とターゲット分類)を、通常攻撃と同じ経路で直接呼び出す。
-    // 文字列によるメソッド名検索(Reflection)は使用しない。
     private void NotifyCombatSystems(float damage, Targetable target)
     {
         CombatTextManager.ShowDamageDealt(target.transform.position, damage);
-
-        if (_passiveHeal != null)
-        {
-            _passiveHeal.NotifyDamageDealt(damage, target.Classification);
-        }
+        if (_passiveHeal != null) _passiveHeal.NotifyDamageDealt(damage, target.Classification);
     }
 
     private void Log(string message)
