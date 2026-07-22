@@ -24,6 +24,7 @@
 
 ### Added
 
+- フェーズ3: スキル射程・範囲のプレビューを実装(SkillRangePreviewを追加。Q: マウス下の対象に発動対象マーカー(射程内は白・射程外はオレンジ=自動接近)、R: 発動した場合の決闘エリア円をキー長押し中に表示。W/Eは従来どおり方向線のみ。Fは押した瞬間に発動する仕様のためプレビューなし。既存のスキルスクリプトは変更せず、設定値をリフレクションで参照する)
 - フェーズ3: クールダウンUIをEternal Return風のステータスHUDへ拡張(下部HUDパネルの枠組みを追加し、攻撃力・攻撃速度・移動速度・攻撃射程のリアルタイム表示、HPバー(現在HP / 最大HP)、ポートレート+レベルバッジを表示。レベル表記はレベルシステム実装までのプレースホルダー。移動速度・攻撃射程はステータス単位(MS360・射程200など)で表示する)
 - フェーズ3: Fフラッシュを実装(FlashController新規・Fキー・移動距離400=4.0 Unity units・クールダウン55秒。全キャラクター共通)。
   マウスカーソルが指すGround地点へ即座にブリンクし、カーソル地点が最大距離より遠い場合はカーソル方向へ最大距離ぶん移動する。
@@ -117,7 +118,7 @@
   W発動・Eダッシュ・死亡による通常攻撃/Q/W/E/Rの禁止を、コンポーネントのenabled切り替えからロック方式へ一本化し、
   復元漏れ・二重復元を構造的に防止(各コントローラーがAwakeで自動追加するためInspector設定不要)。
   Phase 3のCC(スタン・スネア・共通D硬直)はロック理由を追加するだけで実装可能。
-- ゼルフR: W/E発動中もRコンポーネントが無効化されなくなり、発動済みの決闘エリアがW/E中も正しく進行・終了するようになった
+- ゼルフR: W/E発動中��Rコンポーネントが無効化されなくなり、発動済みの決闘エリアがW/E中も正しく進行・終了するようになった
   (従来は持続時間が凍結し実質延長されていた)。
 - ゼルフR: ゼルフ自身の死亡時に決闘エリアを即時終了し、自身MSブースト・スロウを全解除するようにした。
 - 自動接近の二重制御を防止: Q/Rの射程外自動接近中は通常攻撃の自動接近を停止し、QとRの自動接近も相互排他にした。
@@ -165,7 +166,7 @@
 - 通常攻撃のダメージ処理を実装。射程内のターゲットへ攻撃間隔ごとにCurrent Attack Damage(Player初期値20)を即時に与え、既存の被弾フラッシュを発生させる。
 - TrainingDummyの死亡処理を実装。HP 0でCollider無効化・選択不可・ターゲット解除・攻撃停止・HPバー非表示となり、短時間死亡状態を表示した後にGameObjectを非表示化する(Destroy不使用でMissing Referenceを防止)。
 - Playerの死亡処理を実装(PlayerDeathHandler)。HP 0でPlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerを無効化し、見た目とHPバーを非表示にする。リスポーンは未実装。
-- CharacterData ScriptableObjectを追加(Scripts/Characters)。キャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータスと成長値、P/Q/W/E/Rのスキル説明を保持する。実行中の現在ステータスは従来どおりCharacterStats / HealthControllerが扱い、SC_PrototypeのPlayerへはまだ適用しない。
+- CharacterData ScriptableObjectを追加(Scripts/Characters)。キャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータスと成長値、P/Q/W/E/Rのスキル説明を保持する。実行中の現在ステータスは従来どおりCharacterStats / HealthControllerが扱い、SC_PrototypeのPlayerへは��だ適用しない。
 - ゼルフのCharacterData(Data/Characters/ZelfData.asset)を追加。基礎ステータス(HP650・HP成長105・HP自動回復3.5/+0.35・AD60/+4.5・AS0.80/+3.0%・AR28/+4.0・MS360・射程200)とP/Q/W/E/Rのスキル説明を設定。
 - キャラクター選択画面SC_CharacterSelectを追加。タイトル・サブタイトルと、5キャラクター分のカード(名前・イメージカラー・役割・利用可能状態)を表示する。Availableのゼルフのみ選択可能で、朧・ヴォルブラーク・リネス・リーゼロッテ・ヴァイスはComing Soon表示の半透明・選択不可。選択中のカードは明るい枠線とカードの明度上昇で表示し、画面下部に選択中キャラクター名を表示する。
 - ゼルフ詳細パネルを追加。名前・役割・Short Description・イメージカラーの大きな仮プレースホルダー・基礎ステータス(HP/AD/AS/AR/MS/AA Range)・P〜Rの短いスキル一覧を表示する。スキルの詳細説明はCharacterDataが保持し、将来ツールチップや別パネルとして表示できる(今回は未実装)。
@@ -205,7 +206,7 @@
 - 将来の通常攻撃から呼び出す、被弾時に短時間白く点滅する処理をTargetableに用意。
 - 通常攻撃の射程判定を実装。TargetableのColliderの最も近い点との水平距離(XZ平面、高さは含めない)がCurrent Attack Range以下なら射程内とする。
 - 攻撃速度と攻撃間隔を実装。CharacterStatsにBase Attack Speed(毎秒の攻撃回数)、Bonus Attack Speed Percent、Base Attack Rangeを追加し、Attack Interval = 1 / Current Attack Speedとする。
-- PlayerBasicAttackControllerを追加。選択中のターゲットが射程内の場合のみ、攻撃間隔ごとに疑似通常攻撃(被弾フラッシュのみ、ダメージ・HP減少なし)を実行する。
+- PlayerBasicAttackControllerを追加。選択中のターゲットが射程内の場合のみ、攻撃間隔ごとに疑似通常���撃(被弾フラッシュのみ、ダメージ・HP減少なし)を実行する。
 - 選択リングの色で射程内外を表示するよう更新(射程内: 明るい緑 / 射程外: オレンジ)。
 
 ### Changed
