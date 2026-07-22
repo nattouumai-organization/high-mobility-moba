@@ -12,6 +12,7 @@ public sealed class SkillRangeIndicator : MonoBehaviour
 
     private LineRenderer _circle;
     private LineRenderer _directionLine;
+    private LineRenderer _pointMarker;
     private Material _material;
 
     /// <summary>parentの子として専用のインジケーターを生成する。</summary>
@@ -57,10 +58,30 @@ public sealed class SkillRangeIndicator : MonoBehaviour
         if (_directionLine != null) _directionLine.enabled = false;
     }
 
+    /// <summary>場所指定スキル用: 発動した場合のスキル地点(ワールド座標)に半径radiusの円マーカーを表示する。</summary>
+    public void ShowPointMarker(Vector3 worldPosition, float radius, Color color)
+    {
+        EnsurePointMarker();
+        _pointMarker.enabled = true;
+        _pointMarker.startColor = color;
+        _pointMarker.endColor = color;
+        for (int i = 0; i < CircleSegments; i++)
+        {
+            float angle = (float)i / CircleSegments * Mathf.PI * 2f;
+            _pointMarker.SetPosition(i, worldPosition + new Vector3(Mathf.Cos(angle) * radius, 0.05f, Mathf.Sin(angle) * radius));
+        }
+    }
+
+    public void HidePointMarker()
+    {
+        if (_pointMarker != null) _pointMarker.enabled = false;
+    }
+
     public void HideAll()
     {
         HideCircle();
         HideDirectionLine();
+        HidePointMarker();
     }
 
     private void EnsureCircle()
@@ -91,6 +112,22 @@ public sealed class SkillRangeIndicator : MonoBehaviour
         _directionLine.material = GetMaterial();
         _directionLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         _directionLine.receiveShadows = false;
+    }
+
+    private void EnsurePointMarker()
+    {
+        if (_pointMarker != null) return;
+        GameObject child = new GameObject("Point Marker");
+        child.transform.SetParent(transform, false);
+        _pointMarker = child.AddComponent<LineRenderer>();
+        _pointMarker.useWorldSpace = true;
+        _pointMarker.loop = true;
+        _pointMarker.positionCount = CircleSegments;
+        _pointMarker.startWidth = LineWidth;
+        _pointMarker.endWidth = LineWidth;
+        _pointMarker.material = GetMaterial();
+        _pointMarker.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _pointMarker.receiveShadows = false;
     }
 
     private Material GetMaterial()

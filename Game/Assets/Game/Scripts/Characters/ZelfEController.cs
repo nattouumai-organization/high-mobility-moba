@@ -136,7 +136,7 @@ public sealed class ZelfEController : MonoBehaviour
         }
     }
 
-    // Eキーを押している間、ダッシュ最大距離の円と本体→カーソル方向の直線を表示する(方向指定スキルの可視化)。
+    // Eキーを押している間、本体→カーソル方向の直線(長さ=ダッシュ距離)のみを表示する(方向指定スキルの可視化)。
     private void UpdateRangeIndicator()
     {
         if (_rangeIndicator == null) return;
@@ -152,9 +152,8 @@ public sealed class ZelfEController : MonoBehaviour
         float yOffset = _characterController != null
             ? _characterController.center.y - _characterController.height * 0.5f + 0.05f
             : 0.05f;
-        _rangeIndicator.ShowCircle(_dashDistance, new Color(_trailColor.r, _trailColor.g, _trailColor.b, 0.7f), yOffset);
 
-        // カーソルの地面位置から本体→カーソルのXZ方向を求め、ダッシュ距離ぶんの方向線を表示する。
+        // カーソルの地面位置から本体→カーソルのXZ方向を求め、ダッシュ距離ぶんの方向線のみを表示する。
         if (TryGetMouseGroundPoint(out Vector3 groundPoint))
         {
             Vector3 direction = groundPoint - transform.position;
@@ -166,7 +165,7 @@ public sealed class ZelfEController : MonoBehaviour
                 return;
             }
         }
-        _rangeIndicator.HideDirectionLine();
+        _rangeIndicator.HideAll();
     }
 
     private void HandleEPressed()

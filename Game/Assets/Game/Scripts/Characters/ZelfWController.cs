@@ -142,7 +142,9 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         }
     }
 
-    // Wキーを押している間、回転ダメージの効果範囲円を表示する(発動中・ロック中・死亡中は表示しない)。
+    // Wキーを押している間、前方軽減の向き(本体の正面方向)を方向線で表示する(方向指定スキルの可視化)。
+    // 発動時の前方判定は本体の正面(transform.forward)を使うため、正面方向をそのまま表示すれば
+    // 「発動した場合の向き」と常に一致する(発動中・ロック中・死亡中は表示しない)。
     private void UpdateRangeIndicator()
     {
         if (_rangeIndicator == null) return;
@@ -154,7 +156,17 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             _rangeIndicator.HideAll();
             return;
         }
-        _rangeIndicator.ShowCircle(_wDamageRadius, new Color(_shieldColor.r, _shieldColor.g, _shieldColor.b, 0.7f), _indicatorYOffset);
+
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f)
+        {
+            _rangeIndicator.HideAll();
+            return;
+        }
+
+        Vector3 origin = transform.position + new Vector3(0f, _indicatorYOffset, 0f);
+        _rangeIndicator.ShowDirectionLine(origin, forward.normalized, _wDamageRadius, new Color(_shieldColor.r, _shieldColor.g, _shieldColor.b, 0.9f));
     }
 
     private void HandleWPressed()

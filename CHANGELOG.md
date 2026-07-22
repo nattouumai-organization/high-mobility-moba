@@ -57,6 +57,10 @@
 
 ### Changed
 
+- フェーズ3準備(phase3-prep2): スキルインジケーターを指定方式ごとに統一。
+  対象指定(Q/R)=攻撃範囲円、方向指定(W/E)=方向線のみ(W=前方軽減の向き、E=ダッシュ方向)、
+  場所指定=発動地点マーカー(SkillRangeIndicator.ShowPointMarkerを新設。フェーズ3の場所指定スキルで使用)。
+  Wの分類を無指定→方向指定に訂正(SkillTargetingTypeのコメント更新)。
 - フェーズ3準備(phase3-prep1): スキル発動方式を「キーを押すと範囲表示・離すと発動」(NormalCast)にQ/W/E/Rで統一。
   SkillCastMode enumを新設し、各スキルのInspectorでQuickCast(押した瞬間に発動)へ個別に切替可能。
 - フェーズ3準備(phase3-prep1): 汎用範囲インジケーターSkillRangeIndicator(円+方向線)を新設。
