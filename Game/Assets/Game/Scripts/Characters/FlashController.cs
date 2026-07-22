@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// F: フラッシュ(全キャラクター共通の場所指定スキル)。
-/// マウスカーソルが指すGround地点へ即座にブリンクする。
+/// Fを押した瞬間に、マウスカーソルが指すGround地点へ即座にブリンクする(着地地点プレビューなし)。
 /// 仕様: 移動距離400(=4.0 Unity units。換算: 射程100 = 1 Unity unit) / クールダウン55秒 / 壁は越えられない。
 /// カーソル地点が最大距離より遠い場合は、カーソル方向へ最大距離ぶんだけ移動する。
 /// Wall Layerに設定した壁が経路上にある場合は壁の手前で停止する(壁抜け不可)。
@@ -21,19 +21,12 @@ public sealed class FlashController : MonoBehaviour
     [SerializeField, Min(0f)] private float _cooldown = 55f;
     [SerializeField, Min(0f)] private float _minCastDistance = 0.1f;
 
-    [Header("Cast")]
-    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
-
     [Header("Layers")]
     // Ground/Targetableが未設定(=0)の場合、ZelfQControllerの設定を流用する。
     [SerializeField] private LayerMask _groundLayer;
     // 壁として扱うレイヤー。未設定(=0)の場合は壁判定を行わない(現在のプロトタイプマップに壁はない)。
     [SerializeField] private LayerMask _wallLayer;
     [SerializeField] private LayerMask _targetableLayer;
-
-    [Header("Visual")]
-    [SerializeField] private Color _markerColor = new Color(1f, 0.85f, 0.25f, 0.9f);
-    [SerializeField, Min(0.05f)] private float _markerRadius = 0.35f;
 
     [Header("Debug (Runtime)")]
     [SerializeField] private float _remainingCooldown;
@@ -45,7 +38,6 @@ public sealed class FlashController : MonoBehaviour
     private ZelfQController _qController;
     private ZelfRController _rController;
     private Camera _mainCamera;
-    private SkillRangeIndicator _rangeIndicator;
     private float _cooldownEndTime;
 
     public float RemainingCooldown => Mathf.Max(0f, _cooldownEndTime - Time.time);
@@ -63,7 +55,6 @@ public sealed class FlashController : MonoBehaviour
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
         _mainCamera = Camera.main;
-        _rangeIndicator = SkillRangeIndicator.Create(transform, "Flash Point Indicator");
 
         if (_qController != null)
         {
@@ -78,36 +69,10 @@ public sealed class FlashController : MonoBehaviour
     {
         _remainingCooldown = RemainingCooldown;
 
-        // NormalCast: 押している間は「そのまま発動した場合の着地地点」を表示し、離した瞬間に発動 /
-        // QuickCast: 押した瞬間に発動(場所指定スキルの可視化は発動地点マーカー)。
-        UpdatePointIndicator();
-
-        if (_inputHub != null && _castMode.IsCastTriggered(_inputHub.FPressedThisFrame, _inputHub.FReleasedThisFrame))
+        // Fは押した瞬間に発動する(着地地点プレビューなし)。
+        if (_inputHub != null && _inputHub.FPressedThisFrame)
         {
             HandleFPressed();
-        }
-    }
-
-    // Fキー押下中、そのまま発動した場合の着地地点(最大距離・壁でクランプ済み)をマーカー表示する。
-    private void UpdatePointIndicator()
-    {
-        if (_rangeIndicator == null) return;
-        bool visible = _inputHub != null && _inputHub.FPressed
-            && (_abilityLock == null || !_abilityLock.IsLocked)
-            && (_selfHealth == null || !_selfHealth.IsDead);
-        if (!visible)
-        {
-            _rangeIndicator.HidePointMarker();
-            return;
-        }
-
-        if (TryGetFlashDestination(out Vector3 destination, out _))
-        {
-            _rangeIndicator.ShowPointMarker(destination, _markerRadius, _markerColor);
-        }
-        else
-        {
-            _rangeIndicator.HidePointMarker();
         }
     }
 
@@ -146,7 +111,7 @@ public sealed class FlashController : MonoBehaviour
         PerformFlash(destination, direction);
     }
 
-    // そのまま発動した場合の着地地点を求める(最大距離クランプ → 壁クランプ → 接地Y補正)。
+    // 発動時の着地地点を求める(最大距離クランプ → 壁クランプ → 接地Y補正)。
     private bool TryGetFlashDestination(out Vector3 destination, out Vector3 direction)
     {
         destination = transform.position;
@@ -197,7 +162,6 @@ public sealed class FlashController : MonoBehaviour
             if (_mouseFacing != null) _mouseFacing.SetLookDirection(direction);
         }
 
-        if (_rangeIndicator != null) _rangeIndicator.HidePointMarker();
         Debug.Log("フラッシュ: 発動しました。", this);
     }
 
