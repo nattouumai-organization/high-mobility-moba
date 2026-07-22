@@ -50,6 +50,8 @@ public sealed class ZelfQController : MonoBehaviour
     private Material _lockMaterial;
     private PlayerMouseFacing _mouseFacing;
     private ZelfPassiveHeal _passiveHeal;
+    private ZelfRController _rController;
+    private AbilityLockController _abilityLock;
 
     public bool IsQAvailable => _isQAvailable;
     public float RemainingCooldown => _remainingCooldown;
@@ -105,6 +107,9 @@ public sealed class ZelfQController : MonoBehaviour
         _clickMovement = _clickMovement != null ? _clickMovement : GetComponent<PlayerClickMovement>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
+        _rController = GetComponent<ZelfRController>();
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
         CreateRangeCircle();
     }
 
@@ -120,8 +125,18 @@ public sealed class ZelfQController : MonoBehaviour
     {
         RestoreMovementAfterRightClickRelease();
         UpdateCooldownAndLocks();
-        UpdateRangeCircle();
         UpdateLockCircles();
+
+        // 行動ロック中(W発動中・Eダッシュ中・死亡中など)は入力を受け付けず、自動接近も中止する。
+        // クールダウン・同一対象ロックの進行はロック中も継続する。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            if (_pendingTarget != null) CancelPendingCast(false);
+            if (_rangeCircle != null) _rangeCircle.enabled = false;
+            return;
+        }
+
+        UpdateRangeCircle();
 
         if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
         {
@@ -141,6 +156,10 @@ public sealed class ZelfQController : MonoBehaviour
 
         Targetable target = GetQTarget();
         if (!CanCastAt(target, true)) return;
+
+        // Rの自動接近と同時進行しないよう中止する(移動の二重制御を防ぐ)。
+        if (_rController != null) _rController.CancelPendingApproach();
+
         if (IsInRange(target))
         {
             Cast(target);

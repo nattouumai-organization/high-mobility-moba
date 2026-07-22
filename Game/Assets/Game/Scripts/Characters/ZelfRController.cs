@@ -22,7 +22,9 @@ using UnityEngine.InputSystem;
 ///   ゼルフ自身: Self MS Boost Percent分のMS上昇をエリア持続中付与する。
 ///
 /// 共通Dで完全不発(共通D未実装のため今回はD判定なし。将来追加予定)。
-/// ZelfEのダッシュ中・ZelfW発動中はZelfEController/ZelfWControllerによりenabledがfalseになる。
+/// ZelfEのダッシュ中・ZelfW発動中・死亡中はAbilityLockControllerのロックにより入力を受け付けない。
+/// コンポーネント自体は無効化されないため、発動済みの決闘エリアはW/E中も正しく進行・終了する。
+/// ゼルフ自身が死亡した場合は決闘エリアを即時終了する。
 /// </summary>
 public sealed class ZelfRController : MonoBehaviour
 {
@@ -70,6 +72,8 @@ public sealed class ZelfRController : MonoBehaviour
     private Material _arenaMaterial;
     private Camera _mainCamera;
     private HealthController _selfHealth;
+    private AbilityLockController _abilityLock;
+    private ZelfQController _qController;
     private CharacterController _characterController;
     private PlayerClickMovement _clickMovement;
     private PlayerMouseFacing _mouseFacing;
@@ -85,6 +89,9 @@ public sealed class ZelfRController : MonoBehaviour
     // 自身のMSブースト適用済みか
     private bool _selfBoostApplied;
     private float _selfBoostAmount;
+
+    /// <summary>R射程外の自動接近中かどうか。通常攻撃の自動接近との競合防止に使用する。</summary>
+    public bool IsApproachingRTarget => _pendingTarget != null;
 
     // エディタでシーン読み込み・値変更時に呼ばれる。
     // 旧バージョンのスクリプトでアタッチ済みのコンポーネントはCast Range=0が
@@ -105,12 +112,17 @@ public sealed class ZelfRController : MonoBehaviour
         _clickMovement = GetComponent<PlayerClickMovement>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
         _mainCamera = Camera.main;
+        _qController = GetComponent<ZelfQController>();
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+
+        // ゼルフ自身の死亡時に決闘エリアを即時終了する。
+        if (_selfHealth != null) _selfHealth.Died += OnSelfDied;
 
         // LayerMaskをZelfQControllerと共有する
-        if (_targetableLayer.value == 0)
+        if (_targetableLayer.value == 0 && _qController != null)
         {
-            ZelfQController q = GetComponent<ZelfQController>();
-            if (q != null) _targetableLayer = q.TargetableLayerMask;
+            _targetableLayer = _qController.TargetableLayerMask;
         }
 
         CreateArenaCircle();
@@ -120,28 +132,33 @@ public sealed class ZelfRController : MonoBehaviour
         Debug.Log($"Zelf R: 初期化しました。CastRange={_castRange}, TargetableLayer={_targetableLayer.value}, SelfStats={(_selfStats != null ? "OK" : "未設定")}", this);
     }
 
-    // 診断用: Eダッシュ中・W発動中は無効化されるのが正常。
-    // それ以外のタイミングで「無効化」ログが出たまま有効化されない場合は復元バグ。
+    // W/Eはロック方式(AbilityLockController)に変更されたため、
+    // 通常プレイでこのコンポーネントが無効化されることはない。
     private void OnDisable()
     {
-        // Eダッシュ・W発動により無効化された場合は自動接近を中止し、射程円も非表示にする。
         CancelPendingApproach();
         if (_rangeCircle != null) _rangeCircle.enabled = false;
-        Debug.Log("Zelf R: コンポーネントが無効化されました(Eダッシュ中・W発動中は正常)。", this);
-    }
-
-    private void OnEnable()
-    {
-        Debug.Log("Zelf R: コンポーネントが有効化されました。", this);
     }
 
     private void OnDestroy()
     {
+        if (_selfHealth != null) _selfHealth.Died -= OnSelfDied;
         CleanUpAllEffects();
         if (_arenaCircle != null) Destroy(_arenaCircle.gameObject);
         if (_arenaMaterial != null) Destroy(_arenaMaterial);
         if (_rangeCircle != null) Destroy(_rangeCircle.gameObject);
         if (_rangeMaterial != null) Destroy(_rangeMaterial);
+    }
+
+    // ゼルフ自身の死亡時: 自動接近を中止し、展開中の決闘エリアを即時終了する。
+    private void OnSelfDied()
+    {
+        CancelPendingApproach();
+        if (_isRActive)
+        {
+            EndArena();
+            Debug.Log("Zelf R: ゼルフの死亡により決闘エリアを終了しました。", this);
+        }
     }
 
     private void Update()
@@ -157,6 +174,15 @@ public sealed class ZelfRController : MonoBehaviour
                 return;
             }
             UpdateInnerSlowAndOuterTransition();
+        }
+
+        // 行動ロック中(W発動中・Eダッシュ中・死亡中など)は入力を受け付けず、自動接近も中止する。
+        // 発動済みエリアの進行(持続時間・スロウ更新)は上のブロックでロック中も継続する。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            CancelPendingApproach();
+            if (_rangeCircle != null) _rangeCircle.enabled = false;
+            return;
         }
 
         // Rキーを押している間は射程円を表示する。
@@ -191,6 +217,9 @@ public sealed class ZelfRController : MonoBehaviour
             Debug.Log("Zelf R: マウスをCharacter分類の有効な敵に合わせてRを離してください。", this);
             return;
         }
+
+        // Qの自動接近と同時進行しないよう中止する(移動の二重制御を防ぐ)。
+        if (_qController != null) _qController.CancelPendingApproach();
 
         // 射程内なら即発動、射程外なら射程内まで自動接近してから発動する。
         if (IsInCastRange(target))

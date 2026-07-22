@@ -11,6 +11,8 @@ using UnityEngine;
 /// ターゲットが死亡した場合は攻撃を停止する(選択の解除はPlayerTargetSelectorが行う)。
 /// 弾丸・投射物・ヒットスキャン・攻撃アニメーションは今回実装しない。
 /// 将来的にミニオンなども扱うBasicAttackControllerへ発展させる想定。
+/// 行動ロック(AbilityLockController)中は攻撃も自動接近も行わない。
+/// Q/Rの射程外自動接近中は、移動の二重制御を防ぐため通常攻撃側の自動接近を行わない。
 /// </summary>
 [RequireComponent(typeof(CharacterStats))]
 [RequireComponent(typeof(PlayerTargetSelector))]
@@ -28,6 +30,13 @@ public class PlayerBasicAttackController : MonoBehaviour
 
     // ゼルフPの与ダメージ回復。未設定の場合はAwakeで同じGameObjectから取得する(任意)。
     [SerializeField] private ZelfPassiveHeal _passiveHeal;
+
+    // 行動ロック。W発動中・Eダッシュ中・死亡中などは攻撃も自動接近も行わない。
+    private AbilityLockController _abilityLock;
+
+    // Q/Rの射程外自動接近との競合防止用(ゼルフ以外のキャラクターではnullでもよい)。
+    private ZelfQController _qController;
+    private ZelfRController _rController;
 
     // 次に通常攻撃できる時刻(Time.time基準)。攻撃速度以上の頻度で攻撃しないための管理値。
     private float _nextAttackTime;
@@ -59,10 +68,23 @@ public class PlayerBasicAttackController : MonoBehaviour
         {
             _passiveHeal = GetComponent<ZelfPassiveHeal>();
         }
+
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _qController = GetComponent<ZelfQController>();
+        _rController = GetComponent<ZelfRController>();
     }
 
     private void Update()
     {
+        // 行動ロック中(W発動中・Eダッシュ中・死亡中など)は攻撃も自動接近も行わない。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            IsCurrentTargetInRange = false;
+            StopOwnApproach(true);
+            return;
+        }
+
         Targetable target = GetValidTarget();
         IsCurrentTargetInRange = target != null && IsInAttackRange(target);
 
@@ -70,16 +92,7 @@ public class PlayerBasicAttackController : MonoBehaviour
         {
             // ターゲットがいない・無効・死亡した場合は攻撃を停止する。
             // 自動接近の途中だった場合は、その場で移動も停止する。
-            if (_isApproaching)
-            {
-                _isApproaching = false;
-
-                if (_clickMovement != null)
-                {
-                    _clickMovement.StopMovement();
-                }
-            }
-
+            StopOwnApproach(true);
             return;
         }
 
@@ -88,23 +101,38 @@ public class PlayerBasicAttackController : MonoBehaviour
 
         if (!IsCurrentTargetInRange)
         {
+            // Q/Rの射程外自動接近中は通常攻撃側の自動接近を行わない(移動の二重制御を防ぐ)。
+            if (IsSkillApproachActive())
+            {
+                StopOwnApproach(false);
+                return;
+            }
+
             // 射程外の場合は攻撃せず、射程内に入るまでターゲットへ自動接近する。
             ApproachTarget(target);
             return;
         }
 
         // 自動接近中に射程内へ入ったら、その場で停止して攻撃を開始する。
-        if (_isApproaching)
-        {
-            _isApproaching = false;
-
-            if (_clickMovement != null)
-            {
-                _clickMovement.StopMovement();
-            }
-        }
+        StopOwnApproach(true);
 
         TryAttack(target);
+    }
+
+    // 通常攻撃側の自動接近を停止する。stopMovementがtrueの場合は移動も停止する。
+    private void StopOwnApproach(bool stopMovement)
+    {
+        if (!_isApproaching) return;
+        _isApproaching = false;
+        if (stopMovement && _clickMovement != null) _clickMovement.StopMovement();
+    }
+
+    // Q/Rの射程外自動接近中かどうか(移動の二重制御防止に使用)。
+    private bool IsSkillApproachActive()
+    {
+        if (_qController != null && _qController.IsApproachingQTarget) return true;
+        if (_rController != null && _rController.IsApproachingRTarget) return true;
+        return false;
     }
 
     /// <summary>

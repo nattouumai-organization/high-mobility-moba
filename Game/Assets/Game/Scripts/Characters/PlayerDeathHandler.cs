@@ -8,15 +8,22 @@ using UnityEngine;
 /// (復活までの時間と復活位置はRespawnControllerが管理する)。
 /// 拠点への帰還・クールダウン短縮は今回実装しない。
 /// PlayerのHPバーは、WorldHealthBarが死亡・復活イベントを受けて非表示・再表示する。
+/// 通常攻撃・スキルの禁止はAbilityLockControllerの死亡ロックで一括管理する。
 /// </summary>
 [RequireComponent(typeof(HealthController))]
 public class PlayerDeathHandler : MonoBehaviour
 {
     private HealthController _healthController;
+    private AbilityLockController _abilityLock;
+
+    // 死亡ロックを追加済みか(二重解除・未解除の防止)。
+    private bool _deathLockAdded;
 
     private void Awake()
     {
         _healthController = GetComponent<HealthController>();
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
     }
 
     private void OnEnable()
@@ -33,10 +40,16 @@ public class PlayerDeathHandler : MonoBehaviour
 
     private void HandleDied()
     {
+        // 通常攻撃・スキルは死亡ロックで一括禁止する(各コントローラーがIsLockedを確認する)。
+        if (_abilityLock != null && !_deathLockAdded)
+        {
+            _abilityLock.AddLock(AbilityLockController.ReasonDeath);
+            _deathLockAdded = true;
+        }
+
         // 操作系コンポーネントを無効化する。
         DisableIfPresent(GetComponent<PlayerClickMovement>());
         DisableIfPresent(GetComponent<PlayerMouseFacing>());
-        DisableIfPresent(GetComponent<PlayerBasicAttackController>());
 
         // CharacterControllerはBehaviourではないため個別に無効化する。
         CharacterController characterController = GetComponent<CharacterController>();
@@ -54,10 +67,16 @@ public class PlayerDeathHandler : MonoBehaviour
 
     private void HandleRevived()
     {
+        // 死亡ロックを解除する。
+        if (_abilityLock != null && _deathLockAdded)
+        {
+            _abilityLock.RemoveLock(AbilityLockController.ReasonDeath);
+            _deathLockAdded = false;
+        }
+
         // 死亡時に無効化した操作系コンポーネントを元へ戻す。
         EnableIfPresent(GetComponent<PlayerClickMovement>());
         EnableIfPresent(GetComponent<PlayerMouseFacing>());
-        EnableIfPresent(GetComponent<PlayerBasicAttackController>());
 
         // CharacterControllerはBehaviourではないため個別に有効化する。
         // 復活位置は、無効化中にRespawnControllerが初期位置へ戻している。

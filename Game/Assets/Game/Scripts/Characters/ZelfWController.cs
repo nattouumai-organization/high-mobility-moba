@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 /// Wキーで発動。持続中は前方からの通常ダメージを軽減し、
 /// 周囲W Damage Radius以内の敵に母ティックAD×1.5分のダメージを与える。
 /// Character/TrainingDummyに命中した場合はQのCDを即時リセットしロックも解除する。
-/// W発動中は通常攻撃・Q・E・Rを無効化し、W終了時に復元する。
+/// W発動中はAbilityLockControllerへロックを追加し、通常攻撃・Q・E・Rの入力を一括で禁止する(W終了時に解除)。
 /// </summary>
 [RequireComponent(typeof(HealthController))]
 public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
@@ -41,11 +41,9 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
     private HealthController _health;
     private CharacterStats _characterStats;
-    private PlayerBasicAttackController _basicAttackController;
     private ZelfQController _qController;
-    private ZelfEController _eController;
-    private ZelfRController _rController;
     private ZelfPassiveHeal _passiveHeal;
+    private AbilityLockController _abilityLock;
     private LayerMask _targetableLayer;
 
     private float _activeEndTime;
@@ -57,16 +55,8 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     // W発動中にCharacterに初めて命中したか（Qリセットは1回のみ）。
     private bool _wQResetTriggered;
 
-    // W発動時のコンポーネント有効状態保存。
-    private bool _basicAttackWasEnabled;
-    private bool _qControllerWasEnabled;
-    private bool _eControllerWasEnabled;
-    private bool _rControllerWasEnabled;
-
-    // Wが実際にスキルを無効化したか。
-    // falseのままDeactivateが呼ばれた場合(例: W未使用での復活時)に
-    // 初期値falseの「WasEnabled」で上書きしてスキルが永久に無効化されるのを防ぐ。
-    private bool _skillsDisabledByW;
+    // WがAbilityLockControllerへロックを追加済みか(二重解除・未解除の防止)。
+    private bool _lockAdded;
 
     public bool IsWActive => _isWActive;
 
@@ -74,11 +64,10 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     {
         _health = GetComponent<HealthController>();
         _characterStats = GetComponent<CharacterStats>();
-        _basicAttackController = GetComponent<PlayerBasicAttackController>();
         _qController = GetComponent<ZelfQController>();
-        _eController = GetComponent<ZelfEController>();
-        _rController = GetComponent<ZelfRController>();
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
 
         // TargetableLayerMaskはZelfQControllerと共有する。
         if (_qController != null)
@@ -152,33 +141,25 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         }
         if (_health.IsDead) return;
 
+        // 他の行動ロック中(Eダッシュ中など)は発動できない。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            Debug.Log("Zelf W: 他の行動中のため発動できません。", this);
+            return;
+        }
+
         _isWActive = true;
         _activeEndTime = Time.time + _duration;
         _cooldownEndTime = Time.time + _cooldown;
         _wQResetTriggered = false;
 
-        // W発動中は通常攻撃・Q・E・Rを無効化する。
-        if (_basicAttackController != null)
+        // W発動中は通常攻撃・Q・E・Rの入力をロックする
+        // (各コントローラーがIsLockedを確認する。コンポーネント自体は無効化しない)。
+        if (_abilityLock != null && !_lockAdded)
         {
-            _basicAttackWasEnabled = _basicAttackController.enabled;
-            _basicAttackController.enabled = false;
+            _abilityLock.AddLock(AbilityLockController.ReasonZelfW);
+            _lockAdded = true;
         }
-        if (_qController != null)
-        {
-            _qControllerWasEnabled = _qController.enabled;
-            _qController.enabled = false;
-        }
-        if (_eController != null)
-        {
-            _eControllerWasEnabled = _eController.enabled;
-            _eController.enabled = false;
-        }
-        if (_rController != null)
-        {
-            _rControllerWasEnabled = _rController.enabled;
-            _rController.enabled = false;
-        }
-        _skillsDisabledByW = true;
 
         RebuildShieldArcPositions();
         _shieldArc.enabled = true;
@@ -201,18 +182,12 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             _damageCoroutine = null;
         }
 
-        // コンポーネントを復元する(死亡時はPlayerDeathHandlerが管理するため、
-        // IsDead状態では復元しない。復活時はOnHealthRevivedで呼び出されるため問題ない）。
-        // Wが実際に無効化した場合のみ復元する。
-        // (W未使用で復活時にDeactivateが呼ばれても、初期値falseのWasEnabledで
-        //  上書きして通常攻撃・Q・E・Rが永久に無効化されるバグを防ぐ)
-        if (_skillsDisabledByW && !_health.IsDead)
+        // Wが追加したロックを解除する。ロック方式のため、死亡・復活・他スキルと
+        // 無効化理由が重なっても復元漏れ・二重復元は起きない。
+        if (_abilityLock != null && _lockAdded)
         {
-            if (_basicAttackController != null) _basicAttackController.enabled = _basicAttackWasEnabled;
-            if (_qController != null) _qController.enabled = _qControllerWasEnabled;
-            if (_eController != null) _eController.enabled = _eControllerWasEnabled;
-            if (_rController != null) _rController.enabled = _rControllerWasEnabled;
-            _skillsDisabledByW = false;
+            _abilityLock.RemoveLock(AbilityLockController.ReasonZelfW);
+            _lockAdded = false;
         }
     }
 

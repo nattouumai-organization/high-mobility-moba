@@ -11,11 +11,7 @@ public sealed class ZelfEController : MonoBehaviour
     [SerializeField] private CharacterController _characterController;
     [SerializeField] private CharacterStats _characterStats;
     [SerializeField] private PlayerClickMovement _clickMovement;
-    [SerializeField] private PlayerBasicAttackController _basicAttackController;
     [SerializeField] private ZelfQController _qController;
-    [SerializeField] private ZelfWController _wController;
-    // Rもダッシュ中に無効化する。Eダッシュ中は「全てのスキル」を禁止する仕様のため。
-    [SerializeField] private ZelfRController _rController;
 
     [Header("Dash")]
     [SerializeField, Min(0f)] private float _dashDistance = 4f;
@@ -58,13 +54,10 @@ public sealed class ZelfEController : MonoBehaviour
     private float _cooldownEndTime;
     private bool _hitCharacterClassification;
     private bool _clickMovementWasEnabled;
-    private bool _basicAttackWasEnabled;
     private bool _characterControllerWasEnabled;
-    private bool _qControllerWasEnabled;
-    private bool _wControllerWasEnabled;
-    private bool _rControllerWasEnabled;
-    // ダッシュが実際にスキルを無効化したか(二重復元・未復元の防止)。
-    private bool _skillsDisabledByDash;
+    // ダッシュがAbilityLockControllerへロックを追加済みか(二重解除・未解除の防止)。
+    private bool _lockAdded;
+    private AbilityLockController _abilityLock;
     private TrailRenderer _trail;
     private Material _trailMaterial;
     private Coroutine _waveCoroutine;
@@ -76,15 +69,14 @@ public sealed class ZelfEController : MonoBehaviour
         _characterController = _characterController != null ? _characterController : GetComponent<CharacterController>();
         _characterStats = _characterStats != null ? _characterStats : GetComponent<CharacterStats>();
         _clickMovement = _clickMovement != null ? _clickMovement : GetComponent<PlayerClickMovement>();
-        _basicAttackController = _basicAttackController != null ? _basicAttackController : GetComponent<PlayerBasicAttackController>();
         _qController = _qController != null ? _qController : GetComponent<ZelfQController>();
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
         _selfHealth = GetComponent<HealthController>();
         _mainCamera = Camera.main;
 
-        _wController = _wController != null ? _wController : GetComponent<ZelfWController>();
-        _rController = _rController != null ? _rController : GetComponent<ZelfRController>();
 
         if (_qController == null)
         {
@@ -136,6 +128,13 @@ public sealed class ZelfEController : MonoBehaviour
         }
         if (_selfHealth != null && _selfHealth.IsDead) return;
 
+        // 他の行動ロック中(W発動中など)は発動できない。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            Debug.Log("ゼルフ E: 他の行動中のため発動できません。", this);
+            return;
+        }
+
         if (!TryGetMouseGroundPoint(out Vector3 groundPoint))
         {
             Debug.Log("ゼルフ E: マウスカーソルがGroundを指していないため発動しません。", this);
@@ -186,30 +185,14 @@ public sealed class ZelfEController : MonoBehaviour
             _clickMovementWasEnabled = _clickMovement.enabled;
             _clickMovement.enabled = false;
         }
-        if (_basicAttackController != null)
+        // ダッシュ中は通常攻撃・Q・W・Rを含む全スキルの入力をロックする
+        // (各コントローラーがIsLockedを確認する。コンポーネント自体は無効化しない)。
+        if (_qController != null) _qController.CancelPendingApproach();
+        if (_abilityLock != null && !_lockAdded)
         {
-            _basicAttackWasEnabled = _basicAttackController.enabled;
-            _basicAttackController.enabled = false;
+            _abilityLock.AddLock(AbilityLockController.ReasonZelfEDash);
+            _lockAdded = true;
         }
-
-        // ダッシュ中はQ・W・Rを含む全スキルの入力を受け付けない。
-        if (_qController != null)
-        {
-            _qController.CancelPendingApproach();
-            _qControllerWasEnabled = _qController.enabled;
-            _qController.enabled = false;
-        }
-        if (_wController != null)
-        {
-            _wControllerWasEnabled = _wController.enabled;
-            _wController.enabled = false;
-        }
-        if (_rController != null)
-        {
-            _rControllerWasEnabled = _rController.enabled;
-            _rController.enabled = false;
-        }
-        _skillsDisabledByDash = true;
 
         _characterControllerWasEnabled = _characterController.enabled;
         _characterController.enabled = false;
@@ -236,16 +219,8 @@ public sealed class ZelfEController : MonoBehaviour
         ResolveOverlapWithTargetables();
         _characterController.enabled = _characterControllerWasEnabled;
         if (_clickMovement != null) _clickMovement.enabled = _clickMovementWasEnabled;
-        if (_basicAttackController != null) _basicAttackController.enabled = _basicAttackWasEnabled;
-
-        // ダッシュ終了後はQ・W・Rを元の状態へ復元する。
-        if (_skillsDisabledByDash)
-        {
-            if (_qController != null) _qController.enabled = _qControllerWasEnabled;
-            if (_wController != null) _wController.enabled = _wControllerWasEnabled;
-            if (_rController != null) _rController.enabled = _rControllerWasEnabled;
-            _skillsDisabledByDash = false;
-        }
+        // ダッシュが追加したロックを解除する。
+        RemoveDashLock();
 
         _isDashing = false;
         FaceDashDirection();
@@ -280,15 +255,19 @@ public sealed class ZelfEController : MonoBehaviour
         if (_waveCoroutine != null) { StopCoroutine(_waveCoroutine); _waveCoroutine = null; }
         if (_trail != null) _trail.emitting = false;
 
-        // 死亡でダッシュが中断された場合もQ・W・Rの有効状態を復元する。
-        // (復元しないと復活後もスキルが無効のままになる。
-        //  移動・通常攻撃・CharacterControllerはPlayerDeathHandlerが管理するため触らない)
-        if (_skillsDisabledByDash)
+        // 死亡でダッシュが中断された場合もロックを解除する。
+        // (死亡中の行動禁止はPlayerDeathHandlerが追加する死亡ロックが担当する。
+        //  移動・CharacterControllerはPlayerDeathHandlerが管理するため触らない)
+        RemoveDashLock();
+    }
+
+    // ダッシュが追加したロックを解除する(未追加なら何もしない)。
+    private void RemoveDashLock()
+    {
+        if (_abilityLock != null && _lockAdded)
         {
-            if (_qController != null) _qController.enabled = _qControllerWasEnabled;
-            if (_wController != null) _wController.enabled = _wControllerWasEnabled;
-            if (_rController != null) _rController.enabled = _rControllerWasEnabled;
-            _skillsDisabledByDash = false;
+            _abilityLock.RemoveLock(AbilityLockController.ReasonZelfEDash);
+            _lockAdded = false;
         }
     }
 
