@@ -73,6 +73,7 @@ public sealed class ZelfRController : MonoBehaviour
     private Camera _mainCamera;
     private HealthController _selfHealth;
     private AbilityLockController _abilityLock;
+    private PlayerInputHub _inputHub;
     private ZelfQController _qController;
     private CharacterController _characterController;
     private PlayerClickMovement _clickMovement;
@@ -115,6 +116,8 @@ public sealed class ZelfRController : MonoBehaviour
         _qController = GetComponent<ZelfQController>();
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
 
         // ゼルフ自身の死亡時に決闘エリアを即時終了する。
         if (_selfHealth != null) _selfHealth.Died += OnSelfDied;
@@ -183,7 +186,7 @@ public sealed class ZelfRController : MonoBehaviour
             CancelPendingApproach();
             if (_rangeCircle != null) _rangeCircle.enabled = false;
             // 診断用: ロック中のRリリースは理由をログに出す。
-            if (Keyboard.current != null && Keyboard.current.rKey.wasReleasedThisFrame)
+            if (_inputHub != null && _inputHub.RReleasedThisFrame)
             {
                 Debug.Log("Zelf R: 他の行動中のため発動できません。", this);
             }
@@ -194,7 +197,7 @@ public sealed class ZelfRController : MonoBehaviour
         UpdateRangeCircle();
 
         // Rキーを離した瞬間に発動判定を行う。
-        if (Keyboard.current != null && Keyboard.current.rKey.wasReleasedThisFrame)
+        if (_inputHub != null && _inputHub.RReleasedThisFrame)
         {
             HandleRReleased();
         }
@@ -263,7 +266,7 @@ public sealed class ZelfRController : MonoBehaviour
             CancelPendingApproach();
             return;
         }
-        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
+        if (_inputHub != null && _inputHub.RightClickPressedThisFrame)
         {
             CancelPendingApproach();
             Debug.Log("Zelf R: 右クリック入力により自動接近を中止しました。", this);
@@ -303,9 +306,9 @@ public sealed class ZelfRController : MonoBehaviour
     private bool TryGetCharacterTargetUnderMouse(out Targetable target)
     {
         target = null;
-        if (Mouse.current == null || _targetableLayer.value == 0) return false;
+        if (_inputHub == null || _targetableLayer.value == 0) return false;
         if (_mainCamera == null) { _mainCamera = Camera.main; if (_mainCamera == null) return false; }
-        Ray ray = _mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+        Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _targetableLayer, QueryTriggerInteraction.Ignore)) return false;
         Targetable t = hit.collider.GetComponentInParent<Targetable>();
         if (t == null || t.IsDead || !t.isActiveAndEnabled) return false;
@@ -584,7 +587,7 @@ public sealed class ZelfRController : MonoBehaviour
 
     private void UpdateRangeCircle()
     {
-        bool visible = Keyboard.current != null && Keyboard.current.rKey.isPressed;
+        bool visible = _inputHub != null && _inputHub.RPressed;
         _rangeCircle.enabled = visible;
         if (!visible) return;
 

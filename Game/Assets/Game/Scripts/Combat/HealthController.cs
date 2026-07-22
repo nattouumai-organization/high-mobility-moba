@@ -5,6 +5,8 @@ using UnityEngine;
 /// 現在HPを管理し、被ダメージ・回復・死亡処理の起点となるコンポーネント。
 /// CharacterStatsを持つ対象(Player)はCurrent Max Healthを最大HPとして使用し、
 /// CharacterStatsを持たない対象(TrainingDummy)はInspectorのMax Healthを使用する。
+/// 最大HPの動的変化(バフ・レベル成長・Inspector変更)を毎フレーム検知し、
+/// 増加分は現在HPへ加算(LoL方式)、減少時は現在HPを新しい最大HPへクランプする。
 /// TakeDamage / Healは、実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、
 /// ダメージを与えた側がゼルフPの与ダメージ回復やダメージ表示に実ダメージ量を使用できるようにする。
 /// Reviveで死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。
@@ -20,11 +22,14 @@ public class HealthController : MonoBehaviour
     // CharacterStatsを持つ場合は、この値ではなくCurrent Max Healthを使用する。
     [SerializeField] private float _maxHealth = 100f;
 
-    // 現在HP。実行時にAwakeで最大HPへ初期化する。Inspectorでの確認用に表示する。
+    // 現在HP。実行時にStartで最大HPへ初期化する。Inspectorでの確認用に表示する。
     [SerializeField] private float _currentHealth = 100f;
 
     private CharacterStats _characterStats;
     private bool _isDead;
+
+    // 最大HPの動的変化を検知するための前回値。
+    private float _lastKnownMaxHealth;
 
     // 同じGameObject上の被ダメージ変更コンポーネント(ゼルフWなど)。Awakeで1回だけ取得する。
     private IIncomingDamageModifier[] _damageModifiers;
@@ -55,12 +60,46 @@ public class HealthController : MonoBehaviour
     {
         _characterStats = GetComponent<CharacterStats>();
         _damageModifiers = GetComponents<IIncomingDamageModifier>();
-        _currentHealth = MaxHealth;
     }
 
     private void Start()
     {
+        // CharacterStatsのAwake(CharacterData適用)が先に終わっている保証がないため、
+        // 現在HPの初期化はStartで行う(Startは全コンポーネントのAwake後に呼ばれる)。
+        _currentHealth = MaxHealth;
+        _lastKnownMaxHealth = MaxHealth;
+
         // 購読側(HPバーなど)の初期表示のため、開始時に現在HPを通知する。
+        NotifyHealthChanged();
+    }
+
+    private void Update()
+    {
+        // 最大HPの動的変化(バフ・レベル成長・Inspector変更)を検知して現在HPへ反映する。
+        float max = MaxHealth;
+        if (!Mathf.Approximately(max, _lastKnownMaxHealth))
+        {
+            HandleMaxHealthChanged(_lastKnownMaxHealth, max);
+            _lastKnownMaxHealth = max;
+        }
+    }
+
+    // 最大HP変化時: 増加分は現在HPへ加算(LoL方式)、減少時は現在HPを新しい最大HPへクランプする。
+    // 死亡中は現在HP(0)を変えず、HPバーの最大値表示だけを更新する。
+    private void HandleMaxHealthChanged(float previousMax, float newMax)
+    {
+        if (!_isDead)
+        {
+            if (newMax > previousMax)
+            {
+                _currentHealth += newMax - previousMax;
+            }
+            else
+            {
+                _currentHealth = Mathf.Min(_currentHealth, newMax);
+            }
+        }
+
         NotifyHealthChanged();
     }
 

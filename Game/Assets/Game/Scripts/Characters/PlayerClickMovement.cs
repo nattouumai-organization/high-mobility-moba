@@ -1,11 +1,11 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// Ground上を右クリックした地点へ、CharacterController.Moveで滑らかに移動させる。
 /// 右クリックを長押ししている間は、カーソル下のGround地点へ移動先を毎フレーム更新し続ける。
 /// TASKS.md「右クリック移動を実装する」用の試作スクリプト。
 /// 移動速度はCharacterStatsのCurrent Move Speedから取得する。
+/// 入力はPlayerInputHub(InputAction)経由で取得する。
 /// TargetableLayerの対象を右クリックした場合は、ターゲット選択を優先しGround移動を開始しない。
 /// ターゲット選択時はPlayerTargetSelectorがStopMovement()を呼び、Playerはその場で停止する。
 /// 射程外のターゲットを選択した場合は、PlayerBasicAttackControllerがMoveToPosition()で射程内まで自動接近させる。
@@ -26,6 +26,8 @@ public class PlayerClickMovement : MonoBehaviour
     // 同じPlayer上のターゲット選択(任意)。存在する場合、Targetable対象の右クリック時は移動しない。
     private PlayerTargetSelector _targetSelector;
 
+    private PlayerInputHub _inputHub;
+
     private Camera _mainCamera;
     private Vector3 _destination;
     private bool _hasDestination;
@@ -35,6 +37,8 @@ public class PlayerClickMovement : MonoBehaviour
         _characterController = GetComponent<CharacterController>();
         _characterStats = GetComponent<CharacterStats>();
         _targetSelector = GetComponent<PlayerTargetSelector>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _mainCamera = Camera.main;
 
         if (_characterStats == null)
@@ -73,11 +77,9 @@ public class PlayerClickMovement : MonoBehaviour
 
     private void UpdateDestinationFromRightClick()
     {
-        Mouse mouse = Mouse.current;
-
         // 長押し中は常にカーソル下の地点へ移動する仕様のため、
         // 押した瞬間だけでなく、右ボタンが押されている間は毎フレーム移動先を更新する。
-        if (mouse == null || !mouse.rightButton.isPressed)
+        if (_inputHub == null || !_inputHub.RightClickPressed)
         {
             return;
         }
@@ -94,7 +96,7 @@ public class PlayerClickMovement : MonoBehaviour
             return;
         }
 
-        Ray ray = _mainCamera.ScreenPointToRay(mouse.position.ReadValue());
+        Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hitInfo, Mathf.Infinity, _groundLayer))
         {
             // Ground以外を右クリックした場合は移動先を変更しない。

@@ -44,6 +44,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     private ZelfQController _qController;
     private ZelfPassiveHeal _passiveHeal;
     private AbilityLockController _abilityLock;
+    private PlayerInputHub _inputHub;
     private LayerMask _targetableLayer;
 
     private float _activeEndTime;
@@ -68,6 +69,8 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
 
         // TargetableLayerMaskはZelfQControllerと共有する。
         if (_qController != null)
@@ -121,7 +124,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             _shieldArc.enabled = _isWActive;
         }
 
-        if (Keyboard.current != null && Keyboard.current.wKey.wasPressedThisFrame)
+        if (_inputHub != null && _inputHub.WPressedThisFrame)
         {
             HandleWPressed();
         }

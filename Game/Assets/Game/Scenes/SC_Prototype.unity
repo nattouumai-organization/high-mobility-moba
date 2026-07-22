@@ -407,6 +407,7 @@ GameObject:
   - component: {fileID: 968542333}
   - component: {fileID: 968542334}
   - component: {fileID: 968542335}
+  - component: {fileID: 968542336}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -558,6 +559,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f2a7c5d8e4b1439a86c0d9e3b5f78a21, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _characterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
   _baseMoveSpeed: 6
   _bonusMoveSpeed: 0
   _baseAttackSpeed: 1
@@ -710,6 +712,9 @@ MonoBehaviour:
   _cooldown: 10
   _frontAngle: 120
   _damageReduction: 0.55
+  _wDamageRadius: 2
+  _wTotalADRatio: 1.5
+  _wTickInterval: 0.1
   _shieldColor: {r: 0.25, g: 0.6, b: 1, a: 0.9}
   _shieldRadius: 1.5
   _shieldWidth: 0.06
@@ -731,9 +736,7 @@ MonoBehaviour:
   _characterController: {fileID: 968542321}
   _characterStats: {fileID: 968542324}
   _clickMovement: {fileID: 968542322}
-  _basicAttackController: {fileID: 968542326}
   _qController: {fileID: 968542333}
-  _wController: {fileID: 0}
   _dashDistance: 4
   _dashDuration: 0.18
   _hitRadius: 0.6
@@ -754,6 +757,39 @@ MonoBehaviour:
   _trailWidth: 0.45
   _isDashing: 0
   _remainingCooldown: 0
+--- !u!114 &968542336
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87c9b8d8bb0aaf249807a73e2a01442c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZelfRController
+  _selfStats: {fileID: 0}
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _arenaRadius: 5
+  _duration: 5
+  _cooldown: 6
+  _castRange: 7
+  _innerSlowPercent: 0.3
+  _outerSlowPercent: 0.6
+  _outerSlowDuration: 2.5
+  _selfMSBoostPercent: 20
+  _arenaColor: {r: 0.75, g: 0.25, b: 1, a: 0.9}
+  _arenaSegments: 64
+  _arenaLineWidth: 0.08
+  _rangeCircleColor: {r: 0.75, g: 0.25, b: 1, a: 0.6}
+  _rangeCircleWidth: 0.035
+  _isRActive: 0
+  _remainingCooldown: 0
+  _remainingDuration: 0
+  _isApproachingRTarget: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0

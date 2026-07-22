@@ -57,6 +57,12 @@
 
 ### Changed
 
+- フェーズ1・2総合改善(phase1-2-fix3): 最大HPの動的変化に対応した。HealthControllerが最大HPの変化を毎フレーム検知し、
+  増加分は現在HPへ加算(LoL方式)・減少時は現在HPをクランプする。CharacterStatsにAddMaxHealthBonus/RemoveMaxHealthBonusを追加。
+- 数値のSO一元管理(phase1-2-fix3): CharacterStatsにCharacter Data参照を追加し、AwakeでZelfData.assetの基礎値を適用するようにした。
+  ステータス単位→Unity単位の換算定数(MS60=1unit/s、射程100=1unit)をCharacterStatsで一元管理。未設定時は従来どおりInspector値を使用(後方互換)。
+- 入力のInputAction移行(phase1-2-fix3): PlayerInputHubを新規追加し、Q/W/E/R・右クリック・マウス座標の取得を
+  Keyboard.current/Mouse.currentの直接ポーリングからInputActionへ置き換えた。Awakeで自動追加されるためInspector設定不要。
 - 行動ロックの診断ログを強化(phase1-2-fix2): ロック中にQ/E/Rを入力した際に必ず理由をConsoleへ出力するようにした。
   Eはロック判定をクールダウン判定より先に移動し、ダッシュ中・死亡中の押下もログを出す。
   AbilityLockControllerはロックの追加/解除をログに出す。

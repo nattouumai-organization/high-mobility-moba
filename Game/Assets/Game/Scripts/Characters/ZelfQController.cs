@@ -52,6 +52,7 @@ public sealed class ZelfQController : MonoBehaviour
     private ZelfPassiveHeal _passiveHeal;
     private ZelfRController _rController;
     private AbilityLockController _abilityLock;
+    private PlayerInputHub _inputHub;
 
     public bool IsQAvailable => _isQAvailable;
     public float RemainingCooldown => _remainingCooldown;
@@ -110,6 +111,8 @@ public sealed class ZelfQController : MonoBehaviour
         _rController = GetComponent<ZelfRController>();
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         CreateRangeCircle();
     }
 
@@ -134,7 +137,7 @@ public sealed class ZelfQController : MonoBehaviour
             if (_pendingTarget != null) CancelPendingCast(false);
             if (_rangeCircle != null) _rangeCircle.enabled = false;
             // 診断用: ロック中のQ押下は理由をログに出す。
-            if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
+            if (_inputHub != null && _inputHub.QPressedThisFrame)
             {
                 Debug.Log("Zelf Q: 他の行動中のため発動できません。", this);
             }
@@ -143,7 +146,7 @@ public sealed class ZelfQController : MonoBehaviour
 
         UpdateRangeCircle();
 
-        if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
+        if (_inputHub != null && _inputHub.QPressedThisFrame)
         {
             HandleQPressed();
         }
@@ -180,7 +183,7 @@ public sealed class ZelfQController : MonoBehaviour
     private void UpdatePendingCast()
     {
         if (_pendingTarget == null) return;
-        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame)
+        if (_inputHub != null && _inputHub.RightClickPressedThisFrame)
         {
             CancelPendingCast(false);
             Log("Zelf Q: 右クリック入力により自動接近を中止しました。");
@@ -240,7 +243,7 @@ public sealed class ZelfQController : MonoBehaviour
     {
         if (_clickMovement == null) return;
         _clickMovement.StopMovement();
-        if (Mouse.current != null && Mouse.current.rightButton.isPressed)
+        if (_inputHub != null && _inputHub.RightClickPressed)
         {
             _clickMovement.enabled = false;
             _movementSuppressedUntilRightRelease = true;
@@ -250,7 +253,7 @@ public sealed class ZelfQController : MonoBehaviour
     private void RestoreMovementAfterRightClickRelease()
     {
         if (!_movementSuppressedUntilRightRelease) return;
-        if (Mouse.current != null && Mouse.current.rightButton.isPressed) return;
+        if (_inputHub != null && _inputHub.RightClickPressed) return;
         if (_clickMovement != null) _clickMovement.enabled = true;
         _movementSuppressedUntilRightRelease = false;
     }
@@ -270,8 +273,8 @@ public sealed class ZelfQController : MonoBehaviour
     private bool TryGetTargetUnderMouse(out Targetable target)
     {
         target = null;
-        if (Mouse.current == null || Camera.main == null || _targetableLayer.value == 0) return false;
-        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+        if (_inputHub == null || Camera.main == null || _targetableLayer.value == 0) return false;
+        Ray ray = Camera.main.ScreenPointToRay(_inputHub.MousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _targetableLayer, QueryTriggerInteraction.Ignore)) return false;
         target = hit.collider.GetComponentInParent<Targetable>();
         return target != null;
@@ -395,7 +398,7 @@ public sealed class ZelfQController : MonoBehaviour
 
     private void UpdateRangeCircle()
     {
-        bool visible = Keyboard.current != null && Keyboard.current.qKey.isPressed;
+        bool visible = _inputHub != null && _inputHub.QPressed;
         _rangeCircle.enabled = visible;
         if (!visible) return;
         _rangeCircle.transform.localPosition = new Vector3(0f, _characterController.center.y - _characterController.height * 0.5f + 0.025f, 0f);

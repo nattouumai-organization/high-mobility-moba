@@ -58,6 +58,7 @@ public sealed class ZelfEController : MonoBehaviour
     // ダッシュがAbilityLockControllerへロックを追加済みか(二重解除・未解除の防止)。
     private bool _lockAdded;
     private AbilityLockController _abilityLock;
+    private PlayerInputHub _inputHub;
     private TrailRenderer _trail;
     private Material _trailMaterial;
     private Coroutine _waveCoroutine;
@@ -72,6 +73,8 @@ public sealed class ZelfEController : MonoBehaviour
         _qController = _qController != null ? _qController : GetComponent<ZelfQController>();
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
         _selfHealth = GetComponent<HealthController>();
@@ -110,7 +113,7 @@ public sealed class ZelfEController : MonoBehaviour
                 return;
             }
             // ダッシュ中のE再入力は受け付けない(診断用にログを出す)。
-            if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+            if (_inputHub != null && _inputHub.EPressedThisFrame)
             {
                 Debug.Log("ゼルフ E: ダッシュ中のため発動できません。", this);
             }
@@ -118,7 +121,7 @@ public sealed class ZelfEController : MonoBehaviour
             return;
         }
 
-        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+        if (_inputHub != null && _inputHub.EPressedThisFrame)
         {
             HandleEPressed();
         }
@@ -164,13 +167,13 @@ public sealed class ZelfEController : MonoBehaviour
     private bool TryGetMouseGroundPoint(out Vector3 point)
     {
         point = Vector3.zero;
-        if (Mouse.current == null || _groundLayer.value == 0) return false;
+        if (_inputHub == null || _groundLayer.value == 0) return false;
         if (_mainCamera == null)
         {
             _mainCamera = Camera.main;
             if (_mainCamera == null) return false;
         }
-        Ray ray = _mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+        Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _groundLayer, QueryTriggerInteraction.Ignore)) return false;
         point = hit.point;
         return true;
