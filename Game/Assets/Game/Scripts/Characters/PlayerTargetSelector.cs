@@ -162,6 +162,12 @@ public class PlayerTargetSelector : MonoBehaviour
         _currentTarget.SetSelected(true);
     }
 
+    /// <summary>選択中のターゲットを解除する。停止コマンド(S)など外部から呼び出すための公開API。</summary>
+    public void ClearTargetSelection()
+    {
+        ClearTarget();
+    }
+
     private void ClearTarget()
     {
         if (_currentTarget != null)

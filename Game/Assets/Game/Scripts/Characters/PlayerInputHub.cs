@@ -2,11 +2,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Playerの入力をInputActionで一元管理するハブ。
-/// 従来のKeyboard.current / Mouse.currentの直接ポーリングを置き換え、
-/// 将来のキーコンフィグ・ゲームパッド対応はこのクラスのバインディング変更だけで行えるようにする。
-/// 各コントローラーのAwakeでGetComponent→なければAddComponentされるため、
-/// Inspectorでの手動アタッチは不要(手動でアタッチしてもよい)。
+/// Player入力の一元管理(InputAction)。Q/W/E/R・停止コマンド(S)・右クリック・マウス座標を公開する。
+/// 各コントローラーのAwakeからget-or-addで自動追加されるため、Inspector設定は不要。
+/// 将来のキーコンフィグ・ゲームパッド対応は、このクラスのバインディング変更のみで行う。
 /// </summary>
 public sealed class PlayerInputHub : MonoBehaviour
 {
@@ -14,36 +12,39 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _wAction;
     private InputAction _eAction;
     private InputAction _rAction;
+    private InputAction _sAction;
     private InputAction _rightClickAction;
     private InputAction _mousePositionAction;
+
     private bool _initialized;
 
-    /// <summary>Qキーがこのフレームに押されたか。</summary>
-    public bool QPressedThisFrame => _qAction.WasPressedThisFrame();
+    // --- Q ---
+    public bool QPressedThisFrame => _qAction != null && _qAction.WasPressedThisFrame();
+    public bool QPressed => _qAction != null && _qAction.IsPressed();
+    public bool QReleasedThisFrame => _qAction != null && _qAction.WasReleasedThisFrame();
 
-    /// <summary>Qキーが押されている間true(長押しで射程円表示に使用)。</summary>
-    public bool QPressed => _qAction.IsPressed();
+    // --- W ---
+    public bool WPressedThisFrame => _wAction != null && _wAction.WasPressedThisFrame();
+    public bool WPressed => _wAction != null && _wAction.IsPressed();
+    public bool WReleasedThisFrame => _wAction != null && _wAction.WasReleasedThisFrame();
 
-    /// <summary>Wキーがこのフレームに押されたか。</summary>
-    public bool WPressedThisFrame => _wAction.WasPressedThisFrame();
+    // --- E ---
+    public bool EPressedThisFrame => _eAction != null && _eAction.WasPressedThisFrame();
+    public bool EPressed => _eAction != null && _eAction.IsPressed();
+    public bool EReleasedThisFrame => _eAction != null && _eAction.WasReleasedThisFrame();
 
-    /// <summary>Eキーがこのフレームに押されたか。</summary>
-    public bool EPressedThisFrame => _eAction.WasPressedThisFrame();
+    // --- R ---
+    public bool RPressedThisFrame => _rAction != null && _rAction.WasPressedThisFrame();
+    public bool RPressed => _rAction != null && _rAction.IsPressed();
+    public bool RReleasedThisFrame => _rAction != null && _rAction.WasReleasedThisFrame();
 
-    /// <summary>Rキーが押されている間true(長押しで射程円表示に使用)。</summary>
-    public bool RPressed => _rAction.IsPressed();
+    // --- 停止コマンド(S) ---
+    public bool SPressedThisFrame => _sAction != null && _sAction.WasPressedThisFrame();
 
-    /// <summary>Rキーがこのフレームに離されたか(離して発動に使用)。</summary>
-    public bool RReleasedThisFrame => _rAction.WasReleasedThisFrame();
-
-    /// <summary>右クリックが押されている間true。</summary>
-    public bool RightClickPressed => _rightClickAction.IsPressed();
-
-    /// <summary>右クリックがこのフレームに押されたか。</summary>
-    public bool RightClickPressedThisFrame => _rightClickAction.WasPressedThisFrame();
-
-    /// <summary>マウスカーソルのスクリーン座標。</summary>
-    public Vector2 MousePosition => _mousePositionAction.ReadValue<Vector2>();
+    // --- マウス ---
+    public bool RightClickPressed => _rightClickAction != null && _rightClickAction.IsPressed();
+    public bool RightClickPressedThisFrame => _rightClickAction != null && _rightClickAction.WasPressedThisFrame();
+    public Vector2 MousePosition => _mousePositionAction != null ? _mousePositionAction.ReadValue<Vector2>() : Vector2.zero;
 
     private void Awake()
     {
@@ -53,12 +54,24 @@ public sealed class PlayerInputHub : MonoBehaviour
     private void OnEnable()
     {
         InitializeActions();
-        EnableAll();
+        _qAction.Enable();
+        _wAction.Enable();
+        _eAction.Enable();
+        _rAction.Enable();
+        _sAction.Enable();
+        _rightClickAction.Enable();
+        _mousePositionAction.Enable();
     }
 
     private void OnDisable()
     {
-        DisableAll();
+        _qAction?.Disable();
+        _wAction?.Disable();
+        _eAction?.Disable();
+        _rAction?.Disable();
+        _sAction?.Disable();
+        _rightClickAction?.Disable();
+        _mousePositionAction?.Disable();
     }
 
     private void OnDestroy()
@@ -67,43 +80,23 @@ public sealed class PlayerInputHub : MonoBehaviour
         _wAction?.Dispose();
         _eAction?.Dispose();
         _rAction?.Dispose();
+        _sAction?.Dispose();
         _rightClickAction?.Dispose();
         _mousePositionAction?.Dispose();
     }
 
-    // AddComponent直後にプロパティが参照されても安全なよう、初期化は冪等にする。
+    // アクション生成は冪等。どのコンポーネントから先に呼ばれても安全。
     private void InitializeActions()
     {
         if (_initialized) return;
         _initialized = true;
 
-        // キー割り当てを変える場合はここのバインディングを変更する。
         _qAction = new InputAction("SkillQ", InputActionType.Button, "<Keyboard>/q");
         _wAction = new InputAction("SkillW", InputActionType.Button, "<Keyboard>/w");
         _eAction = new InputAction("SkillE", InputActionType.Button, "<Keyboard>/e");
         _rAction = new InputAction("SkillR", InputActionType.Button, "<Keyboard>/r");
+        _sAction = new InputAction("StopCommand", InputActionType.Button, "<Keyboard>/s");
         _rightClickAction = new InputAction("RightClick", InputActionType.Button, "<Mouse>/rightButton");
         _mousePositionAction = new InputAction("MousePosition", InputActionType.Value, "<Mouse>/position");
-        EnableAll();
-    }
-
-    private void EnableAll()
-    {
-        _qAction?.Enable();
-        _wAction?.Enable();
-        _eAction?.Enable();
-        _rAction?.Enable();
-        _rightClickAction?.Enable();
-        _mousePositionAction?.Enable();
-    }
-
-    private void DisableAll()
-    {
-        _qAction?.Disable();
-        _wAction?.Disable();
-        _eAction?.Disable();
-        _rAction?.Disable();
-        _rightClickAction?.Disable();
-        _mousePositionAction?.Disable();
     }
 }

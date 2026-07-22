@@ -52,6 +52,9 @@ public sealed class ZelfQController : MonoBehaviour
     private ZelfPassiveHeal _passiveHeal;
     private ZelfRController _rController;
     private AbilityLockController _abilityLock;
+    [Header("Cast")]
+    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
+
     private PlayerInputHub _inputHub;
     private Camera _mainCamera;
 
@@ -148,7 +151,8 @@ public sealed class ZelfQController : MonoBehaviour
 
         UpdateRangeCircle();
 
-        if (_inputHub != null && _inputHub.QPressedThisFrame)
+        // NormalCast: 押している間は射程円を表示し、離した瞬間に発動 / QuickCast: 押した瞬間に発動。
+        if (_inputHub != null && _castMode.IsCastTriggered(_inputHub.QPressedThisFrame, _inputHub.QReleasedThisFrame))
         {
             HandleQPressed();
         }

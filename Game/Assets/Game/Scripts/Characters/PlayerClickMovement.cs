@@ -26,6 +26,8 @@ public class PlayerClickMovement : MonoBehaviour
     // 同じPlayer上のターゲット選択(任意)。存在する場合、Targetable対象の右クリック時は移動しない。
     private PlayerTargetSelector _targetSelector;
 
+    private ZelfQController _qController;
+    private ZelfRController _rController;
     private PlayerInputHub _inputHub;
 
     private Camera _mainCamera;
@@ -40,6 +42,8 @@ public class PlayerClickMovement : MonoBehaviour
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _mainCamera = Camera.main;
+        _qController = GetComponent<ZelfQController>();
+        _rController = GetComponent<ZelfRController>();
 
         if (_characterStats == null)
         {
@@ -51,6 +55,8 @@ public class PlayerClickMovement : MonoBehaviour
 
     private void Update()
     {
+        HandleStopCommand();
+
         UpdateDestinationFromRightClick();
         MoveTowardsDestination();
     }
@@ -130,5 +136,19 @@ public class PlayerClickMovement : MonoBehaviour
         float moveDistance = Mathf.Min(_characterStats.CurrentMoveSpeed * Time.deltaTime, remainingDistance);
         Vector3 motion = toDestination.normalized * moveDistance;
         _characterController.Move(motion);
+    }
+
+    /// <summary>
+    /// 停止コマンド(Sキー): 進行中の移動を中断し、ターゲット選択とQ/Rの自動接近も解除して、その場で停止する。
+    /// (ターゲット解除により通常攻撃の自動接近・継続攻撃も停止する)
+    /// </summary>
+    private void HandleStopCommand()
+    {
+        if (_inputHub == null || !_inputHub.SPressedThisFrame) return;
+
+        StopMovement();
+        if (_targetSelector != null) _targetSelector.ClearTargetSelection();
+        if (_qController != null) _qController.CancelPendingApproach();
+        if (_rController != null) _rController.CancelPendingApproach();
     }
 }

@@ -30,6 +30,9 @@ public sealed class ZelfEController : MonoBehaviour
     [Header("Cooldown")]
     [SerializeField, Min(0f)] private float _cooldown = 8f;
 
+    [Header("Cast")]
+    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
+
     [Header("Layers")]
     [SerializeField] private LayerMask _groundLayer;
     [SerializeField] private LayerMask _targetableLayer;
@@ -48,6 +51,7 @@ public sealed class ZelfEController : MonoBehaviour
     private ZelfPassiveHeal _passiveHeal;
     private HealthController _selfHealth;
     private Camera _mainCamera;
+    private SkillRangeIndicator _rangeIndicator;
     private Vector3 _dashDirection;
     private float _remainingDashDistance;
     private float _dashSpeed;
@@ -79,6 +83,7 @@ public sealed class ZelfEController : MonoBehaviour
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
         _selfHealth = GetComponent<HealthController>();
         _mainCamera = Camera.main;
+        _rangeIndicator = SkillRangeIndicator.Create(transform, "E Range Indicator");
 
 
         if (_qController == null)
@@ -117,14 +122,51 @@ public sealed class ZelfEController : MonoBehaviour
             {
                 Debug.Log("ゼルフ E: ダッシュ中のため発動できません。", this);
             }
+            if (_rangeIndicator != null) _rangeIndicator.HideAll();
             UpdateDash();
             return;
         }
 
-        if (_inputHub != null && _inputHub.EPressedThisFrame)
+        // NormalCast: 押している間はダッシュ射程と方向を表示し、離した瞬間に発動 / QuickCast: 押した瞬間に発動。
+        UpdateRangeIndicator();
+
+        if (_inputHub != null && _castMode.IsCastTriggered(_inputHub.EPressedThisFrame, _inputHub.EReleasedThisFrame))
         {
             HandleEPressed();
         }
+    }
+
+    // Eキーを押している間、ダッシュ最大距離の円と本体→カーソル方向の直線を表示する(方向指定スキルの可視化)。
+    private void UpdateRangeIndicator()
+    {
+        if (_rangeIndicator == null) return;
+        bool visible = _inputHub != null && _inputHub.EPressed && !_isDashing
+            && (_abilityLock == null || !_abilityLock.IsLocked)
+            && (_selfHealth == null || !_selfHealth.IsDead);
+        if (!visible)
+        {
+            _rangeIndicator.HideAll();
+            return;
+        }
+
+        float yOffset = _characterController != null
+            ? _characterController.center.y - _characterController.height * 0.5f + 0.05f
+            : 0.05f;
+        _rangeIndicator.ShowCircle(_dashDistance, new Color(_trailColor.r, _trailColor.g, _trailColor.b, 0.7f), yOffset);
+
+        // カーソルの地面位置から本体→カーソルのXZ方向を求め、ダッシュ距離ぶんの方向線を表示する。
+        if (TryGetMouseGroundPoint(out Vector3 groundPoint))
+        {
+            Vector3 direction = groundPoint - transform.position;
+            direction.y = 0f;
+            if (direction.sqrMagnitude > 0.0001f)
+            {
+                Vector3 origin = transform.position + new Vector3(0f, yOffset, 0f);
+                _rangeIndicator.ShowDirectionLine(origin, direction.normalized, _dashDistance, new Color(_trailColor.r, _trailColor.g, _trailColor.b, 0.9f));
+                return;
+            }
+        }
+        _rangeIndicator.HideDirectionLine();
     }
 
     private void HandleEPressed()

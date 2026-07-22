@@ -15,6 +15,9 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     [Header("Settings")]
     [SerializeField, Min(0f)] private float _duration = 0.75f;
     [SerializeField, Min(0f)] private float _cooldown = 10f;
+
+    [Header("Cast")]
+    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
     [SerializeField, Range(0f, 360f)] private float _frontAngle = 120f;
     [SerializeField, Range(0f, 1f)] private float _damageReduction = 0.55f;
 
@@ -45,6 +48,8 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     private ZelfPassiveHeal _passiveHeal;
     private AbilityLockController _abilityLock;
     private PlayerInputHub _inputHub;
+    private SkillRangeIndicator _rangeIndicator;
+    private float _indicatorYOffset;
     private LayerMask _targetableLayer;
 
     private float _activeEndTime;
@@ -71,6 +76,10 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
+
+        _rangeIndicator = SkillRangeIndicator.Create(transform, "W Range Indicator");
+        CharacterController cc = GetComponent<CharacterController>();
+        _indicatorYOffset = cc != null ? cc.center.y - cc.height * 0.5f + 0.05f : 0.05f;
 
         // TargetableLayerMaskはZelfQControllerと共有する。
         if (_qController != null)
@@ -124,10 +133,28 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             _shieldArc.enabled = _isWActive;
         }
 
-        if (_inputHub != null && _inputHub.WPressedThisFrame)
+        // NormalCast: 押している間は効果範囲円を表示し、離した瞬間に発動 / QuickCast: 押した瞬間に発動。
+        UpdateRangeIndicator();
+
+        if (_inputHub != null && _castMode.IsCastTriggered(_inputHub.WPressedThisFrame, _inputHub.WReleasedThisFrame))
         {
             HandleWPressed();
         }
+    }
+
+    // Wキーを押している間、回転ダメージの効果範囲円を表示する(発動中・ロック中・死亡中は表示しない)。
+    private void UpdateRangeIndicator()
+    {
+        if (_rangeIndicator == null) return;
+        bool visible = _inputHub != null && _inputHub.WPressed && !_isWActive
+            && (_abilityLock == null || !_abilityLock.IsLocked)
+            && (_health == null || !_health.IsDead);
+        if (!visible)
+        {
+            _rangeIndicator.HideAll();
+            return;
+        }
+        _rangeIndicator.ShowCircle(_wDamageRadius, new Color(_shieldColor.r, _shieldColor.g, _shieldColor.b, 0.7f), _indicatorYOffset);
     }
 
     private void HandleWPressed()

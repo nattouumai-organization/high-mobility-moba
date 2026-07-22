@@ -73,6 +73,9 @@ public sealed class ZelfRController : MonoBehaviour
     private Camera _mainCamera;
     private HealthController _selfHealth;
     private AbilityLockController _abilityLock;
+    [Header("Cast")]
+    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
+
     private PlayerInputHub _inputHub;
     private ZelfQController _qController;
     private CharacterController _characterController;
@@ -196,8 +199,8 @@ public sealed class ZelfRController : MonoBehaviour
         // Rキーを押している間は射程円を表示する。
         UpdateRangeCircle();
 
-        // Rキーを離した瞬間に発動判定を行う。
-        if (_inputHub != null && _inputHub.RReleasedThisFrame)
+        // NormalCast: Rキーを離した瞬間に発動 / QuickCast: 押した瞬間に発動。
+        if (_inputHub != null && _castMode.IsCastTriggered(_inputHub.RPressedThisFrame, _inputHub.RReleasedThisFrame))
         {
             HandleRReleased();
         }
