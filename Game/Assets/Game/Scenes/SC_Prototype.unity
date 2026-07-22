@@ -409,6 +409,7 @@ GameObject:
   - component: {fileID: 968542335}
   - component: {fileID: 968542336}
   - component: {fileID: 968542337}
+  - component: {fileID: 968542338}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -809,7 +810,38 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CommonDController
   _invulnerabilityDuration: 0.2
   _cooldown: 34
+  _counterBaseDamage: 45
+  _counterAdRatio: 0.3
+  _msBoostPercent: 10
+  _msBoostDuration: 1.5
   _isWindowActive: 0
+  _remainingCooldown: 0
+--- !u!114 &968542338
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b0dee79d10242948863a8dd0c8a771d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FlashController
+  _characterController: {fileID: 0}
+  _clickMovement: {fileID: 0}
+  _flashDistance: 4
+  _cooldown: 55
+  _minCastDistance: 0.1
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _wallLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
   _remainingCooldown: 0
 --- !u!1 &968543001
 GameObject:
@@ -1631,6 +1663,65 @@ MonoBehaviour:
   _warningLead: 1
   _ccDuration: 1
   _emitEnabled: 1
+--- !u!1 &1260973273
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1260973275}
+  - component: {fileID: 1260973274}
+  m_Layer: 0
+  m_Name: HUD
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1260973274
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1260973273}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 96d70a145a838854d99710d6d73f6ae9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillCooldownHud
+  _mainSlotSize: 64
+  _subSlotSize: 52
+  _slotSpacing: 8
+  _groupGap: 20
+  _bottomMargin: 24
+  _slotBackgroundColor: {r: 0.05, g: 0.08, b: 0.14, a: 0.92}
+  _slotBorderColor: {r: 0.35, g: 0.55, b: 0.85, a: 0.9}
+  _activeBorderColor: {r: 1, g: 0.85, b: 0.3, a: 1}
+  _keyLabelColor: {r: 0.85, g: 0.92, b: 1, a: 1}
+  _cooldownOverlayColor: {r: 0, g: 0, b: 0, a: 0.78}
+  _cooldownTextColor: {r: 1, g: 0.96, b: 0.85, a: 1}
+  _mainAccentColor: {r: 0.24, g: 0.61, b: 1, a: 1}
+  _dAccentColor: {r: 1, g: 0.55, b: 0.25, a: 1}
+  _fAccentColor: {r: 1, g: 0.85, b: 0.3, a: 1}
+  _readyFlashDuration: 0.3
+--- !u!4 &1260973275
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1260973273}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 1.03829, y: 0, z: 1.39676}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1357900001
 GameObject:
   m_ObjectHideFlags: 0
@@ -2311,3 +2402,4 @@ SceneRoots:
   - {fileID: 1246788902}
   - {fileID: 1446788902}
   - {fileID: 1357900002}
+  - {fileID: 1260973275}
