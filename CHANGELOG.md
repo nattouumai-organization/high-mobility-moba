@@ -57,6 +57,12 @@
 
 ### Changed
 
+- フェーズ1・2総合改善(phase1-2-fix4): 通常攻撃の被弾フラッシュを実ダメージが通った時のみ発生させるようにした
+  (ゼルフWの軽減などでダメージ0の場合は光らない。Q/W/Eと同じ基準に統一)。
+- フェーズ1・2総合改善(phase1-2-fix4): Camera.mainの毎フレーム検索を廃止し、Awakeでキャッシュ・破棄時のみ再取得する方式へ統一した
+  (ZelfQController・PlayerTargetSelector)。
+- フェーズ1・2総合改善(phase1-2-fix4): 死亡中はターゲット選択を停止し、選択中のターゲットも解除するようにした。
+  あわせてPlayerTargetSelectorの入力をPlayerInputHub(InputAction)経由へ移行した。
 - フェーズ1・2総合改善(phase1-2-fix3): 最大HPの動的変化に対応した。HealthControllerが最大HPの変化を毎フレーム検知し、
   増加分は現在HPへ加算(LoL方式)・減少時は現在HPをクランプする。CharacterStatsにAddMaxHealthBonus/RemoveMaxHealthBonusを追加。
 - 数値のSO一元管理(phase1-2-fix3): CharacterStatsにCharacter Data参照を追加し、AwakeでZelfData.assetの基礎値を適用するようにした。

@@ -1,15 +1,16 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 右クリックによる攻撃対象(Targetable)の選択・切替・解除を管理する。
 /// TASKS.md「通常攻撃のターゲット選択を実装する」用の試作スクリプト。
+/// 入力はPlayerInputHub(InputAction)経由で取得する。
 /// 入力優先順位は「TargetableLayerの対象選択 > GroundLayerへの移動」とし、
 /// PlayerClickMovementはIsPointingAtTargetable()に問い合わせて移動可否を判断する。
 /// ターゲットを選択した際は、PlayerClickMovement.StopMovement()を呼びPlayerをその場で停止させる。
 /// 右クリック長押し中にTargetableを指した場合はターゲット選択を優先し、その対象を選択・切替する。
 /// 右クリック長押し中にGroundを指している間はターゲットを解除し続け、長押し移動へ切り替える。
 /// ターゲットが死亡・破棄・無効化された場合は、選択を安全に解除する。
+/// 自分(Player)が死亡している間は、選択中のターゲットを解除し、新しいターゲット選択も受け付けない。
 /// </summary>
 public class PlayerTargetSelector : MonoBehaviour
 {
@@ -25,6 +26,11 @@ public class PlayerTargetSelector : MonoBehaviour
     // 同じPlayer上の移動制御(任意)。ターゲット選択時に移動を停止するために使用する。
     private PlayerClickMovement _clickMovement;
 
+    // 自分(Player)のHP。死亡中はターゲット選択を停止するために参照する。
+    private HealthController _selfHealth;
+
+    private PlayerInputHub _inputHub;
+
     // 現在選択中のターゲット。未選択時はnull。
     public Targetable CurrentTarget => _currentTarget;
 
@@ -34,10 +40,21 @@ public class PlayerTargetSelector : MonoBehaviour
     {
         _mainCamera = Camera.main;
         _clickMovement = GetComponent<PlayerClickMovement>();
+        _selfHealth = GetComponent<HealthController>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
     }
 
     private void Update()
     {
+        // 死亡中は選択中のターゲットを解除し、新しいターゲット選択も受け付けない。
+        // (復活後は自動的に選択可能に戻る)
+        if (_selfHealth != null && _selfHealth.IsDead)
+        {
+            ClearTarget();
+            return;
+        }
+
         ClearTargetIfInvalid();
         HandleRightClick();
     }
@@ -53,8 +70,7 @@ public class PlayerTargetSelector : MonoBehaviour
 
     private void HandleRightClick()
     {
-        Mouse mouse = Mouse.current;
-        if (mouse == null || !mouse.rightButton.isPressed)
+        if (_inputHub == null || !_inputHub.RightClickPressed)
         {
             return;
         }
@@ -111,13 +127,22 @@ public class PlayerTargetSelector : MonoBehaviour
     {
         ray = default;
 
-        Mouse mouse = Mouse.current;
-        if (mouse == null || _mainCamera == null)
+        if (_inputHub == null)
         {
             return false;
         }
 
-        ray = _mainCamera.ScreenPointToRay(mouse.position.ReadValue());
+        // Camera.mainは毎フレーム呼ぶと検索コストがかかるため、Awakeでキャッシュし、破棄時のみ再取得する。
+        if (_mainCamera == null)
+        {
+            _mainCamera = Camera.main;
+            if (_mainCamera == null)
+            {
+                return false;
+            }
+        }
+
+        ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
         return true;
     }
 

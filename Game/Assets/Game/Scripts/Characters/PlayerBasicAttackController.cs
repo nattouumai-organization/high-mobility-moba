@@ -213,11 +213,12 @@ public class PlayerBasicAttackController : MonoBehaviour
                 {
                     _passiveHeal.NotifyDamageDealt(actualDamage, target.Classification);
                 }
+
+                // 被弾フラッシュは実ダメージが通った時のみ発生させる
+                // (ゼルフWの軽減などでダメージ0の場合は光らせない。Q/W/Eと同じ基準)。
+                target.PlayHitFlash();
             }
         }
-
-        // 既存の被弾フラッシュを発生させる。
-        target.PlayHitFlash();
 
         // 攻撃間隔はCharacterStatsから毎回取得するため、Inspectorでの攻撃速度変更が次の攻撃から反映される。
         _nextAttackTime = Time.time + _characterStats.AttackInterval;

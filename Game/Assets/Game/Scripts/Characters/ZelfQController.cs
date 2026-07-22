@@ -53,6 +53,7 @@ public sealed class ZelfQController : MonoBehaviour
     private ZelfRController _rController;
     private AbilityLockController _abilityLock;
     private PlayerInputHub _inputHub;
+    private Camera _mainCamera;
 
     public bool IsQAvailable => _isQAvailable;
     public float RemainingCooldown => _remainingCooldown;
@@ -113,6 +114,7 @@ public sealed class ZelfQController : MonoBehaviour
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
+        _mainCamera = Camera.main;
         CreateRangeCircle();
     }
 
@@ -273,8 +275,10 @@ public sealed class ZelfQController : MonoBehaviour
     private bool TryGetTargetUnderMouse(out Targetable target)
     {
         target = null;
-        if (_inputHub == null || Camera.main == null || _targetableLayer.value == 0) return false;
-        Ray ray = Camera.main.ScreenPointToRay(_inputHub.MousePosition);
+        if (_inputHub == null || _targetableLayer.value == 0) return false;
+        // Camera.mainは毎フレーム呼ぶと検索コストがかかるため、Awakeでキャッシュし、破棄時のみ再取得する。
+        if (_mainCamera == null) { _mainCamera = Camera.main; if (_mainCamera == null) return false; }
+        Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _targetableLayer, QueryTriggerInteraction.Ignore)) return false;
         target = hit.collider.GetComponentInParent<Targetable>();
         return target != null;
