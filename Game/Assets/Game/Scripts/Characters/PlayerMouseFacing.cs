@@ -9,6 +9,9 @@ using UnityEngine.InputSystem;
 /// 移動はPlayerClickMovementの責務であり、本スクリプトは回転のみを担う。
 /// ZelfQControllerなどの外部スクリプトは、publicメソッドのSetLookTarget / SetLookDirectionで
 /// 目標回転を安全に更新できる(privateフィールドは本スクリプト内部だけで管理する)。
+/// スタン中(CrowdControlControllerのIsStunned)は向きを変えられない。
+/// 右クリックによる目標回転の予約は受け付け、スタン終了後に回転を再開する。
+/// スネア中は通常攻撃などの行動が可能なため、向きの変更は従来どおり許可する。
 /// </summary>
 public class PlayerMouseFacing : MonoBehaviour
 {
@@ -25,15 +28,29 @@ public class PlayerMouseFacing : MonoBehaviour
     private Quaternion _targetRotation;
     private bool _hasTargetRotation;
 
+    // CC(スタン)による回転禁止の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
+    private CrowdControlController _crowdControl;
+
     private void Awake()
     {
         _mainCamera = Camera.main;
         _targetRotation = transform.rotation;
+        _crowdControl = GetComponent<CrowdControlController>();
     }
 
     private void Update()
     {
         UpdateTargetRotationFromRightClick();
+
+        // スタン中は向きを変えられない(右クリックによる目標回転の予約は上で受け付け済み。
+        // スタン終了後に予約した方向へ回転を再開する)。
+        // スネア中は通常攻撃などが可能なため、向きの変更は許可する。
+        if (_crowdControl == null) _crowdControl = GetComponent<CrowdControlController>();
+        if (_crowdControl != null && _crowdControl.IsStunned)
+        {
+            return;
+        }
+
         RotateTowardsTarget();
     }
 
