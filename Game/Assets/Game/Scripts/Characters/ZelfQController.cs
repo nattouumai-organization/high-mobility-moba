@@ -133,6 +133,11 @@ public sealed class ZelfQController : MonoBehaviour
         {
             if (_pendingTarget != null) CancelPendingCast(false);
             if (_rangeCircle != null) _rangeCircle.enabled = false;
+            // 診断用: ロック中のQ押下は理由をログに出す。
+            if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
+            {
+                Debug.Log("Zelf Q: 他の行動中のため発動できません。", this);
+            }
             return;
         }
 

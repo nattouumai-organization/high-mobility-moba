@@ -42,6 +42,7 @@ public sealed class AbilityLockController : MonoBehaviour
         _locks.TryGetValue(reason, out int count);
         _locks[reason] = count + 1;
         _totalLockCount++;
+        Debug.Log($"AbilityLock: '{reason}' を追加しました(合計{_totalLockCount}件)。", this);
         if (!wasLocked) LockStateChanged?.Invoke(true);
     }
 
@@ -55,6 +56,7 @@ public sealed class AbilityLockController : MonoBehaviour
         }
         _locks[reason] = count - 1;
         _totalLockCount--;
+        Debug.Log($"AbilityLock: '{reason}' を解除しました(残り{_totalLockCount}件)。", this);
         if (!IsLocked) LockStateChanged?.Invoke(false);
     }
 }

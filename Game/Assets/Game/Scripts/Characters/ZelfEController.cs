@@ -109,6 +109,11 @@ public sealed class ZelfEController : MonoBehaviour
                 AbortDashOnDeath();
                 return;
             }
+            // ダッシュ中のE再入力は受け付けない(診断用にログを出す)。
+            if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+            {
+                Debug.Log("ゼルフ E: ダッシュ中のため発動できません。", this);
+            }
             UpdateDash();
             return;
         }
@@ -121,17 +126,21 @@ public sealed class ZelfEController : MonoBehaviour
 
     private void HandleEPressed()
     {
+        // 他の行動ロック中(W発動中・死亡中など)は発動できない。
+        // クールダウン判定より先に確認し、ロックが原因のときは必ずこのログを出す。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            Debug.Log("ゼルフ E: 他の行動中のため発動できません。", this);
+            return;
+        }
         if (Time.time < _cooldownEndTime)
         {
             Debug.Log("ゼルフ E: クールダウン中です。", this);
             return;
         }
-        if (_selfHealth != null && _selfHealth.IsDead) return;
-
-        // 他の行動ロック中(W発動中など)は発動できない。
-        if (_abilityLock != null && _abilityLock.IsLocked)
+        if (_selfHealth != null && _selfHealth.IsDead)
         {
-            Debug.Log("ゼルフ E: 他の行動中のため発動できません。", this);
+            Debug.Log("ゼルフ E: 死亡中のため発動できません。", this);
             return;
         }
 

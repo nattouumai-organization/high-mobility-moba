@@ -182,6 +182,11 @@ public sealed class ZelfRController : MonoBehaviour
         {
             CancelPendingApproach();
             if (_rangeCircle != null) _rangeCircle.enabled = false;
+            // 診断用: ロック中のRリリースは理由をログに出す。
+            if (Keyboard.current != null && Keyboard.current.rKey.wasReleasedThisFrame)
+            {
+                Debug.Log("Zelf R: 他の行動中のため発動できません。", this);
+            }
             return;
         }
 
