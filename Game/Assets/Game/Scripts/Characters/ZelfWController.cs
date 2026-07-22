@@ -5,9 +5,9 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// ゼルフWを管理する。
 /// Wキーで発動。持続中は前方からの通常ダメージを軽減し、
-/// 周囲W Damage Radius以内の敵に毎ティックAD×1.5分のダメージを与える。
+/// 周囲W Damage Radius以内の敵に母ティックAD×1.5分のダメージを与える。
 /// Character/TrainingDummyに命中した場合はQのCDを即時リセットしロックも解除する。
-/// W発動中は通常攻撃・Q・Eを無効化し、W終了時に復元する。
+/// W発動中は通常攻撃・Q・E・Rを無効化し、W終了時に復元する。
 /// </summary>
 [RequireComponent(typeof(HealthController))]
 public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
@@ -44,6 +44,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     private PlayerBasicAttackController _basicAttackController;
     private ZelfQController _qController;
     private ZelfEController _eController;
+    private ZelfRController _rController;
     private ZelfPassiveHeal _passiveHeal;
     private LayerMask _targetableLayer;
 
@@ -60,6 +61,12 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     private bool _basicAttackWasEnabled;
     private bool _qControllerWasEnabled;
     private bool _eControllerWasEnabled;
+    private bool _rControllerWasEnabled;
+
+    // Wが実際にスキルを無効化したか。
+    // falseのままDeactivateが呼ばれた場合(例: W未使用での復活時)に
+    // 初期値falseの「WasEnabled」で上書きしてスキルが永久に無効化されるのを防ぐ。
+    private bool _skillsDisabledByW;
 
     public bool IsWActive => _isWActive;
 
@@ -70,6 +77,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         _basicAttackController = GetComponent<PlayerBasicAttackController>();
         _qController = GetComponent<ZelfQController>();
         _eController = GetComponent<ZelfEController>();
+        _rController = GetComponent<ZelfRController>();
         _passiveHeal = GetComponent<ZelfPassiveHeal>();
 
         // TargetableLayerMaskはZelfQControllerと共有する。
@@ -149,7 +157,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         _cooldownEndTime = Time.time + _cooldown;
         _wQResetTriggered = false;
 
-        // W発動中は通常攻撃・Q・Eを無効化する。
+        // W発動中は通常攻撃・Q・E・Rを無効化する。
         if (_basicAttackController != null)
         {
             _basicAttackWasEnabled = _basicAttackController.enabled;
@@ -165,6 +173,12 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             _eControllerWasEnabled = _eController.enabled;
             _eController.enabled = false;
         }
+        if (_rController != null)
+        {
+            _rControllerWasEnabled = _rController.enabled;
+            _rController.enabled = false;
+        }
+        _skillsDisabledByW = true;
 
         RebuildShieldArcPositions();
         _shieldArc.enabled = true;
@@ -189,15 +203,20 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
         // コンポーネントを復元する(死亡時はPlayerDeathHandlerが管理するため、
         // IsDead状態では復元しない。復活時はOnHealthRevivedで呼び出されるため問題ない）。
-        if (!_health.IsDead)
+        // Wが実際に無効化した場合のみ復元する。
+        // (W未使用で復活時にDeactivateが呼ばれても、初期値falseのWasEnabledで
+        //  上書きして通常攻撃・Q・E・Rが永久に無効化されるバグを防ぐ)
+        if (_skillsDisabledByW && !_health.IsDead)
         {
             if (_basicAttackController != null) _basicAttackController.enabled = _basicAttackWasEnabled;
             if (_qController != null) _qController.enabled = _qControllerWasEnabled;
             if (_eController != null) _eController.enabled = _eControllerWasEnabled;
+            if (_rController != null) _rController.enabled = _rControllerWasEnabled;
+            _skillsDisabledByW = false;
         }
     }
 
-    // W持続中、毎_wTickInterval秒宾囲の敵にダメージを与えるコルーチン。
+    // W持続中、毎_wTickInterval秒周囲の敵にダメージを与えるコルーチン。
     private IEnumerator WDamageLoop()
     {
         // ダメージ/ティック = AD × TotalADRatio / (ティック回数)。
@@ -206,7 +225,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
         while (_isWActive)
         {
-            // 毜ティックごとにADを再取得する(W中にADが変わった場合の対応)。
+            // 毎ティックごとにADを再取得する(W中にADが変わった場合の対応)。
             float ad = _characterStats != null ? _characterStats.CurrentAttackDamage : 0f;
             float damagePerTick = ad * _wTotalADRatio / Mathf.Max(1f, ticksInDuration);
 

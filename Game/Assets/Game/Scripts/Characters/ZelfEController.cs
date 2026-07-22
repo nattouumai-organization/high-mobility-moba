@@ -14,6 +14,8 @@ public sealed class ZelfEController : MonoBehaviour
     [SerializeField] private PlayerBasicAttackController _basicAttackController;
     [SerializeField] private ZelfQController _qController;
     [SerializeField] private ZelfWController _wController;
+    // Rもダッシュ中に無効化する。Eダッシュ中は「全てのスキル」を禁止する仕様のため。
+    [SerializeField] private ZelfRController _rController;
 
     [Header("Dash")]
     [SerializeField, Min(0f)] private float _dashDistance = 4f;
@@ -60,6 +62,9 @@ public sealed class ZelfEController : MonoBehaviour
     private bool _characterControllerWasEnabled;
     private bool _qControllerWasEnabled;
     private bool _wControllerWasEnabled;
+    private bool _rControllerWasEnabled;
+    // ダッシュが実際にスキルを無効化したか(二重復元・未復元の防止)。
+    private bool _skillsDisabledByDash;
     private TrailRenderer _trail;
     private Material _trailMaterial;
     private Coroutine _waveCoroutine;
@@ -79,6 +84,7 @@ public sealed class ZelfEController : MonoBehaviour
         _mainCamera = Camera.main;
 
         _wController = _wController != null ? _wController : GetComponent<ZelfWController>();
+        _rController = _rController != null ? _rController : GetComponent<ZelfRController>();
 
         if (_qController == null)
         {
@@ -125,14 +131,14 @@ public sealed class ZelfEController : MonoBehaviour
     {
         if (Time.time < _cooldownEndTime)
         {
-            Debug.Log("Zelf E: クールダウン中です。", this);
+            Debug.Log("ゼルフ E: クールダウン中です。", this);
             return;
         }
         if (_selfHealth != null && _selfHealth.IsDead) return;
 
         if (!TryGetMouseGroundPoint(out Vector3 groundPoint))
         {
-            Debug.Log("Zelf E: マウスカーソルがGroundを指していないため発動しません。", this);
+            Debug.Log("ゼルフ E: マウスカーソルがGroundを指していないため発動しません。", this);
             return;
         }
 
@@ -140,7 +146,7 @@ public sealed class ZelfEController : MonoBehaviour
         direction.y = 0f;
         if (direction.sqrMagnitude < _minCastDistance * _minCastDistance)
         {
-            Debug.Log("Zelf E: マウス地点が近すぎるため発動しません。", this);
+            Debug.Log("ゼルフ E: マウス地点が近すぎるため発動しません。", this);
             return;
         }
 
@@ -186,7 +192,7 @@ public sealed class ZelfEController : MonoBehaviour
             _basicAttackController.enabled = false;
         }
 
-        // ダッシュ中はQ・Wを含む全スキルの入力を受け付けない。
+        // ダッシュ中はQ・W・Rを含む全スキルの入力を受け付けない。
         if (_qController != null)
         {
             _qController.CancelPendingApproach();
@@ -198,6 +204,12 @@ public sealed class ZelfEController : MonoBehaviour
             _wControllerWasEnabled = _wController.enabled;
             _wController.enabled = false;
         }
+        if (_rController != null)
+        {
+            _rControllerWasEnabled = _rController.enabled;
+            _rController.enabled = false;
+        }
+        _skillsDisabledByDash = true;
 
         _characterControllerWasEnabled = _characterController.enabled;
         _characterController.enabled = false;
@@ -226,9 +238,14 @@ public sealed class ZelfEController : MonoBehaviour
         if (_clickMovement != null) _clickMovement.enabled = _clickMovementWasEnabled;
         if (_basicAttackController != null) _basicAttackController.enabled = _basicAttackWasEnabled;
 
-        // ダッシュ終了後はQ・Wを復元する。
-        if (_qController != null) _qController.enabled = _qControllerWasEnabled;
-        if (_wController != null) _wController.enabled = _wControllerWasEnabled;
+        // ダッシュ終了後はQ・W・Rを元の状態へ復元する。
+        if (_skillsDisabledByDash)
+        {
+            if (_qController != null) _qController.enabled = _qControllerWasEnabled;
+            if (_wController != null) _wController.enabled = _wControllerWasEnabled;
+            if (_rController != null) _rController.enabled = _rControllerWasEnabled;
+            _skillsDisabledByDash = false;
+        }
 
         _isDashing = false;
         FaceDashDirection();
@@ -237,7 +254,6 @@ public sealed class ZelfEController : MonoBehaviour
     }
 
     // ダッシュ終了後、ヴィエゴWのように前方へウェーブを飛ばしWave Distance先まで命中判定。
-    // ウェーブ終了後にQリセットとロック解除。
     private IEnumerator PostDashWave(Vector3 startPosition)
     {
         if (_waveDistance > 0f && _waveSpeed > 0f)
@@ -263,6 +279,17 @@ public sealed class ZelfEController : MonoBehaviour
         _isDashing = false;
         if (_waveCoroutine != null) { StopCoroutine(_waveCoroutine); _waveCoroutine = null; }
         if (_trail != null) _trail.emitting = false;
+
+        // 死亡でダッシュが中断された場合もQ・W・Rの有効状態を復元する。
+        // (復元しないと復活後もスキルが無効のままになる。
+        //  移動・通常攻撃・CharacterControllerはPlayerDeathHandlerが管理するため触らない)
+        if (_skillsDisabledByDash)
+        {
+            if (_qController != null) _qController.enabled = _qControllerWasEnabled;
+            if (_wController != null) _wController.enabled = _wControllerWasEnabled;
+            if (_rController != null) _rController.enabled = _rControllerWasEnabled;
+            _skillsDisabledByDash = false;
+        }
     }
 
     private void FaceDashDirection()

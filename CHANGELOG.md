@@ -36,8 +36,36 @@
 - ゼルフE命中時のQ即時再使用を実装。EがCharacter分類(Character扱いTrainingDummy含む)へ命中した瞬間、ZelfQController.ResetCooldown()とClearLockout(target)をその場で即時実行する(PostDashWave終了を待たない)。Minion・Tower分類だけへの命中ではリセットしない。
 - ダメージ処理へ攻撃者情報と通常ダメージ分類を追加(Scripts/Combat/DamageInfo.cs: DamageType / DamageContext / IIncomingDamageModifier)。HealthController.TakeDamageが攻撃者のTransformとダメージ種別(Normal / True)を受け取れるようになり、HPへ適用する直前に同じGameObject上のIIncomingDamageModifier(ゼルフWなど)がDamageContext(攻撃者・ダメージ種別・元ダメージ)を使ってダメージ量を変更できる。通常ダメージ(Normal)だけが軽減対象で、確定ダメージ(True)は将来の朧R処刑・ヴォルブラークR反射用の分類のみ用意し今回は使用しない。通常攻撃(PlayerBasicAttackController)・ゼルフQ・ゼルフE・DummyAutoAttackは攻撃者情報を渡すよう更新し、従来のTakeDamage(ダメージ量のみ)も攻撃者なしの通常ダメージとして互換動作する。与ダメージ表示・被ダメージ表示・ゼルフP回復・HPバー・死亡処理の既存経路は変更しない。
 
+- ゼルフRを実装した(ZelfRController.cs / Scripts/Characters)。
+  Rキーでマウス下のCharacter/TrainingDummy分類の敵を中心に半径_arenaRadius(初期値5.0)の決闘エリアを展開する。
+  エリアは対象の位置に固定され、LineRendererで紫色の輪として可視化される(Duration / Cooldown はInspector設定)。
+  発動時にエリア内の全Targetable(自分以外)をエリア外縁0.6m外へ即座に押し出す(ミニオン押し出しタスク対応)。
+  Character/TrainingDummy分類の押し出し対象にはエリア外スロウを即時付与する。
+  エリア発動中、エリア内のCharacter/TrainingDummy分類の敵にはInner Slow Percentのスロウを毎フレーム維持する。
+  エリア内からエリア外へ退出した敵にはOuter Slow PercentのスロウをOuter Slow Duration秒間付与する(エリア内外スロウタスク対応)。
+  ゼルフ自身にはSelf MS Boost PercentのMS上昇バフをエリア持続中付与する。
+  スロウ/MS上昇はCharacterStats.AddMoveSpeedBonus / RemoveMoveSpeedBonusで管理し、
+  エリア終了・対象死亡時に確実に解除する。
+  共通Dによる完全不発は共通D未実装のため今回は対象外(将来追加予定)。
+- CharacterStatsにBaseMoveSpeedプロパティ・AddMoveSpeedBonusメソッド・RemoveMoveSpeedBonusメソッドを追加した。
+  ZelfRControllerのスロウ/MS上昇計算から利用する。既存のCurrentMoveSpeed計算は変更しない。
+- ZelfEControllerのダッシュ開始時にZelfRControllerもenabled=falseへ無効化し、ダッシュ終了後に元の状態へ復元するようにした。
+  「Eダッシュ中は全スキルを無効化する」仕様に合わせてRも対象とした。
+- ZelfWControllerのW発動時にZelfRControllerもenabled=falseへ無効化し、W終了後に元の状態へ復元するようにした。
+  「W発動中はスキルを無効化する」仕様に合わせてRも対象とした。
+- TASKS.mdでゼルフR関連の3タスク(決闘エリア・ミニオン押し出し・エリア内外スロウ)を完了([x])へ更新した。
+
 ### Changed
 
+- ゼルフRのCast RangeをInspector設定不要にした。
+  旧バージョンのシーンで0のまま保存されていても、OnValidate(エディタ)と
+  Awake(実行時)で既定値7へ自動補正する。初期化ログにCastRange値を表示する。
+- ゼルフRの押し出し対象からCharacter・TrainingDummy・Tower分類を除外した。
+  押し出されるのはミニオン等のみで、キャラクターとタワーはエリア内に留まる。
+- ゼルフRを「R長押しで射程円表示 → キーを離して発動」方式へ変更した。
+  Cast Range(初期値7)の射程円をRキー押下中に自分中心へ表示する(ZelfQと同方式)。
+- ゼルフRを射程外の対象に発動した場合、射程内まで自動接近してから発動するようにした。
+  右クリック・自身死亡・対象消失・E/WによるR無効化で自動接近は中止される。
 - ZelfQControllerからReflection依存(System.Reflectionのusing / FieldInfo / BindingFlags / privateフィールド名・メソッド名を文字列で参照する処理)を全て削除。ブリンク後の向き更新はPlayerMouseFacingのpublicメソッド、ゼルフP回復への通知はZelfPassiveHeal.NotifyDamageDealt()の直接呼び出しへ変更。PlayerMouseFacingのprivateフィールドはPlayerMouseFacing内部だけで管理する。
 - ゼルフQの対象決定を正しい仕様へ修正。Qの対象はマウス下の有効なTargetableのみとし、PlayerTargetSelectorで選択中の対象はQの対象決定に使用しない(従来はマウス下に対象がいない場合、選択中の対象へフォールバックしていた)。マウス下に有効な対象がいない場合、またはマウス下の対象がTower分類の場合、Qは発動しない。
 - ゼルフQの射程外処理の正しい仕様を記録: マウス下の対象がQ射程外の場合、Playerは対象へ自動接近し、Q射程内に入った時点でQを自動発動する。自動接近中に右クリック入力があった場合、または対象が死亡・無効化・破棄・Tower分類へ変化した場合は自動接近を中止する(挙動は従来どおり)。
@@ -49,6 +77,19 @@
 ### Removed
 
 - ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換えする仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な参照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
+
+### Fixed
+
+- ゼルフRが発動できなくなる場合がある問題を修正した。
+  - ZelfWController: W未使用のまま復活すると、初期値falseの「WasEnabled」で
+    通常攻撃・Q・E・Rが上書きされて永久に無効化されるバグを修正。
+    _skillsDisabledByWフラグで「Wが実際に無効化した場合のみ復元」するようにした。
+  - ZelfEController: ダッシュ中に死亡するとQ・W・Rが無効化されたまま復元されない
+    バグを修正。AbortDashOnDeathでも_skillsDisabledByDashフラグに基づき復元する。
+  - ZelfRController: 診断用に初期化・有効化・無効化のログを追加。
+    Play開始時に「初期化しました」ログが出ない場合はコンポーネント未アタッチと判別できる。
+    自身死亡中のR発動も防止した。
+
 
 ## 2026-07-21
 
