@@ -62,6 +62,8 @@ public sealed class ZelfEController : MonoBehaviour
     // ダッシュがAbilityLockControllerへロックを追加済みか(二重解除・未解除の防止)。
     private bool _lockAdded;
     private AbilityLockController _abilityLock;
+    // CC(スタン・スネア)の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
+    private CrowdControlController _crowdControl;
     private PlayerInputHub _inputHub;
     private TrailRenderer _trail;
     private Material _trailMaterial;
@@ -77,6 +79,7 @@ public sealed class ZelfEController : MonoBehaviour
         _qController = _qController != null ? _qController : GetComponent<ZelfQController>();
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _crowdControl = GetComponent<CrowdControlController>();
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
@@ -110,6 +113,9 @@ public sealed class ZelfEController : MonoBehaviour
     {
         _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
 
+        // CC参照の遅延取得(CrowdControlControllerが実行時に追加された場合に備える)。
+        if (_crowdControl == null) _crowdControl = GetComponent<CrowdControlController>();
+
         if (_isDashing)
         {
             if (_selfHealth != null && _selfHealth.IsDead)
@@ -142,6 +148,7 @@ public sealed class ZelfEController : MonoBehaviour
         if (_rangeIndicator == null) return;
         bool visible = _inputHub != null && _inputHub.EPressed && !_isDashing
             && (_abilityLock == null || !_abilityLock.IsLocked)
+            && (_crowdControl == null || !_crowdControl.IsMovementBlocked)
             && (_selfHealth == null || !_selfHealth.IsDead);
         if (!visible)
         {
@@ -170,11 +177,17 @@ public sealed class ZelfEController : MonoBehaviour
 
     private void HandleEPressed()
     {
-        // 他の行動ロック中(W発動中・死亡中など)は発動できない。
+        // 他の行動ロック中(W発動中・スタン中・死亡中など)は発動できない。
         // クールダウン判定より先に確認し、ロックが原因のときは必ずこのログを出す。
         if (_abilityLock != null && _abilityLock.IsLocked)
         {
             Debug.Log("ゼルフ E: 他の行動中のため発動できません。", this);
+            return;
+        }
+        // スネア中は移動スキルのEを発動できない(スタン中は上の行動ロックで既に禁止済み)。
+        if (_crowdControl != null && _crowdControl.IsMovementBlocked)
+        {
+            Debug.Log("ゼルフ E: スネア中のため発動できません。", this);
             return;
         }
         if (Time.time < _cooldownEndTime)
@@ -309,7 +322,7 @@ public sealed class ZelfEController : MonoBehaviour
         if (_trail != null) _trail.emitting = false;
 
         // 死亡でダッシュが中断された場合もロックを解除する。
-        // (死亡中の行動禁止はPlayerDeathHandlerが追加する死亡ロックが担当する。
+        // (死亡中の行動禁止はPlayerDeathHandlerが追加する死亡ロックが担当。
         //  移動・CharacterControllerはPlayerDeathHandlerが管理するため触らない)
         RemoveDashLock();
     }

@@ -9,6 +9,7 @@ using UnityEngine;
 /// 入力処理の先頭でIsLockedを確認する。
 /// これにより複数の無効化理由が重なった場合の復元漏れ・二重復元を構造的に防ぐ。
 /// Phase 3のCC(スタン・スネア・共通D硬直)もロック理由を追加するだけで実装できる。
+/// スタンはCrowdControlControllerがReasonStunで追加・解除する。
 /// 各コントローラーのAwakeでGetComponent→なければAddComponentするため、
 /// Inspectorでの手動アタッチは不要(手動でアタッチしてもよい)。
 /// </summary>
@@ -18,6 +19,7 @@ public sealed class AbilityLockController : MonoBehaviour
     public const string ReasonZelfW = "ZelfW";
     public const string ReasonZelfEDash = "ZelfEDash";
     public const string ReasonDeath = "Death";
+    public const string ReasonStun = "Stun";
 
     // 理由ごとのロック数。
     private readonly Dictionary<string, int> _locks = new Dictionary<string, int>();

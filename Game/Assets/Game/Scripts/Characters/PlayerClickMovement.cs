@@ -9,6 +9,8 @@ using UnityEngine;
 /// TargetableLayerの対象を右クリックした場合は、ターゲット選択を優先しGround移動を開始しない。
 /// ターゲット選択時はPlayerTargetSelectorがStopMovement()を呼び、Playerはその場で停止する。
 /// 射程外のターゲットを選択した場合は、PlayerBasicAttackControllerがMoveToPosition()で射程内まで自動接近させる。
+/// スタン・スネア中(CrowdControlControllerのIsMovementBlocked)は移動しない。
+/// 移動先の予約(右クリック)は受け付け、CC終了後に移動を再開する。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -30,6 +32,9 @@ public class PlayerClickMovement : MonoBehaviour
     private ZelfRController _rController;
     private PlayerInputHub _inputHub;
 
+    // CC(スタン・スネア)による移動禁止の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
+    private CrowdControlController _crowdControl;
+
     private Camera _mainCamera;
     private Vector3 _destination;
     private bool _hasDestination;
@@ -44,6 +49,7 @@ public class PlayerClickMovement : MonoBehaviour
         _mainCamera = Camera.main;
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
+        _crowdControl = GetComponent<CrowdControlController>();
 
         if (_characterStats == null)
         {
@@ -58,6 +64,14 @@ public class PlayerClickMovement : MonoBehaviour
         HandleStopCommand();
 
         UpdateDestinationFromRightClick();
+
+        // スタン・スネア中は移動しない(移動先の予約は上で受け付け済み。CC終了後に移動を再開する)。
+        if (_crowdControl == null) _crowdControl = GetComponent<CrowdControlController>();
+        if (_crowdControl != null && _crowdControl.IsMovementBlocked)
+        {
+            return;
+        }
+
         MoveTowardsDestination();
     }
 

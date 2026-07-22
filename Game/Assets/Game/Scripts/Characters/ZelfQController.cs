@@ -52,6 +52,8 @@ public sealed class ZelfQController : MonoBehaviour
     private ZelfPassiveHeal _passiveHeal;
     private ZelfRController _rController;
     private AbilityLockController _abilityLock;
+    // CC(スタン・スネア)の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
+    private CrowdControlController _crowdControl;
     [Header("Cast")]
     [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
 
@@ -115,6 +117,7 @@ public sealed class ZelfQController : MonoBehaviour
         _rController = GetComponent<ZelfRController>();
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
+        _crowdControl = GetComponent<CrowdControlController>();
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _mainCamera = Camera.main;
@@ -135,7 +138,7 @@ public sealed class ZelfQController : MonoBehaviour
         UpdateCooldownAndLocks();
         UpdateLockCircles();
 
-        // 行動ロック中(W発動中・Eダッシュ中・死亡中など)は入力を受け付けず、自動接近も中止する。
+        // 行動ロック中(W発動中・Eダッシュ中・スタン中・死亡中など)は入力を受け付けず、自動接近も中止する。
         // クールダウン・同一対象ロックの進行はロック中も継続する。
         if (_abilityLock != null && _abilityLock.IsLocked)
         {
@@ -145,6 +148,20 @@ public sealed class ZelfQController : MonoBehaviour
             if (_inputHub != null && _inputHub.QPressedThisFrame)
             {
                 Debug.Log("Zelf Q: 他の行動中のため発動できません。", this);
+            }
+            return;
+        }
+
+        // スネア中は移動(ブリンク)を含むQを発動できない(スタン中は上の行動ロックで既に禁止済み)。
+        // 射程外自動接近の移動もここで中止する(CrowdControlController側でも毎フレーム中止される)。
+        if (_crowdControl == null) _crowdControl = GetComponent<CrowdControlController>();
+        if (_crowdControl != null && _crowdControl.IsMovementBlocked)
+        {
+            if (_pendingTarget != null) CancelPendingCast(false);
+            if (_rangeCircle != null) _rangeCircle.enabled = false;
+            if (_inputHub != null && _inputHub.QPressedThisFrame)
+            {
+                Debug.Log("Zelf Q: スネア中のため発動できません。", this);
             }
             return;
         }

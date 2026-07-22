@@ -24,6 +24,7 @@
 
 ### Added
 
+- フェーズ3: ハードCC(スタン・スネア)とスロウを実装(スタン: 移動・通常攻撃・全スキルを禁止。スネア: 移動と移動スキル(ゼルフQ/E)を禁止し、通常攻撃・W・R・D・Fは使用可能(FはLoL準拠)。スロウ: 基礎移動速度を割合で減少させ、複数同時は最も強い1つのみ適用(LoL方式)・共通Dでは防げない。同種ハードCCの重ねがけは残り時間が長い方を採用。ハードCC中は右クリックの移動先予約のみ受け付け、CC終了後に移動を再開。死亡時は全CCを解除。HardCcTestEmitterをスタン/スネア/スロウ切替式に拡張)
 - フェーズ3: スキル射程・範囲のプレビューを実装(SkillRangePreviewを追加。Q: マウス下の対象に発動対象マーカー(射程内は白・射程外はオレンジ=自動接近)、R: 発動した場合の決闘エリア円をキー長押し中に表示。W/Eは従来どおり方向線のみ。Fは押した瞬間に発動する仕様のためプレビューなし。既存のスキルスクリプトは変更せず、設定値をリフレクションで参照する)
 - フェーズ3: クールダウンUIをEternal Return風のステータスHUDへ拡張(下部HUDパネルの枠組みを追加し、攻撃力・攻撃速度・移動速度・攻撃射程のリアルタイム表示、HPバー(現在HP / 最大HP)、ポートレート+レベルバッジを表示。レベル表記はレベルシステム実装までのプレースホルダー。移動速度・攻撃射程はステータス単位(MS360・射程200など)で表示する)
 - フェーズ3: Fフラッシュを実装(FlashController新規・Fキー・移動距離400=4.0 Unity units・クールダウン55秒。全キャラクター共通)。
@@ -50,7 +51,7 @@
 ### Added
 
 - ZelfQControllerにW/E連携用のpublic APIを追加した(GroundLayerMask / TargetableLayerMask / ResetCooldown / ClearLockout / CancelPendingApproach)。ZelfWControllerとZelfEControllerがReflectionを使わずにQの状態を安全に操作できるようにした。
-- WとEからQクールダウンリセット、Same Target Lockout解除、自動接近中止を安全に呼べるようにした。WとEがCharacterまたはCharacter扱いTrainingDummyへ命中した際、(1)ResetCooldown (2)ClearLockout(target) の順で即時実行する。
+- WとEからQクールダウンリセット、Same Target Lockout解除、自動接近中止を安全に呼べるようにした。WとEがCharacterまたはCharacter扱いTrainingDummyへ���中した際、(1)ResetCooldown (2)ClearLockout(target) の順で即時実行する。
 - TASKS.mdでゼルフWの前方ダメージ軽減・ゼルフEの方向ダッシュ・ゼルフE命中時のQ即時再使用の3項目を完了([x])へ更新した。
 - PlayerMouseFacingへ、外部スクリプトから安全に目標回転を更新できるpublicメソッドを追加(SetLookTarget: ワールド座標指定 / SetLookDirection: 方向ベクトル指定)。Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。実際の回転は従来どおり毎フレームInspectorのRotation Speed設定で行われ、右クリックによる回転仕様は変更しない。
 - ゼルフWの前方ダメージ軽減を実装(ZelfWController、Scripts/Characters)。Wキー(Input System)で0.75秒間、前方120度から受ける通常ダメージだけを55%軽減する(Duration / Cooldown 10秒 / Front Angle / Damage ReductionはいずれもInspector設定)。前方判定はダメージを受けた瞬間のPlayerのtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で被ダメージごとに行い、背後・側面からのダメージ、攻撃者情報が取得できないダメージ、確定ダメージ(将来用)は軽減しない。Wは攻撃技ではなくダメージ・ノックバック・スロウ・スタン・スネアを与えず、CC無効化・無敵・対象指定不可・シールドも持たない。持続中はPlayer前方に青い扇形のLineRenderer防御エフェクトを表示し(Playerの回転に追従)、W終了時に非表示になる。軽減発生時はDebug.Logで確認でき、軽減後の実ダメージは既存の被ダメージ表示で表示される。
@@ -118,7 +119,7 @@
   W発動・Eダッシュ・死亡による通常攻撃/Q/W/E/Rの禁止を、コンポーネントのenabled切り替えからロック方式へ一本化し、
   復元漏れ・二重復元を構造的に防止(各コントローラーがAwakeで自動追加するためInspector設定不要)。
   Phase 3のCC(スタン・スネア・共通D硬直)はロック理由を追加するだけで実装可能。
-- ゼルフR: W/E発動中��Rコンポーネントが無効化されなくなり、発動済みの決闘エリアがW/E中も正しく進行・終了するようになった
+- ゼルフR: W/E発動中��Rコンポーネントが���効化されなくなり、発動済みの決闘エリアがW/E中も正しく進行・終了するようになった
   (従来は持続時間が凍結し実質延長されていた)。
 - ゼルフR: ゼルフ自身の死亡時に決闘エリアを即時終了し、自身MSブースト・スロウを全解除するようにした。
 - 自動接近の二重制御を防止: Q/Rの射程外自動接近中は通常攻撃の自動接近を停止し、QとRの自動接近も相互排他にした。
@@ -141,7 +142,7 @@
 
 ### Removed
 
-- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換える仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な参照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
+- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換える仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な���照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
 
 ### Fixed
 
@@ -204,7 +205,7 @@
 - SC_Prototypeシーンにテスト用ダミーTrainingDummyを1体設置(TargetableLayer / 赤系仮マテリアル)。
 - 選択中のダミーに、足元の黄色い選択リングと本体色を明るくする視覚フィードバックを追加。
 - 将来の通常攻撃から呼び出す、被弾時に短時間白く点滅する処理をTargetableに用意。
-- 通常攻撃の射程判定を実装。TargetableのColliderの最も近い点との水平距離(XZ平面、高さは含めない)がCurrent Attack Range以下なら射程内とする。
+- 通常攻撃の射程判定を実装。TargetableのCollider��最も近い点との水平距離(XZ平面、高さは含めない)がCurrent Attack Range以下なら射程内とする。
 - 攻撃速度と攻撃間隔を実装。CharacterStatsにBase Attack Speed(毎秒の攻撃回数)、Bonus Attack Speed Percent、Base Attack Rangeを追加し、Attack Interval = 1 / Current Attack Speedとする。
 - PlayerBasicAttackControllerを追加。選択中のターゲットが射程内の場合のみ、攻撃間隔ごとに疑似通常���撃(被弾フラッシュのみ、ダメージ・HP減少なし)を実行する。
 - 選択リングの色で射程内外を表示するよう更新(射程内: 明るい緑 / 射程外: オレンジ)。
