@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Player入力の一元管理(InputAction)。Q/W/E/R・停止コマンド(S)・右クリック・マウス座標を公開する。
+/// Player入力の一元管理(InputAction)。Q/W/E/R・停止コマンド(S)・共通D・F(フラッシュ)・右クリック・マウス座標を公開する。
 /// 各コントローラーのAwakeからget-or-addで自動追加されるため、Inspector設定は不要。
 /// 将来のキーコンフィグ・ゲームパッド対応は、このクラスのバインディング変更のみで行う。
 /// </summary>
@@ -14,6 +14,7 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _rAction;
     private InputAction _sAction;
     private InputAction _dAction;
+    private InputAction _fAction;
     private InputAction _rightClickAction;
     private InputAction _mousePositionAction;
 
@@ -45,6 +46,11 @@ public sealed class PlayerInputHub : MonoBehaviour
     // --- 共通D(カウンター) ---
     public bool DPressedThisFrame => _dAction != null && _dAction.WasPressedThisFrame();
 
+    // --- F(フラッシュ) ---
+    public bool FPressedThisFrame => _fAction != null && _fAction.WasPressedThisFrame();
+    public bool FPressed => _fAction != null && _fAction.IsPressed();
+    public bool FReleasedThisFrame => _fAction != null && _fAction.WasReleasedThisFrame();
+
     // --- マウス ---
     public bool RightClickPressed => _rightClickAction != null && _rightClickAction.IsPressed();
     public bool RightClickPressedThisFrame => _rightClickAction != null && _rightClickAction.WasPressedThisFrame();
@@ -64,6 +70,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _rAction.Enable();
         _sAction.Enable();
         _dAction.Enable();
+        _fAction.Enable();
         _rightClickAction.Enable();
         _mousePositionAction.Enable();
     }
@@ -76,6 +83,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _rAction?.Disable();
         _sAction?.Disable();
         _dAction?.Disable();
+        _fAction?.Disable();
         _rightClickAction?.Disable();
         _mousePositionAction?.Disable();
     }
@@ -88,6 +96,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _rAction?.Dispose();
         _sAction?.Dispose();
         _dAction?.Dispose();
+        _fAction?.Dispose();
         _rightClickAction?.Dispose();
         _mousePositionAction?.Dispose();
     }
@@ -104,6 +113,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _rAction = new InputAction("SkillR", InputActionType.Button, "<Keyboard>/r");
         _sAction = new InputAction("StopCommand", InputActionType.Button, "<Keyboard>/s");
         _dAction = new InputAction("CommonD", InputActionType.Button, "<Keyboard>/d");
+        _fAction = new InputAction("Flash", InputActionType.Button, "<Keyboard>/f");
         _rightClickAction = new InputAction("RightClick", InputActionType.Button, "<Mouse>/rightButton");
         _mousePositionAction = new InputAction("MousePosition", InputActionType.Value, "<Mouse>/position");
     }
