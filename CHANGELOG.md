@@ -31,6 +31,11 @@
   W発動中・Eダッシュ中・死亡中などの行動ロック中は発動できない。発動時は進行中の移動・Q/R自動接近を中止し、ブリンクした方向を向く。
   デス時のR・共通D・Fクールダウン60%短縮は後続タスクで実装する。
 - PlayerInputHubにFフラッシュのInputActionを追加(FPressedThisFrame / FPressed / FReleasedThisFrame)。
+- フェーズ3: クールダウンUIを実装(SkillCooldownHud新規)。LoL / Eternal Return風に画面下中央へQ/W/E/R(大)と共通D/F(小)のスキルスロットを並べる。
+  クールダウン中は時計回りのラジアルワイプと残り秒数(10秒未満は小数点1桁)を表示し、完了時は白いフラッシュで通知する。
+  W持続中・Eダッシュ中・R決闘エリア中・共通Dウィンドウ中はスロット枠をハイライトする。
+  見た目はCGアニメ調に合わせた濃紺ベース+青アクセント(D=橙/F=黄のアクセント付き)で、色・サイズはInspectorで調整可能。
+  UIはすべてコード生成(Screen Space Overlay)で、既存スクリプトの変更なし(各コントローラーの_cooldownEndTime/_cooldownをリフレクションで参照するため、該当フィールドを改名する場合はSkillCooldownHudも更新する)。
 
 ### Changed
 
