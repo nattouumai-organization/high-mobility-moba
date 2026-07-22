@@ -20,11 +20,19 @@
 - 削除した要素
 ```
 
+## 2026-07-23
+
+### Changed
+
+- 仕様変更: 共通D失敗時の0.30秒硬直を廃止した。失敗しても何も起きない(クールダウンのみ消費する)。
+  GAME_DESIGN.mdの共通D仕様を更新し、TASKS.mdから「共通D失敗時の0.30秒硬直を実装する」タスクを削除した。
+  CommonDControllerの失敗時硬直に関するコメントを整理した(WindowExpiredイベントはUIなどの拡張用に残す)。
+
 ## 2026-07-22
 
 ### Added
 
-- ZelfQControllerにW/E連携用のpublic APIを追加した(GroundLayerMask / TargetableLayerMask / ResetCooldown / ClearLockout / CancelPendingApproach)。ZelfWControllerとZelfEControllerがReflectionを使わずQの状態を安全に操作できるようにした。
+- ZelfQControllerにW/E連携用のpublic APIを追加した(GroundLayerMask / TargetableLayerMask / ResetCooldown / ClearLockout / CancelPendingApproach)。ZelfWControllerとZelfEControllerがReflectionを使わずにQの状態を安全に操作できるようにした。
 - WとEからQクールダウンリセット、Same Target Lockout解除、自動接近中止を安全に呼べるようにした。WとEがCharacterまたはCharacter扱いTrainingDummyへ命中した際、(1)ResetCooldown (2)ClearLockout(target) の順で即時実行する。
 - TASKS.mdでゼルフWの前方ダメージ軽減・ゼルフEの方向ダッシュ・ゼルフE命中時のQ即時再使用の3項目を完了([x])へ更新した。
 - PlayerMouseFacingへ、外部スクリプトから安全に目標回転を更新できるpublicメソッドを追加(SetLookTarget: ワールド座標指定 / SetLookDirection: 方向ベクトル指定)。Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。実際の回転は従来どおり毎フレームInspectorのRotation Speed設定で行われ、右クリックによる回転仕様は変更しない。
@@ -57,6 +65,8 @@
 
 ### Changed
 
+- フェーズ3: 共通D成功時のカウンター攻撃を実装(無効化成功時、攻撃者だ45+ADの30%の通常ダメージ。追加スタン・スネアは与えない)。
+- フェーズ3: 共通D成功時に移動速度が10%上昇する効果を実装(持続は既定1.5秒・Inspector調整可。効果中の再成功は掛け直しで重複加算しない。死亡時は即解除)。
 - フェーズ3: 共通Dの0.20秒CC無効化を実装(CommonDController新規・Dキー・クールダウン34秒)。ウィンドウ中に受けた最初のハードCCを1回だけ無効化し、CounterSucceeded/WindowExpiredイベントで後続タスク(成功時カウンター・失敗時硬直)へ拡張できる。
 - フェーズ3: CCを受け取る共通の入口CrowdControlControllerを新設(ApplyHardCC。ハードCC専用でスロウは対象外)。行動制限の実体は後続タスク「ハードCC、スネア、スタン、スロウを実装する」で実装する。
 - フェーズ3: テスト用HardCcTestEmitterを追加(一定間隔+予告ログでハードCCを発射。TrainingDummyにアタッチして使用)。
@@ -114,7 +124,7 @@
 
 ### Removed
 
-- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換えする仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な参照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
+- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換える仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な参照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
 
 ### Fixed
 
