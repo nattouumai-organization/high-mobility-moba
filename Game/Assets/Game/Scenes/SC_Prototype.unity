@@ -408,6 +408,7 @@ GameObject:
   - component: {fileID: 968542334}
   - component: {fileID: 968542335}
   - component: {fileID: 968542336}
+  - component: {fileID: 968542337}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -696,6 +697,7 @@ MonoBehaviour:
   _remainingCooldown: 0
   _isCurrentTargetLocked: 0
   _isApproachingQTarget: 0
+  _castMode: 0
 --- !u!114 &968542334
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -710,6 +712,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _duration: 0.75
   _cooldown: 10
+  _castMode: 0
   _frontAngle: 120
   _damageReduction: 0.55
   _wDamageRadius: 2
@@ -746,6 +749,7 @@ MonoBehaviour:
   _baseDamage: 20
   _adRatio: 0.5
   _cooldown: 8
+  _castMode: 0
   _groundLayer:
     serializedVersion: 2
     m_Bits: 64
@@ -790,6 +794,23 @@ MonoBehaviour:
   _remainingCooldown: 0
   _remainingDuration: 0
   _isApproachingRTarget: 0
+  _castMode: 0
+--- !u!114 &968542337
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c748d447f370a6048b8a6901b9bde0bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CommonDController
+  _invulnerabilityDuration: 0.2
+  _cooldown: 34
+  _isWindowActive: 0
+  _remainingCooldown: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1122,6 +1143,7 @@ GameObject:
   - component: {fileID: 1246788906}
   - component: {fileID: 1246788920}
   - component: {fileID: 1246788940}
+  - component: {fileID: 1246788941}
   m_Layer: 7
   m_Name: TrainingDummy
   m_TagString: Untagged
@@ -1592,6 +1614,23 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _respawnDelay: 1
+--- !u!114 &1246788941
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1246788901}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 629bb84fb6aa18a498f23678c0d65bc6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HardCcTestEmitter
+  _target: {fileID: 0}
+  _interval: 3
+  _warningLead: 1
+  _ccDuration: 1
+  _emitEnabled: 1
 --- !u!1 &1357900001
 GameObject:
   m_ObjectHideFlags: 0

@@ -57,6 +57,10 @@
 
 ### Changed
 
+- フェーズ3: 共通Dの0.20秒CC無効化を実装(CommonDController新規・Dキー・クールダウン34秒)。ウィンドウ中に受けた最初のハードCCを1回だけ無効化し、CounterSucceeded/WindowExpiredイベントで後続タスク(成功時カウンター・失敗時硬直)へ拡張できる。
+- フェーズ3: CCを受け取る共通の入口CrowdControlControllerを新設(ApplyHardCC。ハードCC専用でスロウは対象外)。行動制限の実体は後続タスク「ハードCC、スネア、スタン、スロウを実装する」で実装する。
+- フェーズ3: テスト用HardCcTestEmitterを追加(一定間隔+予告ログでハードCCを発射。TrainingDummyにアタッチして使用)。
+- PlayerInputHubに共通DのInputActionを追加(DPressedThisFrame)。
 - フェーズ3準備(phase3-prep2): スキルインジケーターを指定方式ごとに統一。
   対象指定(Q/R)=攻撃範囲円、方向指定(W/E)=方向線のみ(W=前方軽減の向き、E=ダッシュ方向)、
   場所指定=発動地点マーカー(SkillRangeIndicator.ShowPointMarkerを新設。フェーズ3の場所指定スキルで使用)。

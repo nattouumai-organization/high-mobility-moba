@@ -13,6 +13,7 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _eAction;
     private InputAction _rAction;
     private InputAction _sAction;
+    private InputAction _dAction;
     private InputAction _rightClickAction;
     private InputAction _mousePositionAction;
 
@@ -41,6 +42,9 @@ public sealed class PlayerInputHub : MonoBehaviour
     // --- 停止コマンド(S) ---
     public bool SPressedThisFrame => _sAction != null && _sAction.WasPressedThisFrame();
 
+    // --- 共通D(カウンター) ---
+    public bool DPressedThisFrame => _dAction != null && _dAction.WasPressedThisFrame();
+
     // --- マウス ---
     public bool RightClickPressed => _rightClickAction != null && _rightClickAction.IsPressed();
     public bool RightClickPressedThisFrame => _rightClickAction != null && _rightClickAction.WasPressedThisFrame();
@@ -59,6 +63,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction.Enable();
         _rAction.Enable();
         _sAction.Enable();
+        _dAction.Enable();
         _rightClickAction.Enable();
         _mousePositionAction.Enable();
     }
@@ -70,6 +75,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction?.Disable();
         _rAction?.Disable();
         _sAction?.Disable();
+        _dAction?.Disable();
         _rightClickAction?.Disable();
         _mousePositionAction?.Disable();
     }
@@ -81,6 +87,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction?.Dispose();
         _rAction?.Dispose();
         _sAction?.Dispose();
+        _dAction?.Dispose();
         _rightClickAction?.Dispose();
         _mousePositionAction?.Dispose();
     }
@@ -96,6 +103,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction = new InputAction("SkillE", InputActionType.Button, "<Keyboard>/e");
         _rAction = new InputAction("SkillR", InputActionType.Button, "<Keyboard>/r");
         _sAction = new InputAction("StopCommand", InputActionType.Button, "<Keyboard>/s");
+        _dAction = new InputAction("CommonD", InputActionType.Button, "<Keyboard>/d");
         _rightClickAction = new InputAction("RightClick", InputActionType.Button, "<Mouse>/rightButton");
         _mousePositionAction = new InputAction("MousePosition", InputActionType.Value, "<Mouse>/position");
     }
