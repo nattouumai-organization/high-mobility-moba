@@ -1176,6 +1176,7 @@ GameObject:
   - component: {fileID: 1246788920}
   - component: {fileID: 1246788940}
   - component: {fileID: 1246788941}
+  - component: {fileID: 1246788942}
   m_Layer: 7
   m_Name: TrainingDummy
   m_TagString: Untagged
@@ -1659,10 +1660,32 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HardCcTestEmitter
   _target: {fileID: 0}
+  _ccType: 2
   _interval: 3
   _warningLead: 1
   _ccDuration: 1
+  _slowPercent: 40
   _emitEnabled: 1
+--- !u!114 &1246788942
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1246788901}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c748d447f370a6048b8a6901b9bde0bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CommonDController
+  _invulnerabilityDuration: 10
+  _cooldown: 1
+  _counterBaseDamage: 45
+  _counterAdRatio: 0.3
+  _msBoostPercent: 10
+  _msBoostDuration: 1.5
+  _isWindowActive: 0
+  _remainingCooldown: 0
 --- !u!1 &1260973273
 GameObject:
   m_ObjectHideFlags: 0
@@ -1753,8 +1776,6 @@ MonoBehaviour:
   _qMarkerRadius: 0.6
   _qInRangeColor: {r: 1, g: 1, b: 1, a: 0.95}
   _qOutOfRangeColor: {r: 1, g: 0.6, b: 0.15, a: 0.95}
-  _wAreaColor: {r: 0.25, g: 0.6, b: 1, a: 0.85}
-  _eRangeColor: {r: 0.25, g: 0.6, b: 1, a: 0.6}
   _rInRangeColor: {r: 0.75, g: 0.25, b: 1, a: 0.8}
   _rOutOfRangeColor: {r: 1, g: 0.6, b: 0.15, a: 0.8}
 --- !u!1 &1357900001

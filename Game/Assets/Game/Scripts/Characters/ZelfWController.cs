@@ -114,8 +114,9 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
     private void OnHealthRevived()
     {
+        // 復活時もWのクールダウンは維持する。
+        // GAME_DESIGN.mdのデス時CD短縮はR・共通D・Fの60%短縮のみで、Wは対象外(短縮は後続タスクで実装)。
         Deactivate();
-        _cooldownEndTime = 0f;
     }
 
     private void Update()

@@ -20,6 +20,17 @@
 - 削除した要素
 ```
 
+## 2026-07-24
+
+### Added
+
+- フェーズ1〜3見直し: ゼルフRの「共通Dで完全不発」を実装(対象が共通Dの無効化ウィンドウ中にRを発動した場合、決闘エリアは展開されず何も起こらない。Rのクールダウンは消費し、対象側では共通D成功時のカウンター攻撃45+AD30%とMS上昇が発生する。射程外からの自動接近後の発動も同様に判定する)
+
+### Fixed
+
+- フェーズ1〜3見直し: スタン中でも共通Dが発動できてしまう問題を修正(CommonDControllerがAbilityLockControllerの行動ロックを確認するようにした。スタン中・ゼルフW発動中・Eダッシュ中・死亡中はDを発動できない。共通DはCCを受ける前に予測して押す技のため、スタンを受けてからの後出しは不可。スネア中は仕様どおりDを使用できる)
+- フェーズ1〜3見直し: 復活時にゼルフWのクールダウンが全回復してしまう問題を修正(OnHealthRevivedでのクールダウンリセットを削除。デス時のCD短縮は仕様上R・共通D・Fの60%短縮のみで、これは後続タスクで実装予定)
+
 ## 2026-07-23
 
 ### Added
@@ -43,7 +54,7 @@
 ### Changed
 
 - 仕様変更: 共通D失敗時の0.30秒硬直を廃止した。失敗しても何も起きない(クールダウンのみ消費する)。
-  GAME_DESIGN.mdの共通D仕様を更新し、TASKS.mdから「共通D失敗時の0.30秒硬直を実装する」タスクを削除した。
+  GAME_DESIGN.mdの共通D仕様���更新し、TASKS.mdから「共通D失敗時の0.30秒硬直を実装する」タスクを削除した。
   CommonDControllerの失敗時硬直に関するコメントを整理した(WindowExpiredイベントはUIなどの拡張用に残す)。
 
 ### Fixed
@@ -114,7 +125,7 @@
   増加分は現在HPへ加算(LoL方式)・減少時は現在HPをクランプする。CharacterStatsにAddMaxHealthBonus/RemoveMaxHealthBonusを追加。
 - 数値のSO一元管理(phase1-2-fix3): CharacterStatsにCharacter Data参照を追加し、AwakeでZelfData.assetの基礎値を適用するようにした。
   ステータス単位→Unity単位の換算定数(MS60=1unit/s、射程100=1unit)をCharacterStatsで一元管理。未設定時は従来どおりInspector値を使用(後方互換)。
-- 入力のInputAction移行(phase1-2-fix3): PlayerInputHubを新規追加し、Q/W/E/R・右クリック・マウス座標の取得を
+- 入力のInputAction移行(phase1-2-fix3): PlayerInputHubを新規追加し、Q/W/E/R・右クリック・マ��ス座標の取得を
   Keyboard.current/Mouse.currentの直接ポーリングからInputActionへ置き換えた。Awakeで自動追加されるためInspector設定不要。
 - 行動ロックの診断ログを強化(phase1-2-fix2): ロック中にQ/E/Rを入力した際に必ず理由をConsoleへ出力するようにした。
   Eはロック判定をクールダウン判定より先に移動し、ダッシュ中・死亡中の押下もログを出す。
@@ -204,7 +215,7 @@
 
 ### Added
 
-- 通常攻撃のターゲット選択を実装。右ク���ックでTargetableLayerの対象を選択し、Groundの右クリックで解除する。
+- 通常攻撃のターゲット選択を実装。右ク���ックでTargetableLayer���対象を選択し、Groundの右クリックで解除する。
 - 右クリック入力の優先順位を「ターゲット選択 > Ground移動」とし、対象を右クリックした場合はGroundへ移動しない。
 - SC_Prototypeシーンにテスト用ダミーTrainingDummyを1体設置(TargetableLayer / 赤系仮マテリアル)。
 - 選択中のダミーに、足元の黄色い選択リングと本体色を明るくする視覚フィードバックを��加。

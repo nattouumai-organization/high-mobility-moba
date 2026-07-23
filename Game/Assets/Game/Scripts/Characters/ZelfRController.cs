@@ -21,7 +21,8 @@ using UnityEngine.InputSystem;
 ///   エリア外へ退出した同分類の敵: Outer Slow Percent分のスロウをOuter Slow Duration秒間付与。
 ///   ゼルフ自身: Self MS Boost Percent分のMS上昇をエリア持続中付与する。
 ///
-/// 共通Dで完全不発(共通D未実装のため今回はD判定なし。将来追加予定)。
+/// 対象が共通Dの無効化ウィンドウ中の場合、Rは完全不発になる
+/// (クールダウンは消費し、対象側では共通D成功時のカウンター攻撃とMS上昇が発生する)。
 /// ZelfEのダッシュ中・ZelfW発動中・死亡中はAbilityLockControllerのロックにより入力を受け付けない。
 /// コンポーネント自体は無効化されないため、発動済みの決闘エリアはW/E中も正しく進行・終了する。
 /// ゼルフ自身が死亡した場合は決闘エリアを即時終了する。
@@ -235,7 +236,7 @@ public sealed class ZelfRController : MonoBehaviour
         // 射程内なら即発動、射程外なら射程内まで自動接近してから発動する。
         if (IsInCastRange(target))
         {
-            ActivateArena(target.transform.position);
+            ActivateArena(target);
             return;
         }
 
@@ -303,7 +304,7 @@ public sealed class ZelfRController : MonoBehaviour
 
         Targetable target = _pendingTarget;
         CancelPendingApproach();
-        ActivateArena(target.transform.position);
+        ActivateArena(target);
     }
 
     private bool TryGetCharacterTargetUnderMouse(out Targetable target)
@@ -321,12 +322,25 @@ public sealed class ZelfRController : MonoBehaviour
         return true;
     }
 
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
     // タスク1: 決闘エリア展開
-    // ─────────────────────────────────────────────────────────────────────
-    private void ActivateArena(Vector3 center)
+    // ─────────────────────────────────────────────────────────────────
+    private void ActivateArena(Targetable target)
     {
-        _arenaCenter = center;
+        if (target == null) return;
+
+        // 共通Dによる完全不発: 対象が共通Dの無効化ウィンドウ中の場合、
+        // 決闘エリアは展開されず何も起こらない(クールダウンは消費する)。
+        // 対象側では共通D成功時のカウンター攻撃とMS上昇が発生する。
+        CommonDController targetCommonD = target.GetComponentInParent<CommonDController>();
+        if (targetCommonD != null && targetCommonD.TryBlockHardCC(transform))
+        {
+            _cooldownEndTime = Time.time + _cooldown;
+            Debug.Log("Zelf R: 対象の共通Dにより完全不発になりました(クールダウンは消費)。", this);
+            return;
+        }
+
+        _arenaCenter = target.transform.position;
         _isRActive = true;
         _activeEndTime = Time.time + _duration;
         _cooldownEndTime = Time.time + _cooldown;
@@ -347,9 +361,9 @@ public sealed class ZelfRController : MonoBehaviour
         Debug.Log("Zelf R: 決闘エリアを展開しました。", this);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
     // タスク2: ミニオン押し出し
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
     private void PushOutAllTargetablesInArena()
     {
         if (_targetableLayer.value == 0) return;
@@ -404,9 +418,9 @@ public sealed class ZelfRController : MonoBehaviour
         Debug.Log($"Zelf R: {target.name} をエリア外へ押し出しました。", this);
     }
 
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
     // タスク3: エリア内外スロウ
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
 
     // 毎フレーム呼ばれる: エリア内Character敵スロウの付与/解除と退出スロウの適用
     private void UpdateInnerSlowAndOuterTransition()
@@ -558,9 +572,9 @@ public sealed class ZelfRController : MonoBehaviour
         RemoveSelfMSBoost();
     }
 
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
     // ビジュアル
-    // ─────────────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────────
     // Rキーを押している間、自分中心にR射程円を表示する(ZelfQの射程円と同方式)。
     private void CreateRangeCircle()
     {

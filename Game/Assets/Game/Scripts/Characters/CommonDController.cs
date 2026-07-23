@@ -8,6 +8,8 @@ using UnityEngine;
 /// スキル指定方式はSkillTargetingType.NoTarget(無指定)。反応スキルのためSkillCastModeの対象外とし、押した瞬間に即発動する。
 /// 成功時: 攻撃者だ45 + ADの30%の通常ダメージのカウンターを与え、短時間MSが10%上がる。追加スタン・スネアは与えない。
 /// 失敗時(無効化できずにウィンドウが終了)は何も起きない(仕様変更 2026-07-23: 硬直などのペナルティなし。クールダウンのみ消費)。
+/// スタン中・W発動中・Eダッシュ中・死亡中などの行動ロック中(AbilityLockController.IsLocked)は発動できない。
+/// 共通DはCCを受ける前に予測して押す技のため、スタンを受けてからの後出しは不可(スネアはDの発動を妨げない)。
 /// ゼルフ専用ではなく、全キャラクターのPlayerオブジェクトにアタッチして使う。
 /// </summary>
 public class CommonDController : MonoBehaviour
@@ -34,6 +36,7 @@ public class CommonDController : MonoBehaviour
 
     private PlayerInputHub _inputHub;
     private HealthController _health;
+    private AbilityLockController _abilityLock;
     private float _windowEndTime;
     private float _cooldownEndTime;
     private bool _hasBlockedThisWindow;
@@ -66,6 +69,10 @@ public class CommonDController : MonoBehaviour
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _health = GetComponent<HealthController>();
         _characterStats = GetComponent<CharacterStats>();
+
+        // スタン・W発動中・Eダッシュ中などの行動ロックを確認するため参照する(未追加でも動くようにget-or-add)。
+        _abilityLock = GetComponent<AbilityLockController>();
+        if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
 
         // CCを受け取る入口をこのキャラクターに用意する(未追加でも動くようにget-or-add)。
         if (GetComponent<CrowdControlController>() == null)
@@ -110,6 +117,14 @@ public class CommonDController : MonoBehaviour
         if (_health != null && _health.IsDead)
         {
             Debug.Log("共通D: 死亡中のため発動できません。", this);
+            return;
+        }
+        // スタン中・W発動中・Eダッシュ中などの行動ロック中は発動できない。
+        // 共通DはCCを受ける前に予測して押す技のため、スタンを受けてからの後出しは不可。
+        // スネアはロックを追加しないため、仕様どおりスネア中はDを使用できる。
+        if (_abilityLock != null && _abilityLock.IsLocked)
+        {
+            Debug.Log("共通D: 行動ロック中(スタン・他スキル発動中など)のため発動できません。", this);
             return;
         }
         if (_isWindowActive)
