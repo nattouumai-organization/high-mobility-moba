@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 最後に右クリックしたGround上の地点の方向を、PlayerがY軸のみ回転して向くようにする。
@@ -7,6 +6,7 @@ using UnityEngine.InputSystem;
 /// 毎フレーム更新されるため、Playerはカーソル方向を向き続ける。
 /// TASKS.md「マウス方向へキャラクターが向く処理を実装する」用の試作スクリプト。
 /// 移動はPlayerClickMovementの責務であり、本スクリプトは回転のみを担う。
+/// 右クリック・マウス座標の入力はPlayerInputHub経由で取得する(Mouse.currentを直接読まない。フェーズ1〜3見直しで一元化)。
 /// ZelfQControllerなどの外部スクリプトは、publicメソッドのSetLookTarget / SetLookDirectionで
 /// 目標回転を安全に更新できる(privateフィールドは本スクリプト内部だけで管理する)。
 /// スタン中(CrowdControlControllerのIsStunned)は向きを変えられない。
@@ -28,6 +28,9 @@ public class PlayerMouseFacing : MonoBehaviour
     private Quaternion _targetRotation;
     private bool _hasTargetRotation;
 
+    // 入力の一元管理(右クリック・マウス座標)。他コントローラーと同じくget-or-addで自動追加する。
+    private PlayerInputHub _inputHub;
+
     // CC(スタン)による回転禁止の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
     private CrowdControlController _crowdControl;
 
@@ -36,6 +39,8 @@ public class PlayerMouseFacing : MonoBehaviour
         _mainCamera = Camera.main;
         _targetRotation = transform.rotation;
         _crowdControl = GetComponent<CrowdControlController>();
+        _inputHub = GetComponent<PlayerInputHub>();
+        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
     }
 
     private void Update()
@@ -84,20 +89,19 @@ public class PlayerMouseFacing : MonoBehaviour
 
     private void UpdateTargetRotationFromRightClick()
     {
-        Mouse mouse = Mouse.current;
-        if (mouse == null || _mainCamera == null)
+        if (_inputHub == null || _mainCamera == null)
         {
             return;
         }
 
         // 最後に右クリックした方向を向く仕様のため、右クリック入力があったフレームだけ目標回転を更新する。
         // 長押し中は毎フレームが右クリック入力として扱われ、カーソル方向を向き続ける。
-        if (!mouse.rightButton.isPressed)
+        if (!_inputHub.RightClickPressed)
         {
             return;
         }
 
-        Ray ray = _mainCamera.ScreenPointToRay(mouse.position.ReadValue());
+        Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
         if (!Physics.Raycast(ray, out RaycastHit hitInfo, Mathf.Infinity, _groundLayer))
         {
             // Ground外を右クリックした場合は、最後に向いていた方向を維持する。

@@ -6,7 +6,7 @@ using UnityEngine;
 /// Dキー押下で0.20秒の無効化ウィンドウを開始し、ウィンドウ中に受けた「最初のハードCC」を1回だけ無効化する。
 /// クールダウンは34秒。
 /// スキル指定方式はSkillTargetingType.NoTarget(無指定)。反応スキルのためSkillCastModeの対象外とし、押した瞬間に即発動する。
-/// 成功時: 攻撃者だ45 + ADの30%の通常ダメージのカウンターを与え、短時間MSが10%上がる。追加スタン・スネアは与えない。
+/// 成功時: 攻撃者へ45 + ADの30%の通常ダメージのカウンターを与え、短時間MSが10%上がる。追加スタン・スネアは与えない。
 /// 失敗時(無効化できずにウィンドウが終了)は何も起きない(仕様変更 2026-07-23: 硬直などのペナルティなし。クールダウンのみ消費)。
 /// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// スタン中・W発動中・Eダッシュ中・死亡中などの行動ロック中(AbilityLockController.IsLocked)は発動できない。
@@ -41,7 +41,8 @@ public class CommonDController : MonoBehaviour
     private HealthController _health;
     private AbilityLockController _abilityLock;
     private float _windowEndTime;
-    private float _cooldownEndTime;
+    // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
+    private double _cooldownEndTime;
     private bool _hasBlockedThisWindow;
     private CharacterStats _characterStats;
     // 適用中のMS上昇量(未適用は0)とその終了時刻。
@@ -64,7 +65,7 @@ public class CommonDController : MonoBehaviour
     public bool IsWindowActive => _isWindowActive;
 
     /// <summary>残りクールダウン(秒)。クールダウンUIタスクで使用する想定。</summary>
-    public float RemainingCooldown => Mathf.Max(0f, _cooldownEndTime - Time.time);
+    public float RemainingCooldown => (float)Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
 
     private void Awake()
     {
@@ -136,16 +137,16 @@ public class CommonDController : MonoBehaviour
             // 発動中の再入力は無視する。
             return;
         }
-        if (Time.time < _cooldownEndTime)
+        if (Time.timeAsDouble < _cooldownEndTime)
         {
-            Debug.Log($"共通D: クールダウン中です(残り{_cooldownEndTime - Time.time:F1}秒)。", this);
+            Debug.Log($"共通D: クールダウン中です(残り{RemainingCooldown:F1}秒)。", this);
             return;
         }
 
         _isWindowActive = true;
         _hasBlockedThisWindow = false;
         _windowEndTime = Time.time + _invulnerabilityDuration;
-        _cooldownEndTime = Time.time + _cooldown;
+        _cooldownEndTime = Time.timeAsDouble + _cooldown;
         Debug.Log($"共通D: 発動しました({_invulnerabilityDuration:F2}秒)。", this);
     }
 
@@ -171,7 +172,7 @@ public class CommonDController : MonoBehaviour
         return true;
     }
 
-    // 成功時のカウンター攻撃: 攻撃者だ45 + ADの30%の通常ダメージを与える。
+    // 成功時のカウンター攻撃: 攻撃者へ45 + ADの30%の通常ダメージを与える。
     // 仕様どおり、成功しても追加のスタンやスネアは与えない(ダメージのみ)。
     private void PerformCounterAttack(Transform attacker)
     {
@@ -200,7 +201,7 @@ public class CommonDController : MonoBehaviour
         }
     }
 
-    // 成功時のMS上昇: 発動時点のMSの10%をフラット量へ換算して加算する。
+    // 成功時のMS上昇: 基礎MS(BaseMoveSpeed)の10%をフラット量へ換算して加算する(ゼルフRのMS上昇と同じ基準。フェーズ1〜3見直しで統一)。
     // 効果中に再成功した場合は掛け直し(重複加算しない)。
     private void ApplyMsBoost()
     {
@@ -213,7 +214,7 @@ public class CommonDController : MonoBehaviour
         // 既に適用中なら一度解除してから掛け直す。
         RemoveMsBoost();
 
-        _activeMsBonus = _characterStats.CurrentMoveSpeed * (_msBoostPercent / 100f);
+        _activeMsBonus = _characterStats.BaseMoveSpeed * (_msBoostPercent / 100f);
         if (_activeMsBonus <= 0f)
         {
             _activeMsBonus = 0f;
@@ -245,10 +246,10 @@ public class CommonDController : MonoBehaviour
     // デス時: 残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
     private void OnSelfDied()
     {
-        float remaining = _cooldownEndTime - Time.time;
-        if (remaining > 0f)
+        double remaining = _cooldownEndTime - Time.timeAsDouble;
+        if (remaining > 0.0)
         {
-            _cooldownEndTime = Time.time + remaining * (1f - _deathCooldownReduction);
+            _cooldownEndTime = Time.timeAsDouble + remaining * (1f - _deathCooldownReduction);
             Debug.Log($"共通D: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{RemainingCooldown:F1}秒)。", this);
         }
     }

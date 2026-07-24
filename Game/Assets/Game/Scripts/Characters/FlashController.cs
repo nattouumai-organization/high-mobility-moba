@@ -40,9 +40,10 @@ public sealed class FlashController : MonoBehaviour
     private ZelfQController _qController;
     private ZelfRController _rController;
     private Camera _mainCamera;
-    private float _cooldownEndTime;
+    // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
+    private double _cooldownEndTime;
 
-    public float RemainingCooldown => Mathf.Max(0f, _cooldownEndTime - Time.time);
+    public float RemainingCooldown => (float)System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
 
     private void Awake()
     {
@@ -87,10 +88,10 @@ public sealed class FlashController : MonoBehaviour
     // デス時: 残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
     private void OnSelfDied()
     {
-        float remaining = _cooldownEndTime - Time.time;
-        if (remaining > 0f)
+        double remaining = _cooldownEndTime - Time.timeAsDouble;
+        if (remaining > 0.0)
         {
-            _cooldownEndTime = Time.time + remaining * (1f - _deathCooldownReduction);
+            _cooldownEndTime = Time.timeAsDouble + remaining * (1f - _deathCooldownReduction);
             Debug.Log($"フラッシュ: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{RemainingCooldown:F1}秒)。", this);
         }
     }
@@ -103,7 +104,7 @@ public sealed class FlashController : MonoBehaviour
             Debug.Log("フラッシュ: 他の行動中のため発動できません。", this);
             return;
         }
-        if (Time.time < _cooldownEndTime)
+        if (Time.timeAsDouble < _cooldownEndTime)
         {
             Debug.Log($"フラッシュ: クールダウン中です(残り{RemainingCooldown:F1}秒)。", this);
             return;
@@ -161,7 +162,7 @@ public sealed class FlashController : MonoBehaviour
 
     private void PerformFlash(Vector3 destination, Vector3 direction)
     {
-        _cooldownEndTime = Time.time + _cooldown;
+        _cooldownEndTime = Time.timeAsDouble + _cooldown;
 
         // 進行中の移動・Q/Rの射程外自動接近を中止してから瞬間移動する。
         if (_clickMovement != null) _clickMovement.StopMovement();

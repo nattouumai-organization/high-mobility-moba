@@ -20,6 +20,20 @@
 - 削除した要素
 ```
 
+## 2026-07-25
+
+### Changed
+
+- フェーズ1〜3見直し(重要度:低): MS%バフの基準を基礎MS(BaseMoveSpeed)へ統一。共通Dの成功時MS上昇が「発動時点の現在MS」基準だったものを、ゼルフRのMS上昇と同じ基礎MS基準へ変更。
+- フェーズ1〜3見直し(重要度:低): スロウ適用後の移動速度にLoL準拠の下限(MS110)を追加(CharacterStats.CurrentMoveSpeed)。基礎MSが110未満の対象(練習用ダミーなど)は基礎MSがそのまま下限。
+- フェーズ1〜3見直し(重要度:低): PlayerMouseFacingの右クリック・マウス座標の入力をPlayerInputHub経由へ一元化(Mouse.currentの直接参照を廃止)。
+- フェーズ1〜3見直し(重要度:低): 各スキル(Q/W/E/R/共通D/F)のクールダウン終了時刻をTime.timeAsDouble基準のdoubleへ変更(長時間起動時のfloat精度劣化対策)。SkillCooldownHudのリフレクション読み取りもfloat/double両対応へ更新。
+
+### Fixed
+
+- フェーズ1〜3見直し(重要度:低): ゼルフEのダッシュ後ウェーブが、自身の死亡後も命中判定を続けていた問題を修正(死亡時に即中断)。
+- フェーズ1〜3見直し(重要度:低): ドキュメント・コメントの誤字を修正(「攻撃傄」→「攻撃側」、「行動妃害耐性」→「行動妨害耐性」、「攻撃者だ45」→「攻撃者へ45」、ゼルフWの説明を「合計AD×1.5分のダメージを毎ティック均等に与える」へ修正)。
+
 ## 2026-07-24
 
 ### Added
@@ -106,16 +120,16 @@
 
 ### Changed
 
-- フェーズ3: 共通D成功時のカウンター攻撃を実装(無効化成功時、攻撃者だ45+ADの30%の通常ダメージ。追加スタン・スネアは与えない)。
+- フェーズ3: 共通D成功時のカウンター攻撃を実装(無効化成功時、攻撃者へ45+ADの30%の通常ダメージ。追加スタン・スネアは与えない)。
 - フェーズ3: 共通D成功時に移動速度が10%上昇する効果を実装(持続は既定1.5秒・Inspector調整可。効果中の再成功は掛け直しで重複加算しない。死亡時は即解除)。
-- フェーズ3: 共通Dの0.20秒CC無効化を実装(CommonDController新規・Dキー・クールダウン34秒)。ウィンドウ中に受けた最初のハードCCを1回だけ無効化し、CounterSucceeded/WindowExpiredイベントで後続タスク(成功時カウンター・失敗時硬直)へ拡張できる。
+- フェーズ3: 共通Dの0.20秒CC無効化を実装(CommonDController新規・Dキー・クー���ダウン34秒)。ウィンドウ中に受けた最初のハードCCを1回だけ無効化し、CounterSucceeded/WindowExpiredイベントで後続タスク(成功時カウンター・失敗時硬直)へ拡張できる。
 - フェーズ3: CCを受け取る共通の入口CrowdControlControllerを新設(ApplyHardCC。ハードCC専用でスロウは対象外)。行動制限の実体は後続タスク「ハードCC、スネア、スタン、スロウを実装する」で実装する。
 - フェーズ3: テスト用HardCcTestEmitterを追加(一定間隔+予告ログでハードCCを発射。TrainingDummyにアタッチして使用)。
 - PlayerInputHubに共通DのInputActionを追加(DPressedThisFrame)。
 - フェーズ3準備(phase3-prep2): スキルインジケーターを指定方式ごとに統一。
   対象指定(Q/R)=攻撃範囲円、方向指定(W/E)=方向線のみ(W=前方軽減の向き、E=ダッシュ方向)、
   場所指定=発動地点マーカー(SkillRangeIndicator.ShowPointMarkerを新設。フェーズ3の場所指定スキルで使用)。
-  Wの分類を無指定→方向指定に訂正(SkillTargetingTypeのコメント更新)。
+  Wの分類���無指定→方向指定に訂正(SkillTargetingTypeのコメント更新)。
 - フェーズ3準備(phase3-prep1): スキル発動方式を「キーを押すと範囲表示・離すと発動」(NormalCast)にQ/W/E/Rで統一。
   SkillCastMode enumを新設し、各スキルのInspectorでQuickCast(押した瞬間に発動)へ個別に切替可能。
 - フェーズ3準備(phase3-prep1): 汎用範囲インジケーターSkillRangeIndicator(円+方向線)を新設。
@@ -199,7 +213,7 @@
 - ターゲット分類を追加。TargetableにTarget Classification(Character / Minion / Tower / TrainingDummy)をInspectorで設定でき、将来のキャラクター・ミニオン・タワーでも再利用できる。TrainingDummyは初期状態でCharacter分類とする。
 - ゼルフP(与ダメージ回復)を実装(ZelfPassiveHeal、Scripts/Characters)。実際に与えたダメージ量(実ダメージ。残りHPを超えた過剰ダメージ分は含まない)を基準に、Character分類は5%、Minion分類は2.5%、Tower分類は0%を回復する(回復率はInspector設定。テスト用のTrainingDummy分類はCharacterと同じ5%)。最大HPを超えず、死亡中は回復しない。回復のクールダウン・追加回復・回復阻害・ライフスティールは未実装。
 - ダメージ表示システムを追加(FloatingCombatText / CombatTextManager、Scripts/UI)。攻撃した側の頭上に与ダメージを赤(例: 60)、受けた側の頭上に被ダメージを青(例: -60)、ゼルフPで実際にHPが増えた場合のみ回復量を緑(例: +3)で表示する。ワールド空間のWorld Space Canvas+標準Text(LegacyRuntimeフォント)による整数表示で、短時間上方向へ移動しながらフェードアウトし、常にMain Cameraの方向を向いて裏返らず、ランダムな横方向オフセットで重なりを軽減する。表示終了後は安全に削除され、プール処理は未実装だが将来プールへ置き換えやすい構造。将来のキャラクター・ミニオン・タワーからも共通利用できる。
-- 攻撃ダミー(AttackDummy)をSC_Prototypeへ1体追加(DummyAutoAttack、Scripts/Characters)。攻撃射程内のPlayerへ攻撃間隔ごとに即時ダメージを与え(攻撃力10・攻撃速度1・射程2、いずれもInspector設定)、実際に与えたダメージ量をPlayerの頭上に黄色で表示する。自身または対象の死亡中は攻撃しない。本体はTrainingDummyと同構成(HP300・Character分類・被弾フラッシュ・選択リング・HPバー付き)。移動・追跡・弾丸・攻撃アニメーション・敵AIは未実装。
+- 攻撃ダミー(AttackDummy)をSC_Prototypeへ1体追加(DummyAutoAttack、Scripts/Characters)。攻撃射程内のPlayerへ攻撃間隔ごとに即時ダメージを与え(攻撃力10・攻撃速度1・射程2、いずれもInspector設定)、実際に与えた���メージ量をPlayerの頭上に黄色で表示する。自身または対象の死亡中は攻撃しない。本体はTrainingDummyと同構成(HP300・Character分類・被弾フラッシュ・選択リング・HPバー付き)。移動・追跡・弾丸・攻撃アニメーション・敵AIは未実装。
 - 復活処理を追加(RespawnController、Scripts/Combat)。Player・TrainingDummy・AttackDummyが死亡から1秒後(Inspector設定)に初期位置・初期向きでHP全快で復活する。HealthControllerにRevive(全快)と復活イベントを追加し、Targetable(本体・Collider)、PlayerDeathHandler(操作系・見た目)、WorldHealthBar(HPバー)がそれぞれ復元する。復活したダミーの再選択は右クリックで行う。
 - ゼルフQの対象ブリンク、対象指定ダメージ、同一対象ロック、分類別クールダウン処理を実装。
 - ZelfQControllerを追加。Qキーで選択中の有効なCharacter / Minion / TrainingDummyへ、Collider最寄り点を基準に安全な停止距離でブリンクする。

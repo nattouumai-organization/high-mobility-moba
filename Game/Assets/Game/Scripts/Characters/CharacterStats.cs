@@ -26,6 +26,13 @@ public class CharacterStats : MonoBehaviour
     /// </summary>
     public const float RangeStatPerUnityUnit = 100f;
 
+    /// <summary>
+    /// スロウ適用後の移動速度の下限(ステータス値)。LoL準拠で、どれだけスロウを重ねても
+    /// 現在MSはこの値(MS110 = 約1.83 units/秒)未満にならない(フェーズ1〜3見直し)。
+    /// 基礎MSがこの値より低い対象(移動しない練習用ダミーなど)は、基礎MSがそのまま下限になる。
+    /// </summary>
+    public const float MinMoveSpeedStat = 110f;
+
     // 基礎値の供給元(任意)。設定するとAwakeで下の基礎値を上書きする。
     // PlayerにはZelfData.assetを設定する。未設定の場合はInspectorの基礎値を使用する。
     [SerializeField] private CharacterData _characterData;
@@ -53,7 +60,17 @@ public class CharacterStats : MonoBehaviour
     /// </summary>
     public float BaseMoveSpeed => _baseMoveSpeed;
 
-    public float CurrentMoveSpeed => Mathf.Max(0f, _baseMoveSpeed + _bonusMoveSpeed);
+    /// <summary>
+    /// 現在の移動速度(毎秒Unity units)。スロウを受けても下限(MinMoveSpeedStat)未満にはならない。
+    /// </summary>
+    public float CurrentMoveSpeed
+    {
+        get
+        {
+            float minMoveSpeed = Mathf.Min(Mathf.Max(0f, _baseMoveSpeed), MinMoveSpeedStat / MoveSpeedStatPerUnityUnit);
+            return Mathf.Max(minMoveSpeed, _baseMoveSpeed + _bonusMoveSpeed);
+        }
+    }
     public float CurrentAttackSpeed =>
         Mathf.Max(MinAttackSpeed, _baseAttackSpeed * (1f + _bonusAttackSpeedPercent / 100f));
     public float AttackInterval => 1f / CurrentAttackSpeed;
@@ -101,6 +118,7 @@ public class CharacterStats : MonoBehaviour
     /// 移動速度ボーナスを加算する。
     /// 正の値でMS上昇バフ、負の値でスロウとして使用する。
     /// スロウはCrowdControlControllerのApplySlow経由で適用され、MS上昇バフは各スキルが直接呼び出す。
+    /// %指定のMSバフは、基礎MS(BaseMoveSpeed)基準でフラット量へ換算してから渡す(ゼルフR・共通Dで統一。フェーズ1〜3見直し)。
     /// </summary>
     public void AddMoveSpeedBonus(float amount)
     {

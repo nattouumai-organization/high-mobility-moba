@@ -55,7 +55,8 @@ public sealed class ZelfEController : MonoBehaviour
     private Vector3 _dashDirection;
     private float _remainingDashDistance;
     private float _dashSpeed;
-    private float _cooldownEndTime;
+    // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
+    private double _cooldownEndTime;
     private bool _hitCharacterClassification;
     private bool _clickMovementWasEnabled;
     private bool _characterControllerWasEnabled;
@@ -111,7 +112,7 @@ public sealed class ZelfEController : MonoBehaviour
 
     private void Update()
     {
-        _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
+        _remainingCooldown = (float)System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
 
         // CC参照の遅延取得(CrowdControlControllerが実行時に追加された場合に備える)。
         if (_crowdControl == null) _crowdControl = GetComponent<CrowdControlController>();
@@ -190,7 +191,7 @@ public sealed class ZelfEController : MonoBehaviour
             Debug.Log("ゼルフ E: スネア中のため発動できません。", this);
             return;
         }
-        if (Time.time < _cooldownEndTime)
+        if (Time.timeAsDouble < _cooldownEndTime)
         {
             Debug.Log("ゼルフ E: クールダウン中です。", this);
             return;
@@ -241,7 +242,7 @@ public sealed class ZelfEController : MonoBehaviour
         _hitTargets.Clear();
         _hitCharacterClassification = false;
         _isDashing = true;
-        _cooldownEndTime = Time.time + _cooldown;
+        _cooldownEndTime = Time.timeAsDouble + _cooldown;
 
         if (_waveCoroutine != null) { StopCoroutine(_waveCoroutine); _waveCoroutine = null; }
 
@@ -303,6 +304,12 @@ public sealed class ZelfEController : MonoBehaviour
             Vector3 wavePosition = startPosition;
             while (traveledDistance < _waveDistance)
             {
+                // 死亡した場合はウェーブを中断する(死亡中に命中判定・Qリセットが発生しないようにする。フェーズ1〜3見直し)。
+                if (_selfHealth != null && _selfHealth.IsDead)
+                {
+                    Debug.Log("Zelf E: 死亡によりダッシュ後ウェーブを中断しました。", this);
+                    break;
+                }
                 float step = Mathf.Min(_waveSpeed * Time.deltaTime, _waveDistance - traveledDistance);
                 Vector3 prevPos = wavePosition;
                 wavePosition += _dashDirection * step;

@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// ゼルフWを管理する。
 /// Wキーで発動。持続中は前方からの通常ダメージを軽減し、
-/// 周囲W Damage Radius以内の敵に母ティックAD×1.5分のダメージを与える。
+/// 周囲W Damage Radius以内の敵に合計AD×1.5分のダメージを毎ティック均等に与える。
 /// Character/TrainingDummyに命中した場合はQのCDを即時リセットしロックも解除する。
 /// W発動中はAbilityLockControllerへロックを追加し、通常攻撃・Q・E・Rの入力を一括で禁止する(W終了時に解除)。
 /// </summary>
@@ -53,7 +53,8 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
     private LayerMask _targetableLayer;
 
     private float _activeEndTime;
-    private float _cooldownEndTime;
+    // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
+    private double _cooldownEndTime;
     private LineRenderer _shieldArc;
     private Material _shieldMaterial;
     private Coroutine _damageCoroutine;
@@ -121,7 +122,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
     private void Update()
     {
-        _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
+        _remainingCooldown = (float)System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
 
         if (_isWActive && Time.time >= _activeEndTime)
         {
@@ -177,7 +178,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             Debug.Log("Zelf W: 発動中のため、持続時間の延長・再発動はしません。", this);
             return;
         }
-        if (Time.time < _cooldownEndTime)
+        if (Time.timeAsDouble < _cooldownEndTime)
         {
             Debug.Log("Zelf W: クールダウン中です。", this);
             return;
@@ -193,7 +194,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
         _isWActive = true;
         _activeEndTime = Time.time + _duration;
-        _cooldownEndTime = Time.time + _cooldown;
+        _cooldownEndTime = Time.timeAsDouble + _cooldown;
         _wQResetTriggered = false;
 
         // W発動中は通常攻撃・Q・E・Rの入力をロックする

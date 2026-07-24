@@ -394,8 +394,9 @@ public sealed class SkillCooldownHud : MonoBehaviour
         float maxCooldown = 0f;
         if (slot.CooldownEndTimeField != null && slot.CooldownField != null)
         {
-            float endTime = (float)slot.CooldownEndTimeField.GetValue(slot.Controller);
-            maxCooldown = (float)slot.CooldownField.GetValue(slot.Controller);
+            // クールダウン終了時刻はdouble(Time.timeAsDouble基準)へ変更されたため、float/doubleのどちらでも読み取れるようにする(フェーズ1〜3見直し)。
+            float endTime = Convert.ToSingle(slot.CooldownEndTimeField.GetValue(slot.Controller));
+            maxCooldown = Convert.ToSingle(slot.CooldownField.GetValue(slot.Controller));
             remaining = Mathf.Max(0f, endTime - Time.time);
         }
         else if (!slot.WarnedMissingField)

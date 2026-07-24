@@ -43,7 +43,8 @@ public sealed class ZelfQController : MonoBehaviour
     private readonly Dictionary<Targetable, float> _locks = new Dictionary<Targetable, float>();
     private readonly Dictionary<Targetable, LineRenderer> _lockCircles = new Dictionary<Targetable, LineRenderer>();
     private Targetable _pendingTarget;
-    private float _cooldownEndTime;
+    // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
+    private double _cooldownEndTime;
     private bool _movementSuppressedUntilRightRelease;
     private LineRenderer _rangeCircle;
     private Material _rangeMaterial;
@@ -77,7 +78,7 @@ public sealed class ZelfQController : MonoBehaviour
     /// </summary>
     public void ResetCooldown()
     {
-        _cooldownEndTime = Time.time;
+        _cooldownEndTime = Time.timeAsDouble;
         _remainingCooldown = 0f;
         _isQAvailable = true;
     }
@@ -250,14 +251,14 @@ public sealed class ZelfQController : MonoBehaviour
 
         _locks[target] = Time.time + _sameTargetLockout;
         CreateLockCircle(target);
-        _cooldownEndTime = Time.time + _cooldown;
+        _cooldownEndTime = Time.timeAsDouble + _cooldown;
         if (target.Classification == TargetClassification.Character || target.Classification == TargetClassification.TrainingDummy)
         {
-            _cooldownEndTime = Time.time;
+            _cooldownEndTime = Time.timeAsDouble;
         }
         else if (target.Classification == TargetClassification.Minion)
         {
-            _cooldownEndTime = Time.time + Mathf.Max(0f, _cooldownEndTime - Time.time) * (1f - _minionCooldownReductionPercent);
+            _cooldownEndTime = Time.timeAsDouble + System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble) * (1f - _minionCooldownReductionPercent);
         }
         Log("Zelf Q: 発動成功。");
     }
@@ -385,7 +386,7 @@ public sealed class ZelfQController : MonoBehaviour
 
     private void UpdateCooldownAndLocks()
     {
-        _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
+        _remainingCooldown = (float)System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
         _isQAvailable = _remainingCooldown <= 0f;
         _isCurrentTargetLocked = IsLocked(GetQTarget());
         List<Targetable> remove = null;

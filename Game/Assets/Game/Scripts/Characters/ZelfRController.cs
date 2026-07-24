@@ -70,7 +70,8 @@ public sealed class ZelfRController : MonoBehaviour
     [SerializeField] private float _remainingDuration;
     [SerializeField] private bool _isApproachingRTarget;
 
-    private float _cooldownEndTime;
+    // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
+    private double _cooldownEndTime;
     private float _activeEndTime;
     private Vector3 _arenaCenter;
     private LineRenderer _arenaCircle;
@@ -176,17 +177,17 @@ public sealed class ZelfRController : MonoBehaviour
         }
 
         // デス時: 残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
-        float remaining = _cooldownEndTime - Time.time;
-        if (remaining > 0f)
+        double remaining = _cooldownEndTime - Time.timeAsDouble;
+        if (remaining > 0.0)
         {
-            _cooldownEndTime = Time.time + remaining * (1f - _deathCooldownReduction);
-            Debug.Log($"Zelf R: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{Mathf.Max(0f, _cooldownEndTime - Time.time):F1}秒)。", this);
+            _cooldownEndTime = Time.timeAsDouble + remaining * (1f - _deathCooldownReduction);
+            Debug.Log($"Zelf R: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble):F1}秒)。", this);
         }
     }
 
     private void Update()
     {
-        _remainingCooldown = Mathf.Max(0f, _cooldownEndTime - Time.time);
+        _remainingCooldown = (float)System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
 
         if (_isRActive)
         {
@@ -234,7 +235,7 @@ public sealed class ZelfRController : MonoBehaviour
             Debug.Log("Zelf R: 発動中です。", this);
             return;
         }
-        if (Time.time < _cooldownEndTime)
+        if (Time.timeAsDouble < _cooldownEndTime)
         {
             Debug.Log("Zelf R: クールダウン中です。", this);
             return;
@@ -292,7 +293,7 @@ public sealed class ZelfRController : MonoBehaviour
             Debug.Log("Zelf R: 右クリック入力により自動接近を中止しました。", this);
             return;
         }
-        if (_isRActive || Time.time < _cooldownEndTime)
+        if (_isRActive || Time.timeAsDouble < _cooldownEndTime)
         {
             CancelPendingApproach();
             return;
@@ -351,7 +352,7 @@ public sealed class ZelfRController : MonoBehaviour
         CommonDController targetCommonD = target.GetComponentInParent<CommonDController>();
         if (targetCommonD != null && targetCommonD.TryBlockHardCC(transform))
         {
-            _cooldownEndTime = Time.time + _cooldown;
+            _cooldownEndTime = Time.timeAsDouble + _cooldown;
             Debug.Log("Zelf R: 対象の共通Dにより完全不発になりました(クールダウンは消費)。", this);
             return;
         }
@@ -359,7 +360,7 @@ public sealed class ZelfRController : MonoBehaviour
         _arenaCenter = target.transform.position;
         _isRActive = true;
         _activeEndTime = Time.time + _duration;
-        _cooldownEndTime = Time.time + _cooldown;
+        _cooldownEndTime = Time.timeAsDouble + _cooldown;
         _targetsInsideArena.Clear();
         _nextInnerSlowRefreshTime = 0f;
         _selfBoostApplied = false;
