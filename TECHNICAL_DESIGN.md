@@ -125,6 +125,7 @@ ZelfWController
 ZelfEController
 CharacterSelectionManager
 CharacterSelectionUI
+PlayerCharacterApplier
 ```
 
 - `CharacterData` はScriptableObject。
@@ -146,9 +147,10 @@ CharacterSelectionUI
 - `ZelfEController`(Scripts/Characters)はゼルフE(方向ダッシュ)を管理する。Eキー(Input System)でマウス下のGround地点の方向へDash Distance 4.0をDash Duration 0.18秒でダッシュする(Hit Radius 0.60 / End Extension 0.75 / Base Damage 20 / AD Ratio 50% / Cooldown 8秒、いずれもInspector設定。Groundを指していない・近すぎる・CD中は不発動)。発動時にPlayerClickMovementを停止してZelfQController.CancelPendingApproach()でQ自動接近を中止し、ダッシュ中はCharacterControllerを無効化して位置を直接更新する(GroundレイキャストでY座標維持、終了時に対象と重なっていればダッシュ方向へ押し出し補正。NavMesh不使用)。命中判定は経路+終点先End ExtensionをHit RadiusのカプセルでTargetableLayerのみ判定し、同一TargetableにはE 1回につき1回だけ `Base Damage + Current Attack Damage × AD Ratio` の通常ダメージをHealthController経由・攻撃者情報付きで与える(Tower分類にも与える。被弾フラッシュ・ダメージ表示・ゼルフP回復は既存経路)。Character分類(TrainingDummy含む)へ1体以上命中した場合のみZelfQController.ResetCooldown()を呼ぶ。ダッシュ中は青いTrailRendererの残像を表示し、終了後短時間で消える。LayerMask未設定時はZelfQControllerのGroundLayerMask / TargetableLayerMaskを自動使用する。
 - `DummyAutoAttack`(Scripts/Characters)は攻撃ダミー(AttackDummy)用の自動攻撃。Inspectorで設定した攻撃対象(PlayerのHealthController)が攻撃射程内の場合のみ、攻撃間隔ごとに即時ダメージを与え(攻撃者として自身のTransformを渡す通常ダメージ。PlayerのゼルフWの前方判定対象になる)、実ダメージ量を受けた側の頭上に黄色で表示する。攻撃力・攻撃速度・射程はInspector設定(試作は10 / 1 / 2)。射程判定はPlayerの通常攻撃と同じく対象Colliderの最も近い点との水平距離で行い、自身または対象の死亡中は攻撃しない。
 - `FloatingCombatText` / `CombatTextManager`(Scripts/UI)は再利用可能なフローティング戦闘テキスト。CombatTextManagerがShowDamageDealt(赤・攻撃対象の頭上・例: 60) / ShowDamageTaken(黄・受けた側の頭上・例: -10) / ShowHeal(緑・例: +3)のstatic APIで表示要求を受け取り(プレイヤー視点で1回のダメージにつき表示は1つ)、対象の頭上のワールド空間にWorld Space Canvas+標準Text(LegacyRuntimeフォント)の整数テキストを生成する(重なり軽減のランダム横方向オフセット付き)。FloatingCombatTextは上方向移動・フェードアウト・Main Cameraへの向き揃え(裏返らない)を行い、表示終了後に自身を安全に削除する。プール処理は未実装だが生成箇所を集約してあり、将来プールへ置き換えやすい。将来のキャラクター・ミニオン・タワーからも共通利用できる。
-- `CharacterData`(Scripts/Characters)はキャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータス・成長値、P/Q/W/E/Rのスキル説明を保持するScriptableObject。第1弾としてData/Characters/ZelfData.assetを作成済み。SC_PrototypeのPlayerへはまだ適用しない。
+- `CharacterData`(Scripts/Characters)はキャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータス・成長値、P/Q/W/E/Rのスキル説明を保持するScriptableObject。Data/Characters/へZelfData.asset・VolbraakData.assetを作成済み。SC_Prototype開始時はPlayerCharacterApplierが選択中のCharacterDataをPlayerへ適用する(フェーズ4前準備)。
 - `CharacterSelectionManager` は選択中のCharacterDataを保持する常駐マネージャー。DontDestroyOnLoadでシーン遷移後も参照でき、二重生成時は後から生成された方を破棄する(セーブデータ化はしない)。
-- `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。
+- `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。詳細パネルのスキル一覧はInspectorの短い一覧を優先し、未設定の場合はCharacterDataのP〜Rスキル説明から自動生成する。
+- `PlayerCharacterApplier` はSC_PrototypeのPlayerへアタッチし、シーン開始時にCharacterSelectionManagerが保持する選択中CharacterDataをCharacterStats.SetCharacterData()へ適用する(未選択でSC_Prototypeを直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用)。選択キャラクターがゼルフ以外の場合はゼルフ固有スキルコンポーネント(ZelfPassiveHeal / ZelfQ/W/E/RController)をDestroyImmediateで取り除き、移動・通常攻撃・共通D・Fなどの共通コンポーネントだけで動作させる(各キャラクターの固有スキルは実装後にこのクラスへ登録する)。DefaultExecutionOrder(-100)で他コンポーネントのAwakeより先に実行し、PlayerのRendererへテーマカラーも適用する(Inspectorで無効化可能)。
 - 起動シーンはSC_CharacterSelectとし、「プロトタイプを開始」ボタンでSC_Prototypeを読み込む(Build SettingsのScene Listへ両シーンを登録)。
 
 ### Skills

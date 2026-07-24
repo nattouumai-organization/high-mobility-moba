@@ -34,7 +34,8 @@ public class CharacterStats : MonoBehaviour
     public const float MinMoveSpeedStat = 110f;
 
     // 基礎値の供給元(任意)。設定するとAwakeで下の基礎値を上書きする。
-    // PlayerにはZelfData.assetを設定する。未設定の場合はInspectorの基礎値を使用する。
+    // PlayerにはCharacterDataアセット(ZelfData/VolbraakData)を設定できる。未設定の場合はInspectorの基礎値を使用する。
+    // SC_Prototype開始時は、キャラクター選択結果に応じてPlayerCharacterApplierがSetCharacterDataで上書きする(フェーズ4前準備)。
     [SerializeField] private CharacterData _characterData;
 
     [SerializeField] private float _baseMoveSpeed = 6f;
@@ -89,7 +90,17 @@ public class CharacterStats : MonoBehaviour
         ApplyCharacterData();
     }
 
-    // CharacterData(SO)から基礎値を読み込む。数値の一元管理先はZelfData.assetになる。
+    /// <summary>
+    /// CharacterDataを差し替えて基礎値を適用し直す(キャラクター選択結果の反映用。フェーズ4前準備)。
+    /// SC_Prototype開始時にPlayerCharacterApplierがAwake(DefaultExecutionOrder(-100))から呼び出す。
+    /// </summary>
+    public void SetCharacterData(CharacterData characterData)
+    {
+        _characterData = characterData;
+        ApplyCharacterData();
+    }
+
+    // CharacterData(SO)から基礎値を読み込む。数値の一元管理先はCharacterDataアセット(ZelfData/VolbraakData)になる。
     private void ApplyCharacterData()
     {
         if (_characterData == null)

@@ -15,7 +15,8 @@ public enum CharacterStatus
 /// 各キャラクターの固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)と、
 /// 基礎ステータス・成長値・P/Q/W/E/Rのスキル説明を保持する。
 /// CharacterDataはキャラクター固有の初期設定データとして扱い、実行中の現在HPや現在ステータスは
-/// 従来どおりCharacterStats / HealthControllerが扱う(SC_PrototypeのPlayerへはまだ適用しない)。
+/// 従来どおりCharacterStats / HealthControllerが扱う(SC_Prototype開始時は、キャラクター選択結果を
+/// PlayerCharacterApplierがPlayerのCharacterStatsへ適用する。フェーズ4前準備)。
 /// スキルの詳細説明は、今後ツールチップや別パネルの表示元として使用できる。
 /// </summary>
 [CreateAssetMenu(fileName = "CharacterData", menuName = "Game/Character Data")]

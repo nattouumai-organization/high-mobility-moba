@@ -22,8 +22,14 @@
 
 ## 2026-07-25
 
+### Added
+
+- フェーズ4前準備: ヴォルブラークのCharacterData(Data/Characters/VolbraakData.asset)を追加。キャラクター選択画面でヴォルブラークが選択可能になる(HP760/HPreg5.0/AD54/AS0.68/AR42/MS335/AA射程175)。
+- フェーズ4前準備: PlayerCharacterApplierを追加(Scripts/Characters)。SC_Prototype開始時に、キャラクター選択画面で選択したCharacterDataをPlayerのCharacterStatsへ適用し、ゼルフ以外を選択した場合はゼルフ固有スキル(P/Q/W/E/R)を取り除く(移動・通常攻撃・共通D・Fは全キャラクター共通で動作)。Playerの見た目には選択キャラクターのテーマカラーを適用する。
+
 ### Changed
 
+- キャラクター選択画面: 詳細パネルのスキル一覧がInspector未設定の場合、CharacterDataのP〜Rスキル説明から自動生成するように変更(ヴォルブラーク追加用)。
 - フェーズ1〜3見直し(重要度:低): MS%バフの基準を基礎MS(BaseMoveSpeed)へ統一。共通Dの成功時MS上昇が「発動時点の現在MS」基準だったものを、ゼルフRのMS上昇と同じ基礎MS基準へ変更。
 - フェーズ1〜3見直し(重要度:低): スロウ適用後の移動速度にLoL準拠の下限(MS110)を追加(CharacterStats.CurrentMoveSpeed)。基礎MSが110未満の対象(練習用ダミーなど)は基礎MSがそのまま下限。
 - フェーズ1〜3見直し(重要度:低): PlayerMouseFacingの右クリック・マウス座標の入力をPlayerInputHub経由へ一元化(Mouse.currentの直接参照を廃止)。
@@ -59,7 +65,7 @@
 
 - フェーズ3: ハードCC(スタン・スネア)とスロウを実装(スタン: 移動・通常攻撃・全スキルを禁止。スネア: 移動と移動スキル(ゼルフQ/E)を禁止し、通常攻撃・W・R・D・Fは使用可能(FはLoL準拠)。スロウ: 基礎移動速度を割合で減少させ、複数同時は最も強い1つのみ適用(LoL方式)・共通Dでは防げない。同種ハードCCの重ねがけは残り時間が長い方を採用。ハードCC中は右クリックの移動先予約のみ受け付け、CC終了後に移動を再開。死亡時は全CCを解除。HardCcTestEmitterをスタン/スネア/スロウ切替式に拡張)
 - フェーズ3: スキル射程・範囲のプレビューを実装(SkillRangePreviewを追加。Q: マウス下の対象に発動対象マーカー(射程内は白・射程外はオレンジ=自動接近)、R: 発動した場合の決闘エリア円をキー長押し中に表示。W/Eは従来どおり方向線のみ。Fは押した瞬間に発動する仕様のためプレビューなし。既存のスキルスクリプトは変更せず、設定値をリフレクションで参照する)
-- フェーズ3: クールダウンUIをEternal Return風のステータスHUDへ拡張(下部HUDパネルの枠組みを追加し、攻撃力・攻撃速度・移動速度・攻撃射程のリアルタイム表示、HPバー(現在HP / 最大HP)、ポートレート+レベルバッジを表示。レベル表記はレベルシステム実装までのプレースホルダー。移動速度・攻撃射程はステータス単位(MS360・射程200など)で表示する)
+- フェーズ3: クールダウンUIをEternal Return風のステータスHUDへ拡張(下部HUDパネルの枠組みを追加し、攻撃力・攻撃速度・移動速度・攻撃射程のリアルタイム表示、HPバー(現在HP / 最大HP)、ポートレート+レベルバッジを表示��レベル表記はレベルシステム実装までのプレースホルダー。移動速度・攻撃射程はステータス単位(MS360・射程200など)で表示する)
 - フェーズ3: Fフラッシュを実装(FlashController新規・Fキー・移動距離400=4.0 Unity units・クールダウン55秒。全キャラクター共通)。
   マウスカーソルが指すGround地点へ即座にブリンクし、カーソル地点が最大距離より遠い場合はカーソル方向へ最大距離ぶん移動する。
   壁(Wall Layer)は越えられず、経路上に壁がある場合は壁の手前で停止する(Wall Layer未設定時は壁判定なし。現在のプロトタイプマップに壁はない)。
@@ -101,7 +107,7 @@
 
 - ゼルフRを実装した(ZelfRController.cs / Scripts/Characters)。
   Rキーでマウス下のCharacter/TrainingDummy分類の敵を中心に半径_arenaRadius(初期値5.0)の決闘エリアを展開する。
-  エリアは対象の位置に固定され、LineRendererで紫色の輪として可視化される(Duration / Cooldown はInspector設定)。
+  エリア��対象の位置に固定され、LineRendererで紫色の輪として可視化される(Duration / Cooldown はInspector設定)。
   発動時にエリア内の全Targetable(自分以外)をエリア外縁0.6m外へ即座に押し出す(ミニオン押し出しタスク対応)。
   Character/TrainingDummy分類の押し出し対象にはエリア外スロウを即時付与する。
   エリア発動中、エリア内のCharacter/TrainingDummy分類の敵にはInner Slow Percentのスロウを毎フレーム維持する。
@@ -207,7 +213,7 @@
 - CharacterData ScriptableObjectを追加(Scripts/Characters)。キャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータスと成長値、P/Q/W/E/Rのスキル説明を保持する。実行中の現在ステータスは従来どおりCharacterStats / HealthControllerが扱い、SC_PrototypeのPlayerへは��だ適用しない。
 - ゼルフのCharacterData(Data/Characters/ZelfData.asset)を追加。基礎ステータス(HP650・HP成長105・HP自動回復3.5/+0.35・AD60/+4.5・AS0.80/+3.0%・AR28/+4.0・MS360・射程200)とP/Q/W/E/Rのスキル説明を設定。
 - キャラクター選択画面SC_CharacterSelectを追加。タイトル・サブタイトルと、5キャラクター分のカード(名前・イメージカラー・役割・利用可能状態)を表示する。Availableのゼルフのみ選択可能で、朧・ヴォルブラーク・リネス・リーゼロッテ・ヴァイスはComing Soon表示の半透明・選択不可。選択中のカードは明るい枠線とカードの明度上昇で表示し、画面下部に選択中キャラクター名を表示する。
-- ゼルフ詳細パネルを追加。名前・役割・Short Description・イメージカラーの大きな仮プレースホルダー・基礎ステータス(HP/AD/AS/AR/MS/AA Range)・P〜Rの短いスキル一覧を表示する。スキルの詳細説明はCharacterDataが保持し、将来ツールチップや別パネルとして表示できる(今回は未実装)。
+- ゼルフ詳細パネルを追加。名前・役割・Short Description・イメージカラー���大きな仮プレースホルダー・基礎ステータス(HP/AD/AS/AR/MS/AA Range)・P〜Rの短いスキル一覧を表示する。スキルの詳細説明はCharacterDataが保持し、将来ツールチップや別パネルとして表示できる(今回は未実装)。
 - 「プロトタイプを開始」ボタンを追加。選択したCharacterDataをCharacterSelectionManager(DontDestroyOnLoad・二重生成防止)が保持したままSC_Prototypeを読み込む。SC_CharacterSelectとSC_PrototypeをBuild SettingsのScene Listへ登録し、起動時はSC_CharacterSelectから始まる。
 - ゼルフの通常攻撃を実装。選択中のTargetableが攻撃射程内の場合のみ��攻撃間隔(Current Attack Speed)ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与える(弾丸・投射物・攻撃アニメーションなし)。射程外では攻撃せず、ターゲット死亡時は攻撃を停止してターゲット選択を安全に解除する(既存の射程判定・自動接近・被弾フラッシュは維持)。
 - ターゲット分類を追加。TargetableにTarget Classification(Character / Minion / Tower / TrainingDummy)をInspectorで設定でき、将来のキャラクター・ミニオン・タワーでも再利用できる。TrainingDummyは初期状態でCharacter分類とする。
@@ -280,7 +286,7 @@
 - 試合時間は約5分を目標とするが、制限時間は設けない方針へ変更。
 - ダメージタイプと防御タイプを1種類に統一。
 - 通常ダメージはARで軽減する。
-- 朧Rの処刑とヴォルブラークRの反射のみを確定ダメージとして扱う。
+- 朧Rの処刑とヴォルブラークRの��射のみを確定ダメージとして扱う。
 - リーゼロッテRはHP、AD、AS、AR、MSを一時的に奪う仕様へ決定。
 - リーゼロッテRでHPを奪う際、双方の現在HP割合を維持する仕様へ決定。
 

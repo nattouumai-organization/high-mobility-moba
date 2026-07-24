@@ -38,12 +38,12 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 12
+  serializedVersion: 13
+  m_BakeOnSceneLoad: 0
   m_GISettings:
     serializedVersion: 2
     m_BounceScale: 1
@@ -257,41 +257,56 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _characters:
   - _characterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
-    _fallbackDisplayName: ゼルフ
-    _fallbackRoleName: 高機動近接ファイター
+    _fallbackDisplayName: "\u30BC\u30EB\u30D5"
+    _fallbackRoleName: "\u9AD8\u6A5F\u52D5\u8FD1\u63A5\u30D5\u30A1\u30A4\u30BF\u30FC"
     _fallbackThemeColor: {r: 0.2, g: 0.45, b: 1, a: 1}
     _fallbackStatus: 0
     _skillSummaryLines:
-    - P：回復
-    - Q：対象ブリンク
-    - W：前方防御
-    - E：方向ダッシュ
-    - R：決闘エリア
+    - "P\uFF1A\u56DE\u5FA9"
+    - "Q\uFF1A\u5BFE\u8C61\u30D6\u30EA\u30F3\u30AF"
+    - "W\uFF1A\u524D\u65B9\u9632\u5FA1"
+    - "E\uFF1A\u65B9\u5411\u30C0\u30C3\u30B7\u30E5"
+    - "R\uFF1A\u6C7A\u95D8\u30A8\u30EA\u30A2"
   - _characterData: {fileID: 0}
-    _fallbackDisplayName: 朧
-    _fallbackRoleName: 忍者暗殺者
+    _fallbackDisplayName: "\u6727"
+    _fallbackRoleName: "\u5FCD\u8005\u6697\u6BBA\u8005"
     _fallbackThemeColor: {r: 0.22, g: 0.12, b: 0.32, a: 1}
     _fallbackStatus: 1
     _skillSummaryLines: []
-  - _characterData: {fileID: 0}
-    _fallbackDisplayName: ヴォルブラーク
-    _fallbackRoleName: ハンマータンク
+  - _characterData: {fileID: 11400000, guid: 60a8f7a0cd2d0e649b6ab763ce2a54ae, type: 2}
+    _fallbackDisplayName: "\u30F4\u30A9\u30EB\u30D6\u30E9\u30FC\u30AF"
+    _fallbackRoleName: "\u30CF\u30F3\u30DE\u30FC\u30BF\u30F3\u30AF"
     _fallbackThemeColor: {r: 0.85, g: 0.2, b: 0.2, a: 1}
     _fallbackStatus: 1
     _skillSummaryLines: []
   - _characterData: {fileID: 0}
-    _fallbackDisplayName: リネス
-    _fallbackRoleName: 雷メイジ
+    _fallbackDisplayName: "\u30EA\u30CD\u30B9"
+    _fallbackRoleName: "\u96F7\u30E1\u30A4\u30B8"
     _fallbackThemeColor: {r: 0.95, g: 0.85, b: 0.25, a: 1}
     _fallbackStatus: 1
     _skillSummaryLines: []
   - _characterData: {fileID: 0}
-    _fallbackDisplayName: リーゼロッテ・ヴァイス
-    _fallbackRoleName: 吸血鬼ガンナー
+    _fallbackDisplayName: "\u30EA\u30FC\u30BC\u30ED\u30C3\u30C6\u30FB\u30F4\u30A1\u30A4\u30B9"
+    _fallbackRoleName: "\u5438\u8840\u9B3C\u30AC\u30F3\u30CA\u30FC"
     _fallbackThemeColor: {r: 1, g: 0.87, b: 0.92, a: 1}
     _fallbackStatus: 1
     _skillSummaryLines: []
   _prototypeSceneName: SC_Prototype
+  _titleText: HIGH MOBILITY MOBA
+  _subtitleText: "\u30AD\u30E3\u30E9\u30AF\u30BF\u30FC\u3092\u9078\u629E"
+  _startButtonLabel: "\u30D7\u30ED\u30C8\u30BF\u30A4\u30D7\u3092\u958B\u59CB"
+  _availableLabel: "\u9078\u629E\u53EF\u80FD"
+  _comingSoonLabel: Coming Soon
+  _selectedLabelPrefix: "\u9078\u629E\u4E2D\uFF1A"
+  _referenceResolution: {x: 1920, y: 1080}
+  _screenBackgroundColor: {r: 0.07, g: 0.08, b: 0.11, a: 1}
+  _cardBackgroundColor: {r: 0.13, g: 0.15, b: 0.2, a: 1}
+  _cardNormalFrameColor: {r: 0, g: 0, b: 0, a: 0.6}
+  _selectedFrameColor: {r: 1, g: 0.95, b: 0.55, a: 1}
+  _selectedBrightness: 0.2
+  _comingSoonAlpha: 0.45
+  _detailPanelColor: {r: 0.11, g: 0.13, b: 0.17, a: 1}
+  _startButtonColor: {r: 0.2, g: 0.45, b: 1, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
