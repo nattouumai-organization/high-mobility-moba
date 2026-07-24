@@ -25,6 +25,14 @@
 ### Added
 
 - フェーズ1〜3見直し: ゼルフRの「共通Dで完全不発」を実装(対象が共通Dの無効化ウィンドウ中にRを発動した場合、決闘エリアは展開されず何も起こらない。Rのクールダウンは消費し、対象側では共通D成功時のカウンター攻撃45+AD30%とMS上昇が発生する。射程外からの自動接近後の発動も同様に判定する)
+- フェーズ1〜3見直し: デス時のR・共通D・Fの残りクールダウン60%短縮を実装(GAME_DESIGN.md 7章準拠。ZelfRController・CommonDController・FlashControllerの各自がHealthController.Diedを購読し、死亡時に残りクールダウンを(1 - 0.6)倍へ短縮する。短縮割合はInspectorのDeath Cooldown Reductionで調整可能。Q/W/Eは仕様どおり短縮しない)
+- フェーズ1〜3見直し: AR(防御力)による通常ダメージ軽減とHPreg(毎秒HP自動回復)を実装(CharacterStatsにCurrentArmor/CurrentHealthRegenとAddArmorBonus/RemoveArmorBonusを追加し、CharacterDataの既存フィールドBaseArmor/ArmorGrowth/BaseHpRegeneration/HpRegenerationGrowthから読み込む。HealthControllerは通常ダメージ(Normal)にFinalDamage = RawDamage × 100 / (100 + AR)の軽減式を適用し(ゼルフWなどのIIncomingDamageModifier適用後)、生存中は毎フレームHPregで回復する。CharacterStatsを持たないTrainingDummyはAR 0・HPregなしの従来動作。ゼルフはAR28/ARUP4.0/HPreg3.5/HPregUP0.35。ZelfData.assetのBase Armor・Base Hp Regenerationに値が入っているかInspectorで要確認)
+
+### Changed
+
+- フェーズ1〜3見直し: ゼルフRのエリア内外スロウをCrowdControlController.ApplySlow経由へ一本化(従来はCharacterStatsを直接操作していたため、他のスロウと加算されて「最も強い1つだけ適用」のLoL方式に反していた。エリア内スロウは短い持続0.4秒を0.25秒間隔で掛け直して維持し(掛け直しはログなし)、退出スロウもApplySlow経由へ変更。ApplySlowにwithLog引数を追加した。死亡時のスロウ解除はCrowdControlControllerの既存処理に集約)
+- フェーズ1〜3見直し: 復活時間の既定値を1秒→4秒へ変更(GAME_DESIGN.md 7章: Lv1〜2=4秒/Lv3〜4=6秒/Lv5〜6=8秒。レベル連動はレベルシステム実装後の後続タスク。既存シーンのPlayerは旧値1秒が保存されているためInspectorでRespawn Delay=4へ手動変更が必要。練習用ダミーは1秒のままでよい)
+- フェーズ1〜3見直し: GAME_DESIGN.mdのゼルフWの説明を実装に合わせて更新(「攻撃判定なし。」を削除し、持続中の周囲への合計AD×150%連続ダメージと、敵ヒーロー初回命中時のQ即時再使用・同一対象ロック解除を追記。コード変更なし)
 
 ### Fixed
 
@@ -69,7 +77,7 @@
 - WとEからQクールダウンリセット、Same Target Lockout解除、自動接近中止を安全に呼べるようにした。WとEがCharacterまたはCharacter扱いTrainingDummyへ���中した際、(1)ResetCooldown (2)ClearLockout(target) の順で即時実行する。
 - TASKS.mdでゼルフWの前方ダメージ軽減・ゼルフEの方向ダッシュ・ゼルフE命中時のQ即時再使用の3項目を完了([x])へ更新した。
 - PlayerMouseFacingへ、外部スクリプトから安全に目標回転を更新できるpublicメソッドを追加(SetLookTarget: ワールド座標指定 / SetLookDirection: 方向ベクトル指定)。Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。実際の回転は従来どおり毎フレームInspectorのRotation Speed設定で行われ、右クリックによる回転仕様は変更しない。
-- ゼルフWの前方ダメージ軽減を実装(ZelfWController、Scripts/Characters)。Wキー(Input System)で0.75秒間、前方120度から受ける通常ダメージだけを55%軽減する(Duration / Cooldown 10秒 / Front Angle / Damage ReductionはいずれもInspector設定)。前方判定はダメージを受けた瞬間のPlayerのtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で被ダメージごとに行い、背後・側面からのダメージ、攻撃者情報が取得できないダメージ、確定ダメージ(将来用)は軽減しない。Wは攻撃技ではなくダメージ・ノックバック・スロウ・スタン・スネアを与えず、CC無効化・無敵・対象指定不可・シールドも持たない。持続中はPlayer前方に青い扇形のLineRenderer防御エフェクトを表示し(Playerの回転に追従)、W終了時に非表示になる。軽減発生時はDebug.Logで確認でき、軽減後の実ダメージは既存の被ダメージ表示で表示される。
+- ゼルフWの前方ダメージ軽減を実装(ZelfWController、Scripts/Characters)。Wキー(Input System)で0.75秒間、前方120度から受ける通常ダメージだけを55%軽減する(Duration / Cooldown 10秒 / Front Angle / Damage ReductionはいずれもInspector設定)。前方判定はダメージを受けた瞬間のPlayerのtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で被ダメージごとに行い、背後・側面からのダメージ、攻撃者情報が取得できないダメージ、確定ダメージ(将来用)は軽減しない。Wは攻撃技ではなくダメージ・ノックバッ��・スロウ・スタン・スネアを与えず、CC無効化・無敵・対象指定不可・シールドも持たない。持続中はPlayer前方に青い扇形のLineRenderer防御エフェクトを表示し(Playerの回転に追従)、W終了時に非表示になる。軽減発生時はDebug.Logで確認でき、軽減後の実ダメージは既存の被ダメージ表示で表示される。
 - ゼルフWへ周囲ダメージを追加した(W Damage Radius 2.0 / Total AD Ratio 1.5 / Tick Interval 0.1秒、いずれもInspector設定)。Duration 0.75秒間に合計AD×1.5分のダメージを_wDamageRadius以内の全Targetableへ毎ティック均等に与える。Character/TrainingDummyへの初回命中時にQのCDを即時リセットし同一対象ロックを解除する。
 - ゼルフW発動中は通常攻撃・Q・Eを無効化し、W終了後に元の状態へ復元する(死亡時はPlayerDeathHandlerが管理するため復元しない)。
 - ゼルフEの方向ダッシュを実装(ZelfEController、Scripts/Characters)。Eキー(Input System)でマウスカーソルが指すGround上の地点の方向へ、Dash Distance 4.0 Unity unitsをDash Duration 0.18秒かけてダッシュする(Cooldown 8秒、いずれもInspector設定)。マウスがGroundを指していない場合・マウス地点が近すぎる場合・クールダウン中は発動しない。ダッシュ終了後にPost-Dash Wave(3.0 Unity units、Speed 10)を前方へ飛ばし、経路とウェーブ経路で命中したTargetableへBase Damage 20 + AD×50%の通常ダメージを与える。ダッシュ中は青いTrailRendererの残像を表示する。
@@ -204,8 +212,8 @@
 
 - 疑似通常攻撃(被弾フラッシュのみ)を、実ダメージを与える通常攻撃へ更新。
 - PlayerMouseFacingの回転速度を毎秒720度から毎秒1440度へ変更(2倍)。
-- 右クリック移動を「クリックした地点へ移動する」から「長押し中は常にカーソル下のGround地点へ向かって移動し続ける」仕様へ変更。長押し中はPlayerがカーソル方向を向き続ける。長押し中にカーソルがTargetableを指した場合はターゲット選択を優先して選択・切替し、その後ターゲット以外(Ground)を右クリック(長押し含む)すると解除されて移動する。
-- PlayerのBase Attack Damageを20から60へ変更(ゼルフのテスト用初期値。Bonus Attack Damageは0)。
+- 右クリック移動を「クリックした地点へ���動する」から「長押し中は常にカーソル下のGround地点へ向かって移動し続ける」仕様へ変更。長押し中はPlayerがカーソル方向を向き続ける。長押し中にカーソルがTargetableを指した場合はターゲット選択を優先して選択・切替し、その後ターゲット以外(Ground)を右クリック(長押し含む)すると解除されて移動する。
+- PlayerのBase Attack Damageを20から60へ変更(ゼルフのテ��ト用初期値。Bonus Attack Damageは0)。
 - TrainingDummyのMax Health / Current Healthを100から300へ変更(通常攻撃60ダメージ×5回で死亡)。
 - HealthControllerのTakeDamage / Healを、実際に適用したダメージ量・回復量(過剰ダメージ・過剰回復分は含まない)を返すよう更新。ダメージを与えた側が実ダメージ量を取得できる。
 - ダメージ表示をプレイヤー視点へ変更。与えたダメージは攻撃対象の頭上に赤色で1つだけ表示し(従来の「攻撃側頭上の赤+受けた側頭上の青」の二重表示を廃止)、Playerが受けたダメージはPlayerの頭上に黄色(例: -10)で表示する。回復(緑)の表示は変更なし。

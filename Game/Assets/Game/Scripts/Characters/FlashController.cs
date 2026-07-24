@@ -5,8 +5,8 @@ using UnityEngine;
 /// Fを押した瞬間に、マウスカーソルが指すGround地点へ即座にブリンクする(着地地点プレビューなし)。
 /// 仕様: 移動距離400(=4.0 Unity units。換算: 射程100 = 1 Unity unit) / クールダウン55秒 / 壁は越えられない。
 /// カーソル地点が最大距離より遠い場合は、カーソル方向へ最大距離ぶんだけ移動する。
-/// Wall Layerに設定した壁が経路上にある場合は壁の手前で停止する(壁抜け不可)。
-/// 【後続タスク】デス時のR・共通D・Fクールダウン60%短縮は後続タスクで実装する。
+/// Wall Layerに設定した壁が経路上にある場合は壁の手前で停止する(壁拜け不可)。
+/// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public sealed class FlashController : MonoBehaviour
@@ -20,6 +20,8 @@ public sealed class FlashController : MonoBehaviour
     [SerializeField, Min(0f)] private float _flashDistance = 4f;
     [SerializeField, Min(0f)] private float _cooldown = 55f;
     [SerializeField, Min(0f)] private float _minCastDistance = 0.1f;
+    // デス時に残りクールダウンを短縮する割合(0.6 = 60%短縮)。GAME_DESIGN.md 7章準拠。
+    [SerializeField, Range(0f, 1f)] private float _deathCooldownReduction = 0.6f;
 
     [Header("Layers")]
     // Ground/Targetableが未設定(=0)の場合、ZelfQControllerの設定を流用する。
@@ -51,6 +53,7 @@ public sealed class FlashController : MonoBehaviour
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
         _selfHealth = GetComponent<HealthController>();
+        if (_selfHealth != null) _selfHealth.Died += OnSelfDied;
         _mouseFacing = GetComponent<PlayerMouseFacing>();
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
@@ -65,6 +68,11 @@ public sealed class FlashController : MonoBehaviour
         Debug.Log($"フラッシュ: 初期化しました(距離{_flashDistance} / CD{_cooldown}秒)。", this);
     }
 
+    private void OnDestroy()
+    {
+        if (_selfHealth != null) _selfHealth.Died -= OnSelfDied;
+    }
+
     private void Update()
     {
         _remainingCooldown = RemainingCooldown;
@@ -73,6 +81,17 @@ public sealed class FlashController : MonoBehaviour
         if (_inputHub != null && _inputHub.FPressedThisFrame)
         {
             HandleFPressed();
+        }
+    }
+
+    // デス時: 残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
+    private void OnSelfDied()
+    {
+        float remaining = _cooldownEndTime - Time.time;
+        if (remaining > 0f)
+        {
+            _cooldownEndTime = Time.time + remaining * (1f - _deathCooldownReduction);
+            Debug.Log($"フラッシュ: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{RemainingCooldown:F1}秒)。", this);
         }
     }
 

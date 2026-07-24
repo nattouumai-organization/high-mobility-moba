@@ -12,8 +12,10 @@ using UnityEngine;
 /// Reviveで死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。
 /// TakeDamageは攻撃者Transformとダメージ種別(DamageType.Normal / True)を受け取れ、HPへ適用する直前に
 /// 同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減など)がDamageContextを使ってダメージ量を変更できる。
-/// 通常ダメージ(Normal)だけが軽減の対象で、確定ダメージ(True)は軽減不可の分類のみ用意し今回は使用しない。
-/// HPreg・シールド・ARによるダメージ軽減は今回実装しない。
+/// 通常ダメージ(Normal)はAR(防御力)で軽減される: FinalDamage = RawDamage × 100 / (100 + AR)。
+/// 確定ダメージ(True)はARでもIIncomingDamageModifierでも軽減されない分類で、今回は使用しない。
+/// HPreg(毎秒自動回復)はCharacterStats.CurrentHealthRegenを毎フレーム参照して回復する(死亡中は回復しない)。
+/// シールドは今回実装しない。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
 /// </summary>
 public class HealthController : MonoBehaviour
@@ -82,6 +84,17 @@ public class HealthController : MonoBehaviour
             HandleMaxHealthChanged(_lastKnownMaxHealth, max);
             _lastKnownMaxHealth = max;
         }
+
+        // HPreg: 毎秒のHP自動回復(GAME_DESIGN.mdゼルフ: 3.5/秒)。死亡中は回復しない。
+        // CharacterStatsを持たない対象(TrainingDummyなど)はHPregなし。
+        if (!_isDead && _characterStats != null)
+        {
+            float regen = _characterStats.CurrentHealthRegen;
+            if (regen > 0f && _currentHealth < MaxHealth)
+            {
+                Heal(regen * Time.deltaTime);
+            }
+        }
     }
 
     // 最大HP変化時: 増加分は現在HPへ加算(LoL方式)、減少時は現在HPを新しい最大HPへクランプする。
@@ -105,7 +118,7 @@ public class HealthController : MonoBehaviour
 
     /// <summary>
     /// ダメージを受けて現在HPを減らす(攻撃者情報なし)。
-    /// 攻撃者情報が取得できないダメージとして扱うため、ゼルフWなどの前方判定による軽減は行われない。
+    /// 攻撃者情報が取得できないダメージとして扱うため、ゼルフWなどの前方判定による軽減は行われない(ARによる軽減は行われる)。
     /// </summary>
     /// <returns>実際に減少したHP量(実ダメージ)。死亡済み・無効な値の場合は0を返す。</returns>
     public float TakeDamage(float damage)
@@ -116,7 +129,8 @@ public class HealthController : MonoBehaviour
     /// <summary>
     /// ダメージを受けて現在HPを減らす。HPは0未満にならず、0になったら死亡処理を開始する。
     /// HPへ適用する直前に、同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減など)が
-    /// 攻撃者・ダメージ種別を使ってダメージ量を変更できる。ARによる軽減は今回実装しない。
+    /// 攻撃者・ダメージ種別を使ってダメージ量を変更できる。
+    /// その後、通常ダメージ(Normal)にはAR(防御力)による軽減式 FinalDamage = RawDamage × 100 / (100 + AR) を適用する。
     /// </summary>
     /// <param name="damage">元ダメージ量。</param>
     /// <param name="attacker">攻撃者のTransform。取得できない場合はnull(前方判定による軽減は行われない)。</param>
@@ -139,6 +153,17 @@ public class HealthController : MonoBehaviour
             return 0f;
         }
 
+        // AR(防御力)による通常ダメージの軽減: FinalDamage = RawDamage × 100 / (100 + AR)。
+        // 確定ダメージ(True)は軽減しない。CharacterStatsを持たない対象はAR 0として扱う(軽減なし)。
+        if (damageType == DamageType.Normal && _characterStats != null)
+        {
+            float armor = _characterStats.CurrentArmor;
+            if (armor > 0f)
+            {
+                modifiedDamage = modifiedDamage * 100f / (100f + armor);
+            }
+        }
+
         float previousHealth = _currentHealth;
         _currentHealth = Mathf.Max(0f, _currentHealth - modifiedDamage);
         float actualDamage = previousHealth - _currentHealth;
@@ -153,7 +178,7 @@ public class HealthController : MonoBehaviour
     }
 
     /// <summary>
-    /// 現在HPを回復する。最大HPは超えない。ゼルフPの与ダメージ回復などから呼び出す。
+    /// 現在HPを回復する。最大HPは超えない。ゼルフPの与ダメージ回復やHPregなどから呼び出す。
     /// </summary>
     /// <returns>
     /// 実際に増加したHP量(実回復量)。最大HPを超えた過剰回復分は含まない。

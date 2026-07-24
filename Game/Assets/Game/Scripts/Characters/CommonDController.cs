@@ -8,6 +8,7 @@ using UnityEngine;
 /// スキル指定方式はSkillTargetingType.NoTarget(無指定)。反応スキルのためSkillCastModeの対象外とし、押した瞬間に即発動する。
 /// 成功時: 攻撃者だ45 + ADの30%の通常ダメージのカウンターを与え、短時間MSが10%上がる。追加スタン・スネアは与えない。
 /// 失敗時(無効化できずにウィンドウが終了)は何も起きない(仕様変更 2026-07-23: 硬直などのペナルティなし。クールダウンのみ消費)。
+/// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// スタン中・W発動中・Eダッシュ中・死亡中などの行動ロック中(AbilityLockController.IsLocked)は発動できない。
 /// 共通DはCCを受ける前に予測して押す技のため、スタンを受けてからの後出しは不可(スネアはDの発動を妨げない)。
 /// ゼルフ専用ではなく、全キャラクターのPlayerオブジェクトにアタッチして使う。
@@ -29,6 +30,8 @@ public class CommonDController : MonoBehaviour
     [SerializeField, Min(0f)] private float _msBoostPercent = 10f;
     // MS上昇の持続時間(秒)。仕様は「短時間」のためInspectorで調整する。
     [SerializeField, Min(0f)] private float _msBoostDuration = 1.5f;
+    // デス時に残りクールダウンを短縮する割合(0.6 = 60%短縮)。GAME_DESIGN.md 7章準拠。
+    [SerializeField, Range(0f, 1f)] private float _deathCooldownReduction = 0.6f;
 
     [Header("Debug (Runtime)")]
     [SerializeField] private bool _isWindowActive;
@@ -68,6 +71,7 @@ public class CommonDController : MonoBehaviour
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _health = GetComponent<HealthController>();
+        if (_health != null) _health.Died += OnSelfDied;
         _characterStats = GetComponent<CharacterStats>();
 
         // スタン・W発動中・Eダッシュ中などの行動ロックを確認するため参照する(未追加でも動くようにget-or-add)。
@@ -231,5 +235,21 @@ public class CommonDController : MonoBehaviour
     private void OnDisable()
     {
         RemoveMsBoost();
+    }
+
+    private void OnDestroy()
+    {
+        if (_health != null) _health.Died -= OnSelfDied;
+    }
+
+    // デス時: 残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
+    private void OnSelfDied()
+    {
+        float remaining = _cooldownEndTime - Time.time;
+        if (remaining > 0f)
+        {
+            _cooldownEndTime = Time.time + remaining * (1f - _deathCooldownReduction);
+            Debug.Log($"共通D: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{RemainingCooldown:F1}秒)。", this);
+        }
     }
 }

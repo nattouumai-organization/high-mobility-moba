@@ -571,6 +571,10 @@ MonoBehaviour:
   _bonusMaxHealth: 0
   _baseAttackDamage: 60
   _bonusAttackDamage: 0
+  _baseArmor: 0
+  _bonusArmor: 0
+  _baseHealthRegen: 0
+  _bonusHealthRegen: 0
 --- !u!114 &968542325
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -660,7 +664,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8c1d4e7f0a3492b83c6d9e2f5a81b37, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _respawnDelay: 1
+  _respawnDelay: 4
 --- !u!114 &968542333
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -782,6 +786,7 @@ MonoBehaviour:
   _duration: 5
   _cooldown: 6
   _castRange: 7
+  _deathCooldownReduction: 0.6
   _innerSlowPercent: 0.3
   _outerSlowPercent: 0.6
   _outerSlowDuration: 2.5
@@ -814,6 +819,7 @@ MonoBehaviour:
   _counterAdRatio: 0.3
   _msBoostPercent: 10
   _msBoostDuration: 1.5
+  _deathCooldownReduction: 0.6
   _isWindowActive: 0
   _remainingCooldown: 0
 --- !u!114 &968542338
@@ -833,6 +839,7 @@ MonoBehaviour:
   _flashDistance: 4
   _cooldown: 55
   _minCastDistance: 0.1
+  _deathCooldownReduction: 0.6
   _groundLayer:
     serializedVersion: 2
     m_Bits: 0
@@ -1684,6 +1691,7 @@ MonoBehaviour:
   _counterAdRatio: 0.3
   _msBoostPercent: 10
   _msBoostDuration: 1.5
+  _deathCooldownReduction: 0.6
   _isWindowActive: 0
   _remainingCooldown: 0
 --- !u!1 &1260973273

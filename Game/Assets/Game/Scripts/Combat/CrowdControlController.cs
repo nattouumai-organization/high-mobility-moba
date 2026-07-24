@@ -9,13 +9,15 @@ public enum HardCcType
 }
 
 /// <summary>
-/// 全キャラクター・ダミー共通の「CC(行動妨害)を受け取る入口」と行動制限の実装。
+/// 全キャラクター・ダミー共通の「CC(行動妓害)を受け取る入口」と行動制限の実装。
 /// - スタン(ハードCC): 移動・通常攻撃・全スキルを禁止する(AbilityLockControllerへロックを追加)。
 /// - スネア(ハードCC): 移動と移動スキル(ゼルフQ/Eなど)を禁止する。通常攻撃とその他のスキルは使用できる。
 ///   フラッシュ(F)はLoL準拠でスネア中も使用できる(スタン中は行動ロックにより使用不可)。
 /// - スロウ(ソフトCC): 移動速度を割合で減少させる。複数のスロウは最も強い1つだけが適用される(LoL方式)。
 /// ハードCC(スタン・スネア)は必ずApplyStun/ApplySnare(またはApplyHardCC)を経由させることで、
 /// 共通Dの無効化判定を一箇所に集約する。スロウは共通Dで防げないため、ApplySlowは無効化判定を行わない。
+/// スロウは発生源を問わず全てApplySlowを経由させる(ZelfRのエリア内・退出スロウも含む)。
+/// これにより異なる発生源のスロウが加算されることはなく、常に最も強い1つだけが適用される。
 /// 同種のハードCCを重ねて受けた場合、持続時間は加算せず「残り時間が長い方」を採用する。
 /// 移動の禁止はPlayerClickMovementがIsMovementBlockedを参照して行い、
 /// Q/Rの射程外自動接近(スキル側の直接移動)は本クラスが毎フレーム中止する。
@@ -174,10 +176,12 @@ public class CrowdControlController : MonoBehaviour
     /// <summary>
     /// スロウを適用する。スロウはハードCCではないため共通Dでは防げない(無効化判定なし)。
     /// 複数のスロウを同時に受けた場合、最も強い1つだけが移動速度へ適用される(LoL方式)。
+    /// ZelfRのエリア内スロウのように短い持続を繰り返し掛け直す場合は、withLogをfalseにしてログの連打を防ぐ。
     /// </summary>
     /// <param name="slowPercent">減速率(%)。40なら基礎移動速度の40%減。</param>
     /// <param name="duration">持続時間(秒)。</param>
-    public void ApplySlow(float slowPercent, float duration)
+    /// <param name="withLog">trueの場合は適用ログを出す。掛け直し(リフレッシュ)用途ではfalseを指定する。</param>
+    public void ApplySlow(float slowPercent, float duration, bool withLog = true)
     {
         if (_health != null && _health.IsDead) return;
         if (slowPercent <= 0f || duration <= 0f) return;
@@ -189,7 +193,7 @@ public class CrowdControlController : MonoBehaviour
 
         _slows.Add(new SlowEffect { Percent = Mathf.Clamp(slowPercent, 0f, 99f), EndTime = Time.time + duration });
         RefreshSlow();
-        Debug.Log($"CrowdControl: スロウを受けました({slowPercent:F0}% / {duration:F2}秒)。", this);
+        if (withLog) Debug.Log($"CrowdControl: スロウを受けました({slowPercent:F0}% / {duration:F2}秒)。", this);
     }
 
     private void BeginStun(float duration)

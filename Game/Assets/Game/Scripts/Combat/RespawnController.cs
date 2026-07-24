@@ -14,7 +14,10 @@ using UnityEngine;
 public class RespawnController : MonoBehaviour
 {
     // 死亡から復活までの時間(秒)。
-    [SerializeField] private float _respawnDelay = 1f;
+    // GAME_DESIGN.md: Lv1〜2=4秒 / Lv3〜4=6秒 / Lv5〜6=8秒。
+    // レベルシステム実装まではLv1〜2の4秒を既定値とする(レベル連動はレベルシステム実装時の後続タスク)。
+    // PlayerはInspectorで4秒へ設定すること。TrainingDummyなどテスト用の対象は短い値(1秒など)のままでよい。
+    [SerializeField] private float _respawnDelay = 4f;
 
     private HealthController _healthController;
     private Vector3 _initialPosition;

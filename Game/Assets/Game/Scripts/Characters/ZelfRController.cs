@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -20,12 +19,15 @@ using UnityEngine.InputSystem;
 ///   エリア内のCharacter/TrainingDummy分類の敵: Inner Slow Percent分のスロウを継続付与。
 ///   エリア外へ退出した同分類の敵: Outer Slow Percent分のスロウをOuter Slow Duration秒間付与。
 ///   ゼルフ自身: Self MS Boost Percent分のMS上昇をエリア持続中付与する。
+///   スロウはすべてCrowdControlController.ApplySlow経由で適用し、
+///   他のスロウと重なった場合は最も強い1つだけが有効になる(LoL方式)。
 ///
 /// 対象が共通Dの無効化ウィンドウ中の場合、Rは完全不発になる
 /// (クールダウンは消費し、対象側では共通D成功時のカウンター攻撃とMS上昇が発生する)。
 /// ZelfEのダッシュ中・ZelfW発動中・死亡中はAbilityLockControllerのロックにより入力を受け付けない。
 /// コンポーネント自体は無効化されないため、発動済みの決闘エリアはW/E中も正しく進行・終了する。
 /// ゼルフ自身が死亡した場合は決闘エリアを即時終了する。
+/// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// </summary>
 public sealed class ZelfRController : MonoBehaviour
 {
@@ -42,6 +44,8 @@ public sealed class ZelfRController : MonoBehaviour
     [SerializeField, Min(0f)] private float _cooldown = 120f;
     // R射程(Unity units)。Inspectorで未設定(0以下)の場合はDefaultCastRangeへ自動補正される。
     [SerializeField, Min(0f)] private float _castRange = DefaultCastRange;
+    // デス時に残りクールダウンを短縮する割合(0.6 = 60%短縮)。GAME_DESIGN.md 7章準拠。
+    [SerializeField, Range(0f, 1f)] private float _deathCooldownReduction = 0.6f;
 
     [Header("Slow & Boost")]
     // エリア内スロウ: BaseMoveSpeedの何%を減速するか
@@ -87,10 +91,14 @@ public sealed class ZelfRController : MonoBehaviour
     // 射程外発動の自動接近対象。nullのときは接近中ではない。
     private Targetable _pendingTarget;
 
-    // エリア内スロウ適用中の対象と適用量
-    private readonly Dictionary<CharacterStats, float> _innerSlowAmounts = new Dictionary<CharacterStats, float>();
-    // エリア外スロウが既に適用中かどうか(重複防止)
-    private readonly HashSet<CharacterStats> _outerSlowActive = new HashSet<CharacterStats>();
+    // エリア内スロウの掛け直し間隔(秒)。短い持続のスロウを繰り返し掛け直してエリア内スロウを維持する。
+    private const float InnerSlowRefreshInterval = 0.25f;
+    // エリア内スロウ1回分の持続時間(秒)。掛け直し間隔より少し長くして途切れを防ぐ。
+    private const float InnerSlowDuration = 0.4f;
+    // 現在エリア内としてスロウを掛けている対象
+    private readonly HashSet<CrowdControlController> _targetsInsideArena = new HashSet<CrowdControlController>();
+    // 次にエリア内スロウを掛け直す時刻
+    private float _nextInnerSlowRefreshTime;
     // 自身のMSブースト適用済みか
     private bool _selfBoostApplied;
     private float _selfBoostAmount;
@@ -157,7 +165,7 @@ public sealed class ZelfRController : MonoBehaviour
         if (_rangeMaterial != null) Destroy(_rangeMaterial);
     }
 
-    // ゼルフ自身の死亡時: 自動接近を中止し、展開中の決闘エリアを即時終了する。
+    // ゼルフ自身の死亡時: 自動接近を中止し、展開中の決闘エリアを即時終了し、残りクールダウンを60%短縮する。
     private void OnSelfDied()
     {
         CancelPendingApproach();
@@ -165,6 +173,14 @@ public sealed class ZelfRController : MonoBehaviour
         {
             EndArena();
             Debug.Log("Zelf R: ゼルフの死亡により決闘エリアを終了しました。", this);
+        }
+
+        // デス時: 残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
+        float remaining = _cooldownEndTime - Time.time;
+        if (remaining > 0f)
+        {
+            _cooldownEndTime = Time.time + remaining * (1f - _deathCooldownReduction);
+            Debug.Log($"Zelf R: デスにより残りクールダウンを{_deathCooldownReduction * 100f:F0}%短縮しました(残り{Mathf.Max(0f, _cooldownEndTime - Time.time):F1}秒)。", this);
         }
     }
 
@@ -344,8 +360,8 @@ public sealed class ZelfRController : MonoBehaviour
         _isRActive = true;
         _activeEndTime = Time.time + _duration;
         _cooldownEndTime = Time.time + _cooldown;
-        _innerSlowAmounts.Clear();
-        _outerSlowActive.Clear();
+        _targetsInsideArena.Clear();
+        _nextInnerSlowRefreshTime = 0f;
         _selfBoostApplied = false;
         _selfBoostAmount = 0f;
 
@@ -422,7 +438,9 @@ public sealed class ZelfRController : MonoBehaviour
     // タスク3: エリア内外スロウ
     // ─────────────────────────────────────────────────────────────────
 
-    // 毎フレーム呼ばれる: エリア内Character敵スロウの付与/解除と退出スロウの適用
+    // 毎フレーム呼ばれる: エリア内Character敵スロウの付与/掛け直しと退出スロウの適用。
+    // スロウはすべてCrowdControlController.ApplySlow経由で適用する(最も強い1つだけが有効になるLoL方式)。
+    // エリア内スロウは短い持続(InnerSlowDuration)を一定間隔で掛け直して維持する。
     private void UpdateInnerSlowAndOuterTransition()
     {
         if (_targetableLayer.value == 0) return;
@@ -432,7 +450,10 @@ public sealed class ZelfRController : MonoBehaviour
         Collider[] cols = Physics.OverlapSphere(_arenaCenter, detectRadius,
             _targetableLayer, QueryTriggerInteraction.Ignore);
 
-        HashSet<CharacterStats> detectedInsideSet = new HashSet<CharacterStats>();
+        bool refreshNow = Time.time >= _nextInnerSlowRefreshTime;
+        if (refreshNow) _nextInnerSlowRefreshTime = Time.time + InnerSlowRefreshInterval;
+
+        HashSet<CrowdControlController> detectedInsideSet = new HashSet<CrowdControlController>();
 
         foreach (Collider col in cols)
         {
@@ -442,8 +463,9 @@ public sealed class ZelfRController : MonoBehaviour
             if (target.Classification != TargetClassification.Character &&
                 target.Classification != TargetClassification.TrainingDummy) continue;
 
-            CharacterStats stats = target.GetComponent<CharacterStats>();
-            if (stats == null) continue;
+            // CCを受け取る入口を取得(未追加でも動くようにget-or-add)。
+            CrowdControlController cc = target.GetComponentInParent<CrowdControlController>();
+            if (cc == null) cc = target.gameObject.AddComponent<CrowdControlController>();
 
             Vector3 horiz = target.transform.position - _arenaCenter;
             horiz.y = 0f;
@@ -451,88 +473,44 @@ public sealed class ZelfRController : MonoBehaviour
 
             if (isInside)
             {
-                detectedInsideSet.Add(stats);
-                if (!_innerSlowAmounts.ContainsKey(stats))
+                detectedInsideSet.Add(cc);
+                if (!_targetsInsideArena.Contains(cc))
                 {
                     // エリア内スロウを新規付与
-                    float slowAmt = stats.BaseMoveSpeed * _innerSlowPercent;
-                    stats.AddMoveSpeedBonus(-slowAmt);
-                    _innerSlowAmounts[stats] = slowAmt;
+                    _targetsInsideArena.Add(cc);
+                    cc.ApplySlow(_innerSlowPercent * 100f, InnerSlowDuration);
                     Debug.Log($"Zelf R: {target.name} にエリア内スロウを付与しました。", this);
                 }
-            }
-        }
-
-        // エリア内スロウ中だが検出範囲に入っていない or エリア外にいる対象を処理
-        List<CharacterStats> toRemove = null;
-        foreach (KeyValuePair<CharacterStats, float> kv in _innerSlowAmounts)
-        {
-            CharacterStats stats = kv.Key;
-            if (!detectedInsideSet.Contains(stats))
-            {
-                // スロウ解除
-                if (stats != null) stats.RemoveMoveSpeedBonus(kv.Value);
-
-                // 退出スロウを付与(対象が生存中のみ)
-                Targetable t = stats != null ? stats.GetComponent<Targetable>() : null;
-                if (t != null && !t.IsDead && stats != null)
+                else if (refreshNow)
                 {
-                    StartCoroutine(ApplyOuterSlowCoroutine(stats, t));
-                    Debug.Log($"Zelf R: {stats.name} がエリアを退出しました。大きなスロウを付与しました。", this);
+                    // 掛け直し(リフレッシュ)はログなしで行い、ログの連打を防ぐ
+                    cc.ApplySlow(_innerSlowPercent * 100f, InnerSlowDuration, withLog: false);
                 }
-
-                if (toRemove == null) toRemove = new List<CharacterStats>();
-                toRemove.Add(stats);
             }
         }
-        if (toRemove != null) foreach (CharacterStats s in toRemove) _innerSlowAmounts.Remove(s);
 
-        // 死亡した対象のスロウを解除
-        RemoveDeadTargetSlows();
-    }
-
-    private IEnumerator ApplyOuterSlowCoroutine(CharacterStats stats, Targetable target)
-    {
-        if (stats == null) yield break;
-        // 既にエリア外スロウが適用中なら重複付与しない
-        if (_outerSlowActive.Contains(stats)) yield break;
-
-        _outerSlowActive.Add(stats);
-        float slowAmt = stats.BaseMoveSpeed * _outerSlowPercent;
-        stats.AddMoveSpeedBonus(-slowAmt);
-
-        float elapsed = 0f;
-        while (elapsed < _outerSlowDuration)
+        // エリア内扱いだが今フレームエリア内に検出されなかった対象: 退出スロウへ切り替える
+        List<CrowdControlController> exited = null;
+        foreach (CrowdControlController cc in _targetsInsideArena)
         {
-            // 対象が死亡・無効化された場合は即座に終了
-            if (stats == null || (target != null && target.IsDead)) break;
-            elapsed += Time.deltaTime;
-            yield return null;
+            if (detectedInsideSet.Contains(cc)) continue;
+            if (exited == null) exited = new List<CrowdControlController>();
+            exited.Add(cc);
         }
+        if (exited == null) return;
 
-        if (stats != null) stats.RemoveMoveSpeedBonus(slowAmt);
-        _outerSlowActive.Remove(stats);
-    }
-
-    private void RemoveDeadTargetSlows()
-    {
-        List<CharacterStats> toRemove = null;
-        foreach (KeyValuePair<CharacterStats, float> kv in _innerSlowAmounts)
+        foreach (CrowdControlController cc in exited)
         {
-            bool shouldRemove = kv.Key == null;
-            if (!shouldRemove)
-            {
-                Targetable t = kv.Key.GetComponent<Targetable>();
-                shouldRemove = (t != null && t.IsDead);
-            }
-            if (shouldRemove)
-            {
-                if (kv.Key != null) kv.Key.RemoveMoveSpeedBonus(kv.Value);
-                if (toRemove == null) toRemove = new List<CharacterStats>();
-                toRemove.Add(kv.Key);
-            }
+            _targetsInsideArena.Remove(cc);
+            if (cc == null) continue;
+
+            // 死亡した対象には退出スロウを掛けない(死亡時のCC全解除はCrowdControl側が担当)。
+            Targetable t = cc.GetComponentInParent<Targetable>();
+            if (t == null || t.IsDead) continue;
+
+            cc.ApplySlow(_outerSlowPercent * 100f, _outerSlowDuration);
+            Debug.Log($"Zelf R: {cc.name} がエリアを退出しました。大きなスロウを付与しました。", this);
         }
-        if (toRemove != null) foreach (CharacterStats s in toRemove) _innerSlowAmounts.Remove(s);
     }
 
     private void ApplySelfMSBoost()
@@ -563,12 +541,9 @@ public sealed class ZelfRController : MonoBehaviour
 
     private void CleanUpAllEffects()
     {
-        foreach (KeyValuePair<CharacterStats, float> kv in _innerSlowAmounts)
-        {
-            if (kv.Key != null) kv.Key.RemoveMoveSpeedBonus(kv.Value);
-        }
-        _innerSlowAmounts.Clear();
-        _outerSlowActive.Clear();
+        // エリア内スロウはCrowdControl側の短い持続(InnerSlowDuration)で自然に切れるため、
+        // ここでは追跡だけ解除する。
+        _targetsInsideArena.Clear();
         RemoveSelfMSBoost();
     }
 
