@@ -413,6 +413,7 @@ GameObject:
   - component: {fileID: 968542339}
   - component: {fileID: 968542340}
   - component: {fileID: 968542341}
+  - component: {fileID: 968542342}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -917,6 +918,43 @@ MonoBehaviour:
   _isFissureActive: 0
   _remainingCooldown: 0
   _remainingFissureDuration: 0
+--- !u!114 &968542342
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8698840522a752546a71a69a556f7e8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakWController
+  _shieldDuration: 3
+  _cooldown: 12
+  _shieldBaseAmount: 80
+  _shieldADRatio: 0.8
+  _explosionRadius: 2.5
+  _explosionBaseDamage: 40
+  _explosionADRatio: 0.9
+  _characterHealPercent: 5
+  _minionHealPercent: 2.5
+  _towerHealPercent: 5
+  _trainingDummyHealPercent: 5
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  _showShieldRing: 1
+  _shieldRingColor: {r: 0.35, g: 0.7, b: 1, a: 0.9}
+  _shieldRingRadius: 1.1
+  _ringLocalHeight: 0.2
+  _ringWidth: 0.06
+  _explosionRingColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.9}
+  _explosionFlashDuration: 0.2
+  _isWActive: 0
+  _currentShield: 0
+  _remainingCooldown: 0
+  _remainingTimeToExplosion: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0

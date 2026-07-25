@@ -8,8 +8,8 @@ using UnityEngine;
 /// - 選択キャラクターがゼルフ以外の場合、ゼルフ固有のスキルコンポーネント(P/Q/W/E/R)を取り除く。
 ///   移動・通常攻撃・共通D・Fフラッシュなどの共通コンポーネントはどのキャラクターでも動作する。
 /// - 選択キャラクターがヴォルブラーク以外の場合、ヴォルブラーク固有のスキルコンポーネント
-///   (P: VolbraakPassiveShield, Q: VolbraakQController)を取り除く。
-///   ヴォルブラークのW/E/Rはフェーズ4の各タスクで実装後、このクラスへ登録していく。
+///   (P: VolbraakPassiveShield, Q: VolbraakQController, W: VolbraakWController)を取り除く。
+///   ヴォルブラークのE/Rはフェーズ4の各タスクで実装後、このクラスへ登録していく。
 /// - 見た目の区別のため、PlayerのRendererへテーマカラーを適用する(Inspectorで無効化可能)。
 /// DefaultExecutionOrder(-100)により、CharacterStatsや各スキルコントローラーのAwakeより先に実行する。
 /// </summary>
@@ -74,11 +74,12 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
             DestroyImmediateIfPresent<ZelfRController>();
         }
 
-        // ヴォルブラーク固有(P/Q)。W/E/Rはフェーズ4の各タスクで実装後、ここへ追加する。
+        // ヴォルブラーク固有(P/Q/W)。E/Rはフェーズ4の各タスクで実装後、ここへ追加する。
         if (characterId != VolbraakCharacterId)
         {
             DestroyImmediateIfPresent<VolbraakPassiveShield>();
             DestroyImmediateIfPresent<VolbraakQController>();
+            DestroyImmediateIfPresent<VolbraakWController>();
         }
     }
 
