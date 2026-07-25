@@ -414,6 +414,7 @@ GameObject:
   - component: {fileID: 968542340}
   - component: {fileID: 968542341}
   - component: {fileID: 968542342}
+  - component: {fileID: 968542343}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -955,6 +956,41 @@ MonoBehaviour:
   _currentShield: 0
   _remainingCooldown: 0
   _remainingTimeToExplosion: 0
+--- !u!114 &968542343
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbc5df1c7a73d7644a750fbff5b9c7b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakEController
+  _characterController: {fileID: 0}
+  _characterStats: {fileID: 0}
+  _clickMovement: {fileID: 0}
+  _dashDistance: 4
+  _dashDuration: 0.25
+  _hitRadius: 0.9
+  _minCastDistance: 0.1
+  _baseDamage: 40
+  _adRatio: 0.7
+  _stunDuration: 1
+  _cooldown: 12
+  _castMode: 0
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _trailColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.85}
+  _trailTime: 0.25
+  _trailWidth: 0.5
+  _isDashing: 0
+  _remainingCooldown: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0
