@@ -26,9 +26,14 @@
 
 - フェーズ4前準備: ヴォルブラークのCharacterData(Data/Characters/VolbraakData.asset)を追加。キャラクター選択画面でヴォルブラークが選択可能になる(HP760/HPreg5.0/AD54/AS0.68/AR42/MS335/AA射程175)。
 - フェーズ4前準備: PlayerCharacterApplierを追加(Scripts/Characters)。SC_Prototype開始時に、キャラクター選択画面で選択したCharacterDataをPlayerのCharacterStatsへ適用し、ゼルフ以外を選択した場合はゼルフ固有スキル(P/Q/W/E/R)を取り除く(移動・通常攻撃・共通D・Fは全キャラクター共通で動作)。Playerの見た目には選択キャラクターのテーマカラーを適用する。
+- ヴォルブラークP(初撃無効化): VolbraakPassiveShieldを追加(Scripts/Characters)。一定時間(既定10秒、Inspector設定)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(通常/確定)を問わず完全無効化する(消費まで永続)。ミニオンの攻撃ではシールドは剥がれない(無効化もされず通常どおり受ける)。被弾があるたびに無被弾タイマーはリセットされる。シールド展開中はPlayerの周囲へリングを表示する。
+- ヴォルブラークP: タワー攻撃の1回無効化とP消費に対応。攻撃者のTargetable分類(Tower)で判定するため、フェーズ5のタワー実装後もそのまま機能する(ミニオン以外の攻撃は全てPを消費して無効化)。
+- ヴォルブラークQ(亀裂): VolbraakQControllerを追加(Scripts/Characters)。Qキーでマウスカーソル方向へ地面を叩き、前方の帯状範囲(長さ4×幅1.6、Inspector設定)へ範囲ダメージ(基礎25+AD×0.8)を与える。叩いた場所には亀裂が残り(既定4秒)、亀裂上の敵へスロウ(既定35%)を継続付与する。同時に複数の亀裂は存在せず、再発動時は古い亀裂が即時消滅する。スロウはCrowdControlController.ApplySlow経由で適用(複数スロウは最も強い1つだけが有効)。クールダウン既定8秒。
 
 ### Changed
 
+- PlayerCharacterApplier: ヴォルブラーク以外のキャラクターを選択した場合に、ヴォルブラーク固有のVolbraakPassiveShield(P)を取り除くように更新。
+- PlayerCharacterApplier: ヴォルブラーク以外のキャラクターを選択した場合に、VolbraakQController(Q)も取り除くように更新。
 - キャラクター選択画面: 詳細パネルのスキル一覧がInspector未設定の場合、CharacterDataのP〜Rスキル説明から自動生成するように変更(ヴォルブラーク追加用)。
 - フェーズ1〜3見直し(重要度:低): MS%バフの基準を基礎MS(BaseMoveSpeed)へ統一。共通Dの成功時MS上昇が「発動時点の現在MS」基準だったものを、ゼルフRのMS上昇と同じ基礎MS基準へ変更。
 - フェーズ1〜3見直し(重要度:低): スロウ適用後の移動速度にLoL準拠の下限(MS110)を追加(CharacterStats.CurrentMoveSpeed)。基礎MSが110未満の対象(練習用ダミーなど)は基礎MSがそのまま下限。
@@ -65,7 +70,7 @@
 
 - フェーズ3: ハードCC(スタン・スネア)とスロウを実装(スタン: 移動・通常攻撃・全スキルを禁止。スネア: 移動と移動スキル(ゼルフQ/E)を禁止し、通常攻撃・W・R・D・Fは使用可能(FはLoL準拠)。スロウ: 基礎移動速度を割合で減少させ、複数同時は最も強い1つのみ適用(LoL方式)・共通Dでは防げない。同種ハードCCの重ねがけは残り時間が長い方を採用。ハードCC中は右クリックの移動先予約のみ受け付け、CC終了後に移動を再開。死亡時は全CCを解除。HardCcTestEmitterをスタン/スネア/スロウ切替式に拡張)
 - フェーズ3: スキル射程・範囲のプレビューを実装(SkillRangePreviewを追加。Q: マウス下の対象に発動対象マーカー(射程内は白・射程外はオレンジ=自動接近)、R: 発動した場合の決闘エリア円をキー長押し中に表示。W/Eは従来どおり方向線のみ。Fは押した瞬間に発動する仕様のためプレビューなし。既存のスキルスクリプトは変更せず、設定値をリフレクションで参照する)
-- フェーズ3: クールダウンUIをEternal Return風のステータスHUDへ拡張(下部HUDパネルの枠組みを追加し、攻撃力・攻撃速度・移動速度・攻撃射程のリアルタイム表示、HPバー(現在HP / 最大HP)、ポートレート+レベルバッジを表示��レベル表記はレベルシステム実装までのプレースホルダー。移動速度・攻撃射程はステータス単位(MS360・射程200など)で表示する)
+- フェーズ3: クールダウンUIをEternal Return風のステータスHUDへ拡張(下部HUDパネルの枠組みを追加し、攻撃力・攻撃速度・移動速度・攻撃射程のリアルタイム表示、HPバー(現在HP / 最大HP)、ポートレート+レベルバッジを表示。レベル表記はレベルシステム実装までのプレースホルダー。移動速度・攻撃射程はステータス単位(MS360・射程200など)で表示する)
 - フェーズ3: Fフラッシュを実装(FlashController新規・Fキー・移動距離400=4.0 Unity units・クールダウン55秒。全キャラクター共通)。
   マウスカーソルが指すGround地点へ即座にブリンクし、カーソル地点が最大距離より遠い場合はカーソル方向へ最大距離ぶん移動する。
   壁(Wall Layer)は越えられず、経路上に壁がある場合は壁の手前で停止する(Wall Layer未設定時は壁判定なし。現在のプロトタイプマップに壁はない)。
@@ -82,7 +87,7 @@
 ### Changed
 
 - 仕様変更: 共通D失敗時の0.30秒硬直を廃止した。失敗しても何も起きない(クールダウンのみ消費する)。
-  GAME_DESIGN.mdの共通D仕様���更新し、TASKS.mdから「共通D失敗時の0.30秒硬直を実装する」タスクを削除した。
+  GAME_DESIGN.mdの共通D仕様を更新し、TASKS.mdから「共通D失敗時の0.30秒硬直を実装する」タスクを削除した。
   CommonDControllerの失敗時硬直に関するコメントを整理した(WindowExpiredイベントはUIなどの拡張用に残す)。
 
 ### Fixed
@@ -94,10 +99,10 @@
 ### Added
 
 - ZelfQControllerにW/E連携用のpublic APIを追加した(GroundLayerMask / TargetableLayerMask / ResetCooldown / ClearLockout / CancelPendingApproach)。ZelfWControllerとZelfEControllerがReflectionを使わずにQの状態を安全に操作できるようにした。
-- WとEからQクールダウンリセット、Same Target Lockout解除、自動接近中止を安全に呼べるようにした。WとEがCharacterまたはCharacter扱いTrainingDummyへ���中した際、(1)ResetCooldown (2)ClearLockout(target) の順で即時実行する。
+- WとEからQクールダウンリセット、Same Target Lockout解除、自動接近中止を安全に呼べるようにした。WとEがCharacterまたはCharacter扱いTrainingDummyへ命中した際、(1)ResetCooldown (2)ClearLockout(target) の順で即時実行する。
 - TASKS.mdでゼルフWの前方ダメージ軽減・ゼルフEの方向ダッシュ・ゼルフE命中時のQ即時再使用の3項目を完了([x])へ更新した。
 - PlayerMouseFacingへ、外部スクリプトから安全に目標回転を更新できるpublicメソッドを追加(SetLookTarget: ワールド座標指定 / SetLookDirection: 方向ベクトル指定)。Y軸回転のみを使い、指定地点がPlayerとほぼ同じ位置の場合は安全に何もしない。実際の回転は従来どおり毎フレームInspectorのRotation Speed設定で行われ、右クリックによる回転仕様は変更しない。
-- ゼルフWの前方ダメージ軽減を実装(ZelfWController、Scripts/Characters)。Wキー(Input System)で0.75秒間、前方120度から受ける通常ダメージだけを55%軽減する(Duration / Cooldown 10秒 / Front Angle / Damage ReductionはいずれもInspector設定)。前方判定はダメージを受けた瞬間のPlayerのtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で被ダメージごとに行い、背後・側面からのダメージ、攻撃者情報が取得できないダメージ、確定ダメージ(将来用)は軽減しない。Wは攻撃技ではなくダメージ・ノックバッ��・スロウ・スタン・スネアを与えず、CC無効化・無敵・対象指定不可・シールドも持たない。持続中はPlayer前方に青い扇形のLineRenderer防御エフェクトを表示し(Playerの回転に追従)、W終了時に非表示になる。軽減発生時はDebug.Logで確認でき、軽減後の実ダメージは既存の被ダメージ表示で表示される。
+- ゼルフWの前方ダメージ軽減を実装(ZelfWController、Scripts/Characters)。Wキー(Input System)で0.75秒間、前方120度から受ける通常ダメージだけを55%軽減する(Duration / Cooldown 10秒 / Front Angle / Damage ReductionはいずれもInspector設定)。前方判定はダメージを受けた瞬間のPlayerのtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で被ダメージごとに行い、背後・側面からのダメージ、攻撃者情報が取得できないダメージ、確定ダメージ(将来用)は軽減しない。Wは攻撃技ではなくダメージ・ノックバック・スロウ・スタン・スネアを与えず、CC無効化・無敵・対象指定不可・シールドも持たない。持続中はPlayer前方に青い扇形のLineRenderer防御エフェクトを表示し(Playerの回転に追従)、W終了時に非表示になる。軽減発生時はDebug.Logで確認でき、軽減後の実ダメージは既存の被ダメージ表示で表示される。
 - ゼルフWへ周囲ダメージを追加した(W Damage Radius 2.0 / Total AD Ratio 1.5 / Tick Interval 0.1秒、いずれもInspector設定)。Duration 0.75秒間に合計AD×1.5分のダメージを_wDamageRadius以内の全Targetableへ毎ティック均等に与える。Character/TrainingDummyへの初回命中時にQのCDを即時リセットし同一対象ロックを解除する。
 - ゼルフW発動中は通常攻撃・Q・Eを無効化し、W終了後に元の状態へ復元する(死亡時はPlayerDeathHandlerが管理するため復元しない)。
 - ゼルフEの方向ダッシュを実装(ZelfEController、Scripts/Characters)。Eキー(Input System)でマウスカーソルが指すGround上の地点の方向へ、Dash Distance 4.0 Unity unitsをDash Duration 0.18秒かけてダッシュする(Cooldown 8秒、いずれもInspector設定)。マウスがGroundを指していない場合・マウス地点が近すぎる場合・クールダウン中は発動しない。ダッシュ終了後にPost-Dash Wave(3.0 Unity units、Speed 10)を前方へ飛ばし、経路とウェーブ経路で命中したTargetableへBase Damage 20 + AD×50%の通常ダメージを与える。ダッシュ中は青いTrailRendererの残像を表示する。
@@ -107,7 +112,7 @@
 
 - ゼルフRを実装した(ZelfRController.cs / Scripts/Characters)。
   Rキーでマウス下のCharacter/TrainingDummy分類の敵を中心に半径_arenaRadius(初期値5.0)の決闘エリアを展開する。
-  エリア��対象の位置に固定され、LineRendererで紫色の輪として可視化される(Duration / Cooldown はInspector設定)。
+  エリアは対象の位置に固定され、LineRendererで紫色の輪として可視化される(Duration / Cooldown はInspector設定)。
   発動時にエリア内の全Targetable(自分以外)をエリア外縁0.6m外へ即座に押し出す(ミニオン押し出しタスク対応)。
   Character/TrainingDummy分類の押し出し対象にはエリア外スロウを即時付与する。
   エリア発動中、エリア内のCharacter/TrainingDummy分類の敵にはInner Slow Percentのスロウを毎フレーム維持する。
@@ -128,14 +133,14 @@
 
 - フェーズ3: 共通D成功時のカウンター攻撃を実装(無効化成功時、攻撃者へ45+ADの30%の通常ダメージ。追加スタン・スネアは与えない)。
 - フェーズ3: 共通D成功時に移動速度が10%上昇する効果を実装(持続は既定1.5秒・Inspector調整可。効果中の再成功は掛け直しで重複加算しない。死亡時は即解除)。
-- フェーズ3: 共通Dの0.20秒CC無効化を実装(CommonDController新規・Dキー・クー���ダウン34秒)。ウィンドウ中に受けた最初のハードCCを1回だけ無効化し、CounterSucceeded/WindowExpiredイベントで後続タスク(成功時カウンター・失敗時硬直)へ拡張できる。
+- フェーズ3: 共通Dの0.20秒CC無効化を実装(CommonDController新規・Dキー・クールダウン34秒)。ウィンドウ中に受けた最初のハードCCを1回だけ無効化し、CounterSucceeded/WindowExpiredイベントで後続タスク(成功時カウンター・失敗時硬直)へ拡張できる。
 - フェーズ3: CCを受け取る共通の入口CrowdControlControllerを新設(ApplyHardCC。ハードCC専用でスロウは対象外)。行動制限の実体は後続タスク「ハードCC、スネア、スタン、スロウを実装する」で実装する。
 - フェーズ3: テスト用HardCcTestEmitterを追加(一定間隔+予告ログでハードCCを発射。TrainingDummyにアタッチして使用)。
 - PlayerInputHubに共通DのInputActionを追加(DPressedThisFrame)。
 - フェーズ3準備(phase3-prep2): スキルインジケーターを指定方式ごとに統一。
   対象指定(Q/R)=攻撃範囲円、方向指定(W/E)=方向線のみ(W=前方軽減の向き、E=ダッシュ方向)、
   場所指定=発動地点マーカー(SkillRangeIndicator.ShowPointMarkerを新設。フェーズ3の場所指定スキルで使用)。
-  Wの分類���無指定→方向指定に訂正(SkillTargetingTypeのコメント更新)。
+  Wの分類を無指定→方向指定に訂正(SkillTargetingTypeのコメント更新)。
 - フェーズ3準備(phase3-prep1): スキル発動方式を「キーを押すと範囲表示・離すと発動」(NormalCast)にQ/W/E/Rで統一。
   SkillCastMode enumを新設し、各スキルのInspectorでQuickCast(押した瞬間に発動)へ個別に切替可能。
 - フェーズ3準備(phase3-prep1): 汎用範囲インジケーターSkillRangeIndicator(円+方向線)を新設。
@@ -153,7 +158,7 @@
   増加分は現在HPへ加算(LoL方式)・減少時は現在HPをクランプする。CharacterStatsにAddMaxHealthBonus/RemoveMaxHealthBonusを追加。
 - 数値のSO一元管理(phase1-2-fix3): CharacterStatsにCharacter Data参照を追加し、AwakeでZelfData.assetの基礎値を適用するようにした。
   ステータス単位→Unity単位の換算定数(MS60=1unit/s、射程100=1unit)をCharacterStatsで一元管理。未設定時は従来どおりInspector値を使用(後方互換)。
-- 入力のInputAction移行(phase1-2-fix3): PlayerInputHubを新規追加し、Q/W/E/R・右クリック・マ��ス座標の取得を
+- 入力のInputAction移行(phase1-2-fix3): PlayerInputHubを新規追加し、Q/W/E/R・右クリック・マウス座標の取得を
   Keyboard.current/Mouse.currentの直接ポーリングからInputActionへ置き換えた。Awakeで自動追加されるためInspector設定不要。
 - 行動ロックの診断ログを強化(phase1-2-fix2): ロック中にQ/E/Rを入力した際に必ず理由をConsoleへ出力するようにした。
   Eはロック判定をクールダウン判定より先に移動し、ダッシュ中・死亡中の押下もログを出す。
@@ -162,7 +167,7 @@
   W発動・Eダッシュ・死亡による通常攻撃/Q/W/E/Rの禁止を、コンポーネントのenabled切り替えからロック方式へ一本化し、
   復元漏れ・二重復元を構造的に防止(各コントローラーがAwakeで自動追加するためInspector設定不要)。
   Phase 3のCC(スタン・スネア・共通D硬直)はロック理由を追加するだけで実装可能。
-- ゼルフR: W/E発動中��Rコンポーネントが���効化されなくなり、発動済みの決闘エリアがW/E中も正しく進行・終了するようになった
+- ゼルフR: W/E発動中にRコンポーネントが無効化されなくなり、発動済みの決闘エリアがW/E中も正しく進行・終了するようになった
   (従来は持続時間が凍結し実質延長されていた)。
 - ゼルフR: ゼルフ自身の死亡時に決闘エリアを即時終了し、自身MSブースト・スロウを全解除するようにした。
 - 自動接近の二重制御を防止: Q/Rの射程外自動接近中は通常攻撃の自動接近を停止し、QとRの自動接近も相互排他にした。
@@ -185,7 +190,7 @@
 
 ### Removed
 
-- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換える仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な���照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
+- ZelfQProjectSetup.cs(Scripts/Editor)を削除。Unity Editorのメニュー操作でSC_Prototypeを設定し、TASKS.md / CHANGELOG.mdを自動書き換える仕組みを廃止(ゲーム実装とMarkdown文書更新の分離、存在しないprivateフィールドを文字列で設定する不安定な処理と、Layer番号6・7を固定値で扱う処理の排除)。ZelfQControllerに必要な参照・レイヤー・数値と、TrainingDummyの分類・HPはSC_PrototypeシーンのInspector設定として保存済みのため、削除後もゼルフQは動作する。
 
 ### Fixed
 
@@ -210,16 +215,16 @@
 - 通常攻撃のダメージ処理を実装。射程内のターゲットへ攻撃間隔ごとにCurrent Attack Damage(Player初期値20)を即時に与え、既存の被弾フラッシュを発生させる。
 - TrainingDummyの死亡処理を実装。HP 0でCollider無効化・選択不可・ターゲット解除・攻撃停止・HPバー非表示となり、短時間死亡状態を表示した後にGameObjectを非表示化する(Destroy不使用でMissing Referenceを防止)。
 - Playerの死亡処理を実装(PlayerDeathHandler)。HP 0でPlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerを無効化し、見た目とHPバーを非表示にする。リスポーンは未実装。
-- CharacterData ScriptableObjectを追加(Scripts/Characters)。キャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータスと成長値、P/Q/W/E/Rのスキル説明を保持する。実行中の現在ステータスは従来どおりCharacterStats / HealthControllerが扱い、SC_PrototypeのPlayerへは��だ適用しない。
+- CharacterData ScriptableObjectを追加(Scripts/Characters)。キャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータスと成長値、P/Q/W/E/Rのスキル説明を保持する。実行中の現在ステータスは従来どおりCharacterStats / HealthControllerが扱い、SC_PrototypeのPlayerへはまだ適用しない。
 - ゼルフのCharacterData(Data/Characters/ZelfData.asset)を追加。基礎ステータス(HP650・HP成長105・HP自動回復3.5/+0.35・AD60/+4.5・AS0.80/+3.0%・AR28/+4.0・MS360・射程200)とP/Q/W/E/Rのスキル説明を設定。
 - キャラクター選択画面SC_CharacterSelectを追加。タイトル・サブタイトルと、5キャラクター分のカード(名前・イメージカラー・役割・利用可能状態)を表示する。Availableのゼルフのみ選択可能で、朧・ヴォルブラーク・リネス・リーゼロッテ・ヴァイスはComing Soon表示の半透明・選択不可。選択中のカードは明るい枠線とカードの明度上昇で表示し、画面下部に選択中キャラクター名を表示する。
-- ゼルフ詳細パネルを追加。名前・役割・Short Description・イメージカラー���大きな仮プレースホルダー・基礎ステータス(HP/AD/AS/AR/MS/AA Range)・P〜Rの短いスキル一覧を表示する。スキルの詳細説明はCharacterDataが保持し、将来ツールチップや別パネルとして表示できる(今回は未実装)。
+- ゼルフ詳細パネルを追加。名前・役割・Short Description・イメージカラー・大きな仮プレースホルダー・基礎ステータス(HP/AD/AS/AR/MS/AA Range)・P〜Rの短いスキル一覧を表示する。スキルの詳細説明はCharacterDataが保持し、将来ツールチップや別パネルとして表示できる(今回は未実装)。
 - 「プロトタイプを開始」ボタンを追加。選択したCharacterDataをCharacterSelectionManager(DontDestroyOnLoad・二重生成防止)が保持したままSC_Prototypeを読み込む。SC_CharacterSelectとSC_PrototypeをBuild SettingsのScene Listへ登録し、起動時はSC_CharacterSelectから始まる。
-- ゼルフの通常攻撃を実装。選択中のTargetableが攻撃射程内の場合のみ��攻撃間隔(Current Attack Speed)ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与える(弾丸・投射物・攻撃アニメーションなし)。射程外では攻撃せず、ターゲット死亡時は攻撃を停止してターゲット選択を安全に解除する(既存の射程判定・自動接近・被弾フラッシュは維持)。
+- ゼルフの通常攻撃を実装。選択中のTargetableが攻撃射程内の場合のみ、攻撃間隔(Current Attack Speed)ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与える(弾丸・投射物・攻撃アニメーションなし)。射程外では攻撃せず、ターゲット死亡時は攻撃を停止してターゲット選択を安全に解除する(既存の射程判定・自動接近・被弾フラッシュは維持)。
 - ターゲット分類を追加。TargetableにTarget Classification(Character / Minion / Tower / TrainingDummy)をInspectorで設定でき、将来のキャラクター・ミニオン・タワーでも再利用できる。TrainingDummyは初期状態でCharacter分類とする。
 - ゼルフP(与ダメージ回復)を実装(ZelfPassiveHeal、Scripts/Characters)。実際に与えたダメージ量(実ダメージ。残りHPを超えた過剰ダメージ分は含まない)を基準に、Character分類は5%、Minion分類は2.5%、Tower分類は0%を回復する(回復率はInspector設定。テスト用のTrainingDummy分類はCharacterと同じ5%)。最大HPを超えず、死亡中は回復しない。回復のクールダウン・追加回復・回復阻害・ライフスティールは未実装。
 - ダメージ表示システムを追加(FloatingCombatText / CombatTextManager、Scripts/UI)。攻撃した側の頭上に与ダメージを赤(例: 60)、受けた側の頭上に被ダメージを青(例: -60)、ゼルフPで実際にHPが増えた場合のみ回復量を緑(例: +3)で表示する。ワールド空間のWorld Space Canvas+標準Text(LegacyRuntimeフォント)による整数表示で、短時間上方向へ移動しながらフェードアウトし、常にMain Cameraの方向を向いて裏返らず、ランダムな横方向オフセットで重なりを軽減する。表示終了後は安全に削除され、プール処理は未実装だが将来プールへ置き換えやすい構造。将来のキャラクター・ミニオン・タワーからも共通利用できる。
-- 攻撃ダミー(AttackDummy)をSC_Prototypeへ1体追加(DummyAutoAttack、Scripts/Characters)。攻撃射程内のPlayerへ攻撃間隔ごとに即時ダメージを与え(攻撃力10・攻撃速度1・射程2、いずれもInspector設定)、実際に与えた���メージ量をPlayerの頭上に黄色で表示する。自身または対象の死亡中は攻撃しない。本体はTrainingDummyと同構成(HP300・Character分類・被弾フラッシュ・選択リング・HPバー付き)。移動・追跡・弾丸・攻撃アニメーション・敵AIは未実装。
+- 攻撃ダミー(AttackDummy)をSC_Prototypeへ1体追加(DummyAutoAttack、Scripts/Characters)。攻撃射程内のPlayerへ攻撃間隔ごとに即時ダメージを与え(攻撃力10・攻撃速度1・射程2、いずれもInspector設定)、実際に与えたダメージ量をPlayerの頭上に黄色で表示する。自身または対象の死亡中は攻撃しない。本体はTrainingDummyと同構成(HP300・Character分類・被弾フラッシュ・選択リング・HPバー付き)。移動・追跡・弾丸・攻撃アニメーション・敵AIは未実装。
 - 復活処理を追加(RespawnController、Scripts/Combat)。Player・TrainingDummy・AttackDummyが死亡から1秒後(Inspector設定)に初期位置・初期向きでHP全快で復活する。HealthControllerにRevive(全快)と復活イベントを追加し、Targetable(本体・Collider)、PlayerDeathHandler(操作系・見た目)、WorldHealthBar(HPバー)がそれぞれ復元する。復活したダミーの再選択は右クリックで行う。
 - ゼルフQの対象ブリンク、対象指定ダメージ、同一対象ロック、分類別クールダウン処理を実装。
 - ZelfQControllerを追加。Qキーで選択中の有効なCharacter / Minion / TrainingDummyへ、Collider最寄り点を基準に安全な停止距離でブリンクする。
@@ -232,8 +237,8 @@
 
 - 疑似通常攻撃(被弾フラッシュのみ)を、実ダメージを与える通常攻撃へ更新。
 - PlayerMouseFacingの回転速度を毎秒720度から毎秒1440度へ変更(2倍)。
-- 右クリック移動を「クリックした地点へ���動する」から「長押し中は常にカーソル下のGround地点へ向かって移動し続ける」仕様へ変更。長押し中はPlayerがカーソル方向を向き続ける。長押し中にカーソルがTargetableを指した場合はターゲット選択を優先して選択・切替し、その後ターゲット以外(Ground)を右クリック(長押し含む)すると解除されて移動する。
-- PlayerのBase Attack Damageを20から60へ変更(ゼルフのテ��ト用初期値。Bonus Attack Damageは0)。
+- 右クリック移動を「クリックした地点へ移動する」から「長押し中は常にカーソル下のGround地点へ向かって移動し続ける」仕様へ変更。長押し中はPlayerがカーソル方向を向き続ける。長押し中にカーソルがTargetableを指した場合はターゲット選択を優先して選択・切替し、その後ターゲット以外(Ground)を右クリック(長押し含む)すると解除されて移動する。
+- PlayerのBase Attack Damageを20から60へ変更(ゼルフのテスト用初期値。Bonus Attack Damageは0)。
 - TrainingDummyのMax Health / Current Healthを100から300へ変更(通常攻撃60ダメージ×5回で死亡)。
 - HealthControllerのTakeDamage / Healを、実際に適用したダメージ量・回復量(過剰ダメージ・過剰回復分は含まない)を返すよう更新。ダメージを与えた側が実ダメージ量を取得できる。
 - ダメージ表示をプレイヤー視点へ変更。与えたダメージは攻撃対象の頭上に赤色で1つだけ表示し(従来の「攻撃側頭上の赤+受けた側頭上の青」の二重表示を廃止)、Playerが受けたダメージはPlayerの頭上に黄色(例: -10)で表示する。回復(緑)の表示は変更なし。
@@ -243,14 +248,14 @@
 
 ### Added
 
-- 通常攻撃のターゲット選択を実装。右ク���ックでTargetableLayer���対象を選択し、Groundの右クリックで解除する。
+- 通常攻撃のターゲット選択を実装。右クリックでTargetableLayerの対象を選択し、Groundの右クリックで解除する。
 - 右クリック入力の優先順位を「ターゲット選択 > Ground移動」とし、対象を右クリックした場合はGroundへ移動しない。
 - SC_Prototypeシーンにテスト用ダミーTrainingDummyを1体設置(TargetableLayer / 赤系仮マテリアル)。
-- 選択中のダミーに、足元の黄色い選択リングと本体色を明るくする視覚フィードバックを��加。
+- 選択中のダミーに、足元の黄色い選択リングと本体色を明るくする視覚フィードバックを追加。
 - 将来の通常攻撃から呼び出す、被弾時に短時間白く点滅する処理をTargetableに用意。
-- 通常攻撃の射程判定を実装。TargetableのCollider��最も近い点との水平距離(XZ平面、高さは含めない)がCurrent Attack Range以下なら射程内とする。
+- 通常攻撃の射程判定を実装。TargetableのColliderの最も近い点との水平距離(XZ平面、高さは含めない)がCurrent Attack Range以下なら射程内とする。
 - 攻撃速度と攻撃間隔を実装。CharacterStatsにBase Attack Speed(毎秒の攻撃回数)、Bonus Attack Speed Percent、Base Attack Rangeを追加し、Attack Interval = 1 / Current Attack Speedとする。
-- PlayerBasicAttackControllerを追加。選択中のターゲットが射程内の場合のみ、攻撃間隔ごとに疑似通常���撃(被弾フラッシュのみ、ダメージ・HP減少なし)を実行する。
+- PlayerBasicAttackControllerを追加。選択中のターゲットが射程内の場合のみ、攻撃間隔ごとに疑似通常攻撃(被弾フラッシュのみ、ダメージ・HP減少なし)を実行する。
 - 選択リングの色で射程内外を表示するよう更新(射程内: 明るい緑 / 射程外: オレンジ)。
 
 ### Changed
@@ -286,7 +291,7 @@
 - 試合時間は約5分を目標とするが、制限時間は設けない方針へ変更。
 - ダメージタイプと防御タイプを1種類に統一。
 - 通常ダメージはARで軽減する。
-- 朧Rの処刑とヴォルブラークRの��射のみを確定ダメージとして扱う。
+- 朧Rの処刑とヴォルブラークRの反射のみを確定ダメージとして扱う。
 - リーゼロッテRはHP、AD、AS、AR、MSを一時的に奪う仕様へ決定。
 - リーゼロッテRでHPを奪う際、双方の現在HP割合を維持する仕様へ決定。
 

@@ -410,6 +410,9 @@ GameObject:
   - component: {fileID: 968542336}
   - component: {fileID: 968542337}
   - component: {fileID: 968542338}
+  - component: {fileID: 968542339}
+  - component: {fileID: 968542340}
+  - component: {fileID: 968542341}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -850,6 +853,70 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   _remainingCooldown: 0
+--- !u!114 &968542339
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13de3ce5a20da4e4b90f2dfe254056de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCharacterApplier
+  _fallbackCharacterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
+  _applyThemeColorToRenderer: 1
+--- !u!114 &968542340
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b98ebf64a9d0e6148ada1f0dbe0c34cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakPassiveShield
+  _rechargeDuration: 10
+  _showShieldRing: 1
+  _ringColor: {r: 0.95, g: 0.9, b: 0.55, a: 0.9}
+  _ringRadius: 0.9
+  _ringLocalHeight: 0.2
+  _ringWidth: 0.06
+--- !u!114 &968542341
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 968542317}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8ec69e4af34c6e41b89b3143074220a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakQController
+  _characterStats: {fileID: 0}
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  _fissureLength: 4
+  _fissureWidth: 1.6
+  _fissureDuration: 4
+  _baseDamage: 25
+  _adRatio: 0.8
+  _slowPercent: 0.35
+  _cooldown: 8
+  _castMode: 0
+  _fissureColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.9}
+  _fissureLineWidth: 0.06
+  _isFissureActive: 0
+  _remainingCooldown: 0
+  _remainingFissureDuration: 0
 --- !u!1 &968543001
 GameObject:
   m_ObjectHideFlags: 0

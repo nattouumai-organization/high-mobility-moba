@@ -11,9 +11,10 @@ using UnityEngine;
 /// ダメージを与えた側がゼルフPの与ダメージ回復やダメージ表示に実ダメージ量を使用できるようにする。
 /// Reviveで死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。
 /// TakeDamageは攻撃者Transformとダメージ種別(DamageType.Normal / True)を受け取れ、HPへ適用する直前に
-/// 同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減など)がDamageContextを使ってダメージ量を変更できる。
+/// 同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減・ヴォルブラークPの初撃無効化など)がDamageContextを使ってダメージ量を変更できる。
 /// 通常ダメージ(Normal)はAR(防御力)で軽減される: FinalDamage = RawDamage × 100 / (100 + AR)。
-/// 確定ダメージ(True)はARでもIIncomingDamageModifierでも軽減されない分類で、今回は使用しない。
+/// 確定ダメージ(True)はARでは軽減されない分類。IIncomingDamageModifierによる変更はダメージ種別を問わず適用され、
+/// 軽減・無効化するかどうかは各コンポーネントが種別を見て判断する(ゼルフWはNormalのみ軽減、ヴォルブラークPは両方を無効化)。
 /// HPreg(毎秒自動回復)はCharacterStats.CurrentHealthRegenを毎フレーム参照して回復する(死亡中は回復しない)。
 /// シールドは今回実装しない。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
@@ -134,7 +135,7 @@ public class HealthController : MonoBehaviour
     /// </summary>
     /// <param name="damage">元ダメージ量。</param>
     /// <param name="attacker">攻撃者のTransform。取得できない場合はnull(前方判定による軽減は行われない)。</param>
-    /// <param name="damageType">ダメージ種別。既定は通常ダメージ(Normal)。確定ダメージ(True)は軽減されない。</param>
+    /// <param name="damageType">ダメージ種別。既定は通常ダメージ(Normal)。確定ダメージ(True)はARでは軽減されない。</param>
     /// <returns>
     /// 実際に減少したHP量(実ダメージ)。軽減後のダメージが基準で、残りHPを超えた過剰ダメージ分は含まない。
     /// 死亡済み・無効な値の場合は0を返す。

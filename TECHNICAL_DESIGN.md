@@ -126,6 +126,8 @@ ZelfEController
 CharacterSelectionManager
 CharacterSelectionUI
 PlayerCharacterApplier
+VolbraakPassiveShield
+VolbraakQController
 ```
 
 - `CharacterData` はScriptableObject。
@@ -150,7 +152,9 @@ PlayerCharacterApplier
 - `CharacterData`(Scripts/Characters)はキャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータス・成長値、P/Q/W/E/Rのスキル説明を保持するScriptableObject。Data/Characters/へZelfData.asset・VolbraakData.assetを作成済み。SC_Prototype開始時はPlayerCharacterApplierが選択中のCharacterDataをPlayerへ適用する(フェーズ4前準備)。
 - `CharacterSelectionManager` は選択中のCharacterDataを保持する常駐マネージャー。DontDestroyOnLoadでシーン遷移後も参照でき、二重生成時は後から生成された方を破棄する(セーブデータ化はしない)。
 - `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。詳細パネルのスキル一覧はInspectorの短い一覧を優先し、未設定の場合はCharacterDataのP〜Rスキル説明から自動生成する。
-- `PlayerCharacterApplier` はSC_PrototypeのPlayerへアタッチし、シーン開始時にCharacterSelectionManagerが保持する選択中CharacterDataをCharacterStats.SetCharacterData()へ適用する(未選択でSC_Prototypeを直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用)。選択キャラクターがゼルフ以外の場合はゼルフ固有スキルコンポーネント(ZelfPassiveHeal / ZelfQ/W/E/RController)をDestroyImmediateで取り除き、移動・通常攻撃・共通D・Fなどの共通コンポーネントだけで動作させる(各キャラクターの固有スキルは実装後にこのクラスへ登録する)。DefaultExecutionOrder(-100)で他コンポーネントのAwakeより先に実行し、PlayerのRendererへテーマカラーも適用する(Inspectorで無効化可能)。
+- `PlayerCharacterApplier` はSC_PrototypeのPlayerへアタッチし、シーン開始時にCharacterSelectionManagerが保持する選択中CharacterDataをCharacterStats.SetCharacterData()へ適用する(未選択でSC_Prototypeを直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用)。選択キャラクターがゼルフ以外の場合はゼルフ固有スキルコンポーネント(ZelfPassiveHeal / ZelfQ/W/E/RController)をDestroyImmediateで取り除き、移動・通常攻撃・共通D・Fなどの共通コンポーネントだけで動作させる(各キャラクターの固有スキルは実装後にこのクラスへ登録する)。同様に、ヴォルブラーク以外を選択した場合はヴォルブラーク固有のVolbraakPassiveShield(P)・VolbraakQController(Q)を取り除く。DefaultExecutionOrder(-100)で他コンポーネントのAwakeより先に実行し、PlayerのRendererへテーマカラーも適用する(Inspectorで無効化可能)。
+- `VolbraakPassiveShield`(Scripts/Characters)はヴォルブラークP(初撃無効化)を管理する。IIncomingDamageModifierとしてHealthControllerからHPへ適用する直前に呼び出され、一定時間(Recharge Duration、既定10秒)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(Normal / True)を問わず完全無効化する(ダメージ0)。シールドは消費まで永続し、ミニオン(TargetClassification.Minion)の攻撃では剥がれない(無効化もされず通常どおり受ける)。タワー(Tower分類)の攻撃も1回無効化するがPを消費する(タワー本体はフェーズ5実装予定。攻撃者のTargetable分類で判定するため実装後そのまま機能する)。攻撃者不明(null)のダメージは無効化の対象。被弾(実際にHPが減るダメージ)があるたびに無被弾タイマーをリセットする(ミニオンからの被弾も含む)。シールド展開中はPlayerの周囲へLineRendererのリングを実行時生成で表示し(Inspectorで無効化可能)、死亡中は再展開せず復活時は展開済みで復活する。
+- `VolbraakQController`(Scripts/Characters)はヴォルブラークQ(地面叩きと亀裂)を管理する。Qキーでマウスカーソル方向へ地面を叩き、前方の帯状範囲(長さ4×幅1.6、Inspector設定)へ範囲ダメージ(基礎25+AD×0.8)を与える。叩いた場所には亀裂が残り(既定4秒)、亀裂上の敵(Tower分類を除く)へCrowdControlController.ApplySlow経由でスロウ(既定35%)を短い持続で掛け直しながら継続付与する(複数スロウは最も強い1つだけが有効になるLoL方式)。同時に複数の亀裂は存在せず、再発動時は古い亀裂が即時消滅する。移動を伴わないためスネア中も使用でき、スタン中・死亡中などは行動ロックにより使用不可。自身の死亡時は展開中の亀裂を即時終了する。亀裂はLineRendererの枠+ジグザグ線をシーン直下へ実行時生成して表示し(地面に固定)、NormalCastではQキー押下中に方向線のみを表示する。GroundとTargetableのLayerMaskはInspectorで設定する(ZelfQControllerと同じ設定)。
 - 起動シーンはSC_CharacterSelectとし、「プロトタイプを開始」ボタンでSC_Prototypeを読み込む(Build SettingsのScene Listへ両シーンを登録)。
 
 ### Skills
