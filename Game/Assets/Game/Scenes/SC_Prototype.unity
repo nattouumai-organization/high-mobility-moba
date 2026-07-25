@@ -847,13 +847,13 @@ MonoBehaviour:
   _deathCooldownReduction: 0.6
   _groundLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 64
   _wallLayer:
     serializedVersion: 2
     m_Bits: 0
   _targetableLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   _remainingCooldown: 0
 --- !u!114 &968542339
 MonoBehaviour:
@@ -982,10 +982,10 @@ MonoBehaviour:
   _castMode: 0
   _groundLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 64
   _targetableLayer:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 128
   _trailColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.85}
   _trailTime: 0.25
   _trailWidth: 0.5

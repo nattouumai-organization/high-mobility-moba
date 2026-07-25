@@ -20,6 +20,16 @@
 - 削除した要素
 ```
 
+## 2026-07-26
+
+### Changed
+- ヴォルブラークE: 敵に当たると突進がそこで停止し、敵を突進方向へ少し押し出して(既定0.8、Inspector設定)ヴォルブラークが敵の手前に止まるように変更。Tower分類と共通Dに弾かれた相手は押し出さない(共通Dの場合は突進の停止のみ)。
+- ヴォルブラークE: 突進をよりゆっくり・長く調整(距離4→5.5、移動時間0.25秒→0.6秒。Inspector設定)。
+- VolbraakQController: GroundLayerMask/TargetableLayerMaskの公開プロパティを追加(FlashControllerがレイヤー未設定時に流用する)。
+
+### Fixed
+- ヴォルブラーク選択時にフラッシュ(F)が「マウスカーソルがGroundを指していないため発動しません」と表示されて発動できない問題を修正。FlashControllerのレイヤー流用先がZelfQControllerのみで、ヴォルブラーク選択時は起動時にZelfQControllerが削除されるためGround Layerが未設定のままになっていた。VolbraakQControllerからも流用するようにし、レイヤー未設定時は原因が分かる設定案内の警告を出すように改善。
+
 ## 2026-07-25
 
 ### Added

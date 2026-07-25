@@ -3,7 +3,8 @@ using UnityEngine;
 
 /// <summary>
 /// ヴォルブラークE(突進とスタン)を管理する。
-/// Eキーでマウスカーソル方向へ突進し、経路上の敵へダメージとスタンを与える(GAME_DESIGN 12章)。
+/// Eキーでマウスカーソル方向へ突進し、当たった敵へダメージとスタンを与える(GAME_DESIGN 12章)。
+/// - 敵に当たると突進はそこで停止し、敵を突進方向へ少し押し出して、ヴォルブラークは敵の手前に止まる。
 /// - 対象が共通Dの無効化ウィンドウ中の場合、ダメージとスタンの両方が不発になる。
 ///   ハードCCは必ずCrowdControlController.ApplyStun経由で適用し、戻り値がtrue(共通Dによる無効化)のときはダメージも適用しない。
 /// - Tower分類は移動・行動しないためスタンは掛けない(ダメージのみ与える)。
@@ -27,10 +28,13 @@ public sealed class VolbraakEController : MonoBehaviour
     [SerializeField] private PlayerClickMovement _clickMovement;
 
     [Header("Dash")]
-    [SerializeField, Min(0f)] private float _dashDistance = 4f;
-    [SerializeField, Min(0.01f)] private float _dashDuration = 0.25f;
+    // 突進はゆっくり・長め(距離5.5を0.6秒かけて移動)。ゼルフEより重い突進として差別化する。
+    [SerializeField, Min(0f)] private float _dashDistance = 5.5f;
+    [SerializeField, Min(0.01f)] private float _dashDuration = 0.6f;
     [SerializeField, Min(0f)] private float _hitRadius = 0.9f;
     [SerializeField, Min(0f)] private float _minCastDistance = 0.1f;
+    // 敵に命中したとき、敵を突進方向へ押し出す距離(Unity units)。
+    [SerializeField, Min(0f)] private float _hitPushDistance = 0.8f;
 
     [Header("Damage")]
     [SerializeField, Min(0f)] private float _baseDamage = 40f;
@@ -276,13 +280,21 @@ public sealed class VolbraakEController : MonoBehaviour
         nextPosition.y = GetGroundedY(nextPosition);
         transform.position = nextPosition;
         _remainingDashDistance -= step;
-        HitTargetsAlongSegment(previousPosition, nextPosition);
-        if (_remainingDashDistance <= 0.0001f) EndDash();
+        bool hitAny = HitTargetsAlongSegment(previousPosition, nextPosition);
+        if (hitAny)
+        {
+            // 敵に当たったら突進はそこで停止する(ヴォルブラークは敵の手前に止まる)。
+            EndDash(stoppedByHit: true);
+            return;
+        }
+        if (_remainingDashDistance <= 0.0001f) EndDash(stoppedByHit: false);
     }
 
-    private void EndDash()
+    private void EndDash(bool stoppedByHit)
     {
-        ResolveOverlapWithTargetables();
+        // 命中停止時は「敵の手前」に止まるため後方(発動元方向)へ、通常終了時は従来どおり前方へ押し出して重なりを解消する。
+        if (stoppedByHit) ResolveOverlapBackward();
+        else ResolveOverlapWithTargetables();
         _characterController.enabled = _characterControllerWasEnabled;
         if (_clickMovement != null) _clickMovement.enabled = _clickMovementWasEnabled;
         // 突進が追加したロックを解除する。
@@ -322,9 +334,11 @@ public sealed class VolbraakEController : MonoBehaviour
         if (_mouseFacing != null) _mouseFacing.SetLookDirection(_dashDirection);
     }
 
-    private void HitTargetsAlongSegment(Vector3 from, Vector3 to)
+    // 命中判定。1体でも命中した場合はtrueを返す(呼び元が突進を停止する)。
+    private bool HitTargetsAlongSegment(Vector3 from, Vector3 to)
     {
-        if (_targetableLayer.value == 0) return;
+        if (_targetableLayer.value == 0) return false;
+        bool anyHit = false;
         Collider[] overlaps = Physics.OverlapCapsule(from, to, _hitRadius, _targetableLayer, QueryTriggerInteraction.Ignore);
         foreach (Collider overlap in overlaps)
         {
@@ -335,13 +349,17 @@ public sealed class VolbraakEController : MonoBehaviour
             HealthController health = target.Health != null ? target.Health : target.GetComponent<HealthController>();
             if (health == null || health.IsDead) continue;
             _hitTargets.Add(target);
-            ApplyHit(target, health);
+            anyHit = true;
+            bool blockedByCommonD = ApplyHit(target, health);
+            // 共通Dに弾かれた場合は攻撃自体が無効化されるため、押し出しは行わない(突進の停止のみ)。
+            if (!blockedByCommonD) PushTarget(target);
         }
+        return anyHit;
     }
 
-    // 命中処理: スタン→ダメージの順で適用する。
+    // 命中処理: スタン→ダメージの順で適用する。共通Dに弾かれた場合はtrueを返す。
     // 共通Dに無効化された場合(ApplyStunがtrue)は、ダメージとスタンの両方が不発になる(GAME_DESIGN 12章)。
-    private void ApplyHit(Targetable target, HealthController health)
+    private bool ApplyHit(Targetable target, HealthController health)
     {
         // Tower分類は移動・行動しないためスタンは掛けない(ダメージのみ与える)。
         if (target.Classification != TargetClassification.Tower)
@@ -352,7 +370,7 @@ public sealed class VolbraakEController : MonoBehaviour
             if (cc.ApplyStun(_stunDuration, transform))
             {
                 Debug.Log($"ヴォルブラーク E: {target.name} の共通Dに弾かれたため、ダメージとスタンの両方が不発になりました。", this);
-                return;
+                return true;
             }
         }
 
@@ -362,6 +380,26 @@ public sealed class VolbraakEController : MonoBehaviour
         {
             target.PlayHitFlash();
             CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);
+        }
+        return false;
+    }
+
+    // 敵を突進方向へ少し押し出す(Tower分類は動かないため押し出さない)。
+    // CharacterControllerを持つ相手はMoveで押し出し、それ以外はTransformを直接動かす。
+    private void PushTarget(Targetable target)
+    {
+        if (_hitPushDistance <= 0f) return;
+        if (target.Classification == TargetClassification.Tower) return;
+
+        Vector3 push = _dashDirection * _hitPushDistance;
+        CharacterController targetController = target.GetComponentInParent<CharacterController>();
+        if (targetController != null && targetController.enabled)
+        {
+            targetController.Move(push);
+        }
+        else
+        {
+            target.transform.position += push;
         }
     }
 
@@ -385,6 +423,20 @@ public sealed class VolbraakEController : MonoBehaviour
         for (int i = 0; i < maxSteps && IsOverlappingTargetable(); i++)
         {
             Vector3 position = transform.position + _dashDirection * stepDistance;
+            position.y = GetGroundedY(position);
+            transform.position = position;
+        }
+    }
+
+    // 命中停止時: 敵と重なっている場合、発動元方向(後方)へ少しずつ戻して「敵の手前」で止まる。
+    private void ResolveOverlapBackward()
+    {
+        if (_targetableLayer.value == 0) return;
+        const int maxSteps = 10;
+        const float stepDistance = 0.25f;
+        for (int i = 0; i < maxSteps && IsOverlappingTargetable(); i++)
+        {
+            Vector3 position = transform.position - _dashDirection * stepDistance;
             position.y = GetGroundedY(position);
             transform.position = position;
         }

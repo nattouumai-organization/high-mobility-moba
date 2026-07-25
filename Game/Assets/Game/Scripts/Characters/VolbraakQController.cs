@@ -82,6 +82,12 @@ public sealed class VolbraakQController : MonoBehaviour
 
     public bool IsFissureActive => _isFissureActive;
 
+    /// <summary>FlashControllerなどがInspector未設定時に流用するGroundのLayerMask。</summary>
+    public LayerMask GroundLayerMask => _groundLayer;
+
+    /// <summary>FlashControllerなどがInspector未設定時に流用するTargetableのLayerMask。</summary>
+    public LayerMask TargetableLayerMask => _targetableLayer;
+
     private void Awake()
     {
         _characterStats = _characterStats != null ? _characterStats : GetComponent<CharacterStats>();
