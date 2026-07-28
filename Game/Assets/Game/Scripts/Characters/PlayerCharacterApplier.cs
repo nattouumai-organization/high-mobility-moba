@@ -11,6 +11,7 @@ using UnityEngine;
 ///   Prefab Variantは本来自分のスキルしか持たないため通常は何も取り除かれないが、
 ///   CharacterDataとPrefab Variantの組み合わせをInspectorで誤設定した場合の安全網として残す。
 /// - 見た目の区別のため、PlayerのRendererへテーマカラーを適用する(Inspectorで無効化可能)。
+/// - PlayerLayerMaskFallbackで未設定(Nothing)のGround/Targetable LayerMaskを既定値へ自動補正する。
 /// DefaultExecutionOrder(-100)により、CharacterStatsや各スキルコントローラーのAwakeより先に実行する。
 /// </summary>
 [DefaultExecutionOrder(-100)]
@@ -46,6 +47,8 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
         {
             // 選択もフォールバックもない場合は何も適用しない(従来どおりシーンのInspector設定で動作する)。
             Debug.LogWarning("PlayerCharacterApplier: CharacterDataが無いため、シーンの初期設定のまま開始します。", this);
+            // CharacterDataが無い場合もLayerMaskの自動補正だけは行う。
+            PlayerLayerMaskFallback.Apply(gameObject);
             return;
         }
 
@@ -54,6 +57,8 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
 
         RemoveMismatchedSkillComponents(selected.CharacterId);
         ApplyThemeColor(selected);
+        // Prefab Variantへ追加し直したコンポーネントのLayerMask未設定(Nothing)を既定値へ自動補正する。
+        PlayerLayerMaskFallback.Apply(gameObject);
 
         Debug.Log($"PlayerCharacterApplier: '{selected.DisplayName}'(Id={selected.CharacterId})としてPlayerを初期化しました。", this);
     }

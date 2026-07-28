@@ -28,6 +28,10 @@
 - PlayerInputHubへカメラ操作用のInputActionを追加(CameraCenter: Space / CameraLockToggle: Y)。
 - キャラごとのPlayerプレハブ(Prefab Variant)方式を実装(フェーズ5前準備)。共通コンポーネントだけを持つPF_Player_Baseを親プレハブとし、各キャラクターは固有スキルコンポーネントを追加したPrefab Variant(PF_Player_Zelf / PF_Player_Volbraak、Prefabs/Characters/)として作成する。CharacterDataへPlayer Prefab参照を追加し、新規PlayerSpawner(Scripts/Characters)が試合シーン開始時に選択キャラクターのVariantをスポナーの位置・向きへ生成する(シーン直置きのPlayerは廃止。既存Playerがある場合は生成をスキップする安全網付き)。
 
+### Fixed
+
+- Prefab Variant移行後に全スキルが「マウスカーソルがGroundを指していないため発動しません」等で不発になる問題を修正。Variantへ追加し直したスキルコンポーネントのGround/Targetable LayerMaskが未設定(Nothing)のままになることが原因。新規PlayerLayerMaskFallback(Scripts/Characters)をPlayerCharacterApplierのAwakeから呼び出し、未設定の_groundLayer/_targetableLayerのみをレイヤー名(GroundLayer/TargetableLayer、無ければ6/7番)から自動補正する(Inspector設定済みの値は上書きしない。FlashControllerのWall Layerなど意図的な未設定は対象外)。
+
 ### Changed
 
 - PlayerCharacterApplier: Prefab Variant方式に合わせて役割を更新。Playerプレハブ(PF_Player_Base)へアタッチして全Variantで共通使用し、CharacterDataの適用(ステータス・テーマカラー)を担当する。固有スキルコンポーネントの取り外しは、CharacterDataとVariantの誤設定に備えた安全網として維持(正しい組み合わせでは何も取り除かれない)。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
