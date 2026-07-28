@@ -1,0 +1,239 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &117624677908228836
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_Name
+      value: PF_Player_Volbraak
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2418946079694419605}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -8859722922140319854}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 464329755435831473}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -752510810624683690}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -8856182062711754707}
+  m_SourcePrefab: {fileID: 100100000, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+--- !u!1 &8506561249949945599 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+  m_PrefabInstance: {fileID: 117624677908228836}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2418946079694419605
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8506561249949945599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b98ebf64a9d0e6148ada1f0dbe0c34cf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakPassiveShield
+  _rechargeDuration: 10
+  _showShieldRing: 1
+  _ringColor: {r: 0.95, g: 0.9, b: 0.55, a: 0.9}
+  _ringRadius: 0.9
+  _ringLocalHeight: 0.2
+  _ringWidth: 0.06
+--- !u!114 &-8859722922140319854
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8506561249949945599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8ec69e4af34c6e41b89b3143074220a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakQController
+  _characterStats: {fileID: 0}
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _fissureLength: 4
+  _fissureWidth: 1.6
+  _fissureDuration: 4
+  _baseDamage: 25
+  _adRatio: 0.8
+  _slowPercent: 0.35
+  _cooldown: 8
+  _castMode: 0
+  _fissureColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.9}
+  _fissureLineWidth: 0.06
+  _isFissureActive: 0
+  _remainingCooldown: 0
+  _remainingFissureDuration: 0
+--- !u!114 &464329755435831473
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8506561249949945599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8698840522a752546a71a69a556f7e8d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakWController
+  _shieldDuration: 3
+  _cooldown: 12
+  _shieldBaseAmount: 80
+  _shieldADRatio: 0.8
+  _explosionRadius: 2.5
+  _explosionBaseDamage: 40
+  _explosionADRatio: 0.9
+  _characterHealPercent: 5
+  _minionHealPercent: 2.5
+  _towerHealPercent: 5
+  _trainingDummyHealPercent: 5
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _showShieldRing: 1
+  _shieldRingColor: {r: 0.35, g: 0.7, b: 1, a: 0.9}
+  _shieldRingRadius: 1.1
+  _ringLocalHeight: 0.2
+  _ringWidth: 0.06
+  _explosionRingColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.9}
+  _explosionFlashDuration: 0.2
+  _isWActive: 0
+  _currentShield: 0
+  _remainingCooldown: 0
+  _remainingTimeToExplosion: 0
+--- !u!114 &-752510810624683690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8506561249949945599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dbc5df1c7a73d7644a750fbff5b9c7b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakEController
+  _characterController: {fileID: 0}
+  _characterStats: {fileID: 0}
+  _clickMovement: {fileID: 0}
+  _dashDistance: 5.5
+  _dashDuration: 0.6
+  _hitRadius: 0.9
+  _minCastDistance: 0.1
+  _hitPushDistance: 0.8
+  _baseDamage: 40
+  _adRatio: 0.7
+  _stunDuration: 1
+  _cooldown: 12
+  _castMode: 0
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _trailColor: {r: 0.95, g: 0.5, b: 0.15, a: 0.85}
+  _trailTime: 0.25
+  _trailWidth: 0.5
+  _isDashing: 0
+  _remainingCooldown: 0
+--- !u!114 &-8856182062711754707
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8506561249949945599}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0ff78306fb6e6145827897381034766, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VolbraakRController
+  _chainRange: 6
+  _chainSpeed: 18
+  _hitRadius: 0.6
+  _minCastDistance: 0.1
+  _chainHeightOffset: 0.9
+  _tetherMaxDistance: 4
+  _tetherDuration: 3
+  _reflectRatio: 1
+  _cooldown: 90
+  _deathCooldownReduction: 0.6
+  _castMode: 0
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _chainColor: {r: 0.95, g: 0.3, b: 0.2, a: 0.95}
+  _chainWidth: 0.08
+  _isChainFlying: 0
+  _isTetherActive: 0
+  _remainingCooldown: 0
+  _remainingTetherDuration: 0
+  _isReflectActive: 0
+  _remainingReflectDuration: 0

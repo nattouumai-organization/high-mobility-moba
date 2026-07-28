@@ -14,6 +14,8 @@ public enum CharacterStatus
 /// TASKS.md「ゼルフのCharacterDataを作成する」用のScriptableObject。
 /// 各キャラクターの固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)と、
 /// 基礎ステータス・成長値・P/Q/W/E/Rのスキル説明を保持する。
+/// キャラクターごとのPlayerプレハブ(PF_Player_BaseのPrefab Variant)への参照も保持し、
+/// 試合シーン開始時にPlayerSpawnerが生成に使用する(フェーズ5前準備)。
 /// CharacterDataはキャラクター固有の初期設定データとして扱い、実行中の現在HPや現在ステータスは
 /// 従来どおりCharacterStats / HealthControllerが扱う(SC_Prototype開始時は、キャラクター選択結果を
 /// PlayerCharacterApplierがPlayerのCharacterStatsへ適用する。フェーズ4前準備)。
@@ -29,6 +31,10 @@ public class CharacterData : ScriptableObject
     [SerializeField] [TextArea] private string _shortDescription = "";
     [SerializeField] private Color _themeColor = Color.white;
     [SerializeField] private CharacterStatus _characterStatus = CharacterStatus.ComingSoon;
+
+    [Header("プレハブ")]
+    [Tooltip("このキャラクターのPlayerプレハブ(PF_Player_BaseのPrefab Variant)。試合シーン開始時にPlayerSpawnerが生成する")]
+    [SerializeField] private GameObject _playerPrefab;
 
     [Header("基礎ステータス")]
     [SerializeField] private float _baseHp;
@@ -62,6 +68,9 @@ public class CharacterData : ScriptableObject
 
     /// <summary>Character StatusがAvailable(選択可能)かどうか。</summary>
     public bool IsAvailable => _characterStatus == CharacterStatus.Available;
+
+    /// <summary>このキャラクターのPlayerプレハブ(Prefab Variant)。未設定の場合はnull。</summary>
+    public GameObject PlayerPrefab => _playerPrefab;
 
     public float BaseHp => _baseHp;
     public float HpGrowth => _hpGrowth;

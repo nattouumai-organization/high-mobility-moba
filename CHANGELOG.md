@@ -26,9 +26,11 @@
 
 - カメラ操作を実装(TopDownCameraController、Scripts/Core。Main Cameraへ追加する)。ロックモード(既定)ではプレイヤーを中心にカメラが追従する。Yでフリーモードと切り替えられ、フリーモードでは追従せず、マウスカーソルを画面端(上下左右)へ持っていくとその方向へゆっくりスクロールする(スクロール速度と画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心になって追従し、離すとその場でフリーモードへ戻る(LOLデフォルトのSpace/Yと同じ配置)。
 - PlayerInputHubへカメラ操作用のInputActionを追加(CameraCenter: Space / CameraLockToggle: Y)。
+- キャラごとのPlayerプレハブ(Prefab Variant)方式を実装(フェーズ5前準備)。共通コンポーネントだけを持つPF_Player_Baseを親プレハブとし、各キャラクターは固有スキルコンポーネントを追加したPrefab Variant(PF_Player_Zelf / PF_Player_Volbraak、Prefabs/Characters/)として作成する。CharacterDataへPlayer Prefab参照を追加し、新規PlayerSpawner(Scripts/Characters)が試合シーン開始時に選択キャラクターのVariantをスポナーの位置・向きへ生成する(シーン直置きのPlayerは廃止。既存Playerがある場合は生成をスキップする安全網付き)。
 
 ### Changed
 
+- PlayerCharacterApplier: Prefab Variant方式に合わせて役割を更新。Playerプレハブ(PF_Player_Base)へアタッチして全Variantで共通使用し、CharacterDataの適用(ステータス・テーマカラー)を担当する。固有スキルコンポーネントの取り外しは、CharacterDataとVariantの誤設定に備えた安全網として維持(正しい組み合わせでは何も取り除かれない)。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
 - ヴォルブラークR(反射): 反射で与えるダメージに反射フラグを付け、反射フラグ付きのダメージ(再反射)は反射しないように更新(GAME_DESIGN 12章「反射は再反射しない」)。ミラー戦(ヴォルブラーク対ヴォルブラーク)などで両者の反射ウィンドウが有効な場合でも、反射同士が無限にループしない。
 - HealthController / DamageContext: ダメージが反射によるものかを表すIsReflectedフラグをDamageContextへ追加。TakeDamageのisReflected引数(既定false)から、軽減判定(IIncomingDamageModifier)と被ダメージ通知(DamageTaken)の両方へ引き継がれる。
 

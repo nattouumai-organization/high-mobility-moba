@@ -1,0 +1,232 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &2547608630518215696
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2278017223772566999, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      propertyPath: m_Name
+      value: PF_Player_Zelf
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -4985544306978353739}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -8080365697766081882}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3124275752711336661}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -927368953786119694}
+    - targetCorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8538790716893068931}
+  m_SourcePrefab: {fileID: 100100000, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+--- !u!1 &6122203799975448587 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8623411862443435035, guid: b3fea191c79b0ea43979843fa1fcaa31, type: 3}
+  m_PrefabInstance: {fileID: 2547608630518215696}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &-4985544306978353739
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6122203799975448587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2f5a8c1b4e7469d83a6c9e0b2f51d74, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZelfPassiveHeal
+  _healthController: {fileID: 0}
+  _characterHealPercent: 5
+  _minionHealPercent: 2.5
+  _towerHealPercent: 0
+  _trainingDummyHealPercent: 5
+--- !u!114 &-8080365697766081882
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6122203799975448587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5cb10c56dbd9b3a408d95e162fe9bc63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZelfQController
+  _characterController: {fileID: 0}
+  _characterStats: {fileID: 0}
+  _targetSelector: {fileID: 0}
+  _clickMovement: {fileID: 0}
+  _targetRange: 4.5
+  _blinkStopDistance: 0.75
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _baseDamage: 30
+  _adRatio: 0.6
+  _cooldown: 6
+  _sameTargetLockout: 1.25
+  _minionCooldownReductionPercent: 0.5
+  _circleSegments: 64
+  _circleWidth: 0.035
+  _rangeCircleColor: {r: 1, g: 1, b: 1, a: 1}
+  _lockCircleColor: {r: 0.2, g: 0.7, b: 1, a: 0.95}
+  _isQAvailable: 1
+  _remainingCooldown: 0
+  _isCurrentTargetLocked: 0
+  _isApproachingQTarget: 0
+  _castMode: 0
+--- !u!114 &3124275752711336661
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6122203799975448587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1a4e7b2d5f8493ab6c9d2e5f8a1b4c7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZelfWController
+  _duration: 0.75
+  _cooldown: 10
+  _castMode: 0
+  _frontAngle: 120
+  _damageReduction: 0.55
+  _wDamageRadius: 2
+  _wTotalADRatio: 1.5
+  _wTickInterval: 0.1
+  _shieldColor: {r: 0.25, g: 0.6, b: 1, a: 0.9}
+  _shieldRadius: 1.5
+  _shieldWidth: 0.06
+  _shieldSegments: 24
+  _isWActive: 0
+  _remainingCooldown: 0
+--- !u!114 &-927368953786119694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6122203799975448587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4b7a0c3e6f9482cd7a0b3c6e9f2a5d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZelfEController
+  _characterController: {fileID: 0}
+  _characterStats: {fileID: 0}
+  _clickMovement: {fileID: 0}
+  _qController: {fileID: 0}
+  _dashDistance: 4
+  _dashDuration: 0.18
+  _hitRadius: 0.6
+  _minCastDistance: 0.1
+  _waveDistance: 3
+  _waveSpeed: 10
+  _baseDamage: 20
+  _adRatio: 0.5
+  _cooldown: 8
+  _castMode: 0
+  _groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _trailColor: {r: 0.25, g: 0.6, b: 1, a: 0.85}
+  _trailTime: 0.25
+  _trailWidth: 0.45
+  _isDashing: 0
+  _remainingCooldown: 0
+--- !u!114 &8538790716893068931
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6122203799975448587}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 87c9b8d8bb0aaf249807a73e2a01442c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ZelfRController
+  _selfStats: {fileID: 0}
+  _targetableLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  _arenaRadius: 5
+  _duration: 5
+  _cooldown: 120
+  _castRange: 7
+  _deathCooldownReduction: 0.6
+  _innerSlowPercent: 0.3
+  _outerSlowPercent: 0.6
+  _outerSlowDuration: 2.5
+  _selfMSBoostPercent: 20
+  _arenaColor: {r: 0.75, g: 0.25, b: 1, a: 0.9}
+  _arenaSegments: 64
+  _arenaLineWidth: 0.08
+  _rangeCircleColor: {r: 0.75, g: 0.25, b: 1, a: 0.6}
+  _rangeCircleWidth: 0.035
+  _isRActive: 0
+  _remainingCooldown: 0
+  _remainingDuration: 0
+  _isApproachingRTarget: 0
+  _castMode: 0

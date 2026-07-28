@@ -1,15 +1,15 @@
 using UnityEngine;
 
 /// <summary>
-/// フェーズ4前準備: SC_Prototype開始時に、キャラクター選択画面で選択したCharacterDataを
-/// Playerへ適用するコンポーネント。SC_PrototypeのPlayerへアタッチして使用する。
+/// 試合シーン開始時に、キャラクター選択画面で選択したCharacterDataをPlayerへ適用するコンポーネント。
+/// Playerプレハブ(PF_Player_Base)へアタッチし、各キャラクターのPrefab Variantが共通で使用する
+/// (フェーズ5前準備でシーン直置きのPlayerからPrefab Variant方式へ移行。生成はPlayerSpawnerが行う)。
 /// - CharacterSelectionManagerが保持する選択中CharacterDataをCharacterStatsへ適用する
-///   (未選択でSC_Prototypeを直接起動した場合はFallback Character Data(ZelfData想定)を使用する)。
-/// - 選択キャラクターがゼルフ以外の場合、ゼルフ固有のスキルコンポーネント(P/Q/W/E/R)を取り除く。
-///   移動・通常攻撃・共通D・Fフラッシュなどの共通コンポーネントはどのキャラクターでも動作する。
-/// - 選択キャラクターがヴォルブラーク以外の場合、ヴォルブラーク固有のスキルコンポーネント
-///   (P: VolbraakPassiveShield, Q: VolbraakQController, W: VolbraakWController, E: VolbraakEController,
-///    R: VolbraakRController)を取り除く。
+///   (未選択でSC_Prototypeを直接起動した場合はFallback Character Dataを使用する。
+///    各Prefab VariantのFallbackにはそのキャラクター自身のCharacterDataを設定する)。
+/// - 選択キャラクターと一致しないキャラクター固有スキルコンポーネントを取り除く。
+///   Prefab Variantは本来自分のスキルしか持たないため通常は何も取り除かれないが、
+///   CharacterDataとPrefab Variantの組み合わせをInspectorで誤設定した場合の安全網として残す。
 /// - 見た目の区別のため、PlayerのRendererへテーマカラーを適用する(Inspectorで無効化可能)。
 /// DefaultExecutionOrder(-100)により、CharacterStatsや各スキルコントローラーのAwakeより先に実行する。
 /// </summary>
@@ -18,7 +18,7 @@ using UnityEngine;
 public sealed class PlayerCharacterApplier : MonoBehaviour
 {
     [Header("フォールバック")]
-    [Tooltip("キャラクター未選択でSC_Prototypeを直接起動した場合に使用するCharacterData(ZelfData想定)")]
+    [Tooltip("キャラクター未選択でSC_Prototypeを直接起動した場合に使用するCharacterData。各Prefab Variantにはそのキャラクター自身のCharacterDataを設定する")]
     [SerializeField] private CharacterData _fallbackCharacterData;
 
     [Header("見た目")]
@@ -59,6 +59,8 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
     }
 
     // 選択キャラクターに合わないキャラクター固有スキルコンポーネントを取り除く。
+    // Prefab Variant方式では各Variantは自分のスキルしか持たないため通常は何も起きず、
+    // CharacterDataとVariantの誤設定に備えた安全網として機能する。
     // DefaultExecutionOrder(-100)により対象コンポーネントのAwakeより先に実行されるため、
     // DestroyImmediateで即時に取り除き、対象のAwake(エフェクト生成・イベント購読など)自体を走らせない。
     private void RemoveMismatchedSkillComponents(string characterId)
