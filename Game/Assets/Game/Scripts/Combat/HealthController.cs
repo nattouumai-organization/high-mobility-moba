@@ -15,6 +15,7 @@ using UnityEngine;
 /// 通常ダメージ(Normal)はAR(防御力)で軽減される: FinalDamage = RawDamage × 100 / (100 + AR)。
 /// 確定ダメージ(True)はARでは軽減されない分類。IIncomingDamageModifierによる変更はダメージ種別を問わず適用され、
 /// 軽減・無効化するかどうかは各コンポーネントが種別を見て判断する(ゼルフWはNormalのみ軽減、ヴォルブラークPは両方を無効化)。
+/// 実ダメージ(実際に減ったHP)が発生したときはDamageTakenイベントで(ダメージ情報, 実ダメージ量)を通知する(ヴォルブラークRの反射などが購読)。
 /// HPreg(毎秒自動回復)はCharacterStats.CurrentHealthRegenを毎フレーム参照して回復する(死亡中は回復しない)。
 /// シールドは今回実装しない。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
@@ -58,6 +59,12 @@ public class HealthController : MonoBehaviour
 
     /// <summary>復活して現在HPが全快したときに通知する。死亡時に無効化した見た目・操作の復元に使用する。</summary>
     public event Action Revived;
+
+    /// <summary>
+    /// ダメージを実際に受けた(実ダメージ > 0)ときに(ダメージ情報, 実ダメージ量)を通知する。ヴォルブラークRの反射などが購読する。
+    /// 死亡処理(Died)より前に通知するため、死亡の瞬間の致死ダメージも通知対象になる。
+    /// </summary>
+    public event Action<DamageContext, float> DamageTaken;
 
     private void Awake()
     {
@@ -169,6 +176,13 @@ public class HealthController : MonoBehaviour
         _currentHealth = Mathf.Max(0f, _currentHealth - modifiedDamage);
         float actualDamage = previousHealth - _currentHealth;
         NotifyHealthChanged();
+
+        // 実際にHPが減った場合のみ、被ダメージを通知する(ヴォルブラークRの反射などが購読)。
+        // 死亡処理より前に通知するため、死亡の瞬間の致死ダメージも通知対象になる。
+        if (actualDamage > 0f)
+        {
+            DamageTaken?.Invoke(new DamageContext(attacker, damageType, damage), actualDamage);
+        }
 
         if (_currentHealth <= 0f)
         {

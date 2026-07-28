@@ -6,12 +6,15 @@ using UnityEngine;
 /// - 鎖で繋がれた敵は、持続時間の間ヴォルブラークから一定距離以上離れられない
 ///   (境界を越えた分だけ毎フレーム内側へ引き戻される。ヴォルブラークが移動すると敵も引きずられる)。
 /// - 鎖はミニオン・タワーには当たらず、すり抜けて敵ヒーローだけを判定する。
+/// - 鎖が命中すると反射ウィンドウ(持続時間は拘束と同じ)が開始され、その間に敵ヒーロー
+///   (Character/TrainingDummy分類)から受けたダメージの実ダメージ量を、攻撃者へ確定ダメージ(True)で自動反射する。
+///   ミニオン・タワー・設置物・自己ダメージ・攻撃者不明のダメージは反射しない(反射の再反射防止は後続タスクで実装する)。
 /// - 対象が共通Dの無効化ウィンドウ中の場合、鎖(拘束)は不発になる(クールダウンは消費)。
-///   GAME_DESIGN 12章「Dで鎖を弾かれても反射は付与」のため、R反射(後続タスクで実装)は
-///   共通Dに弾かれた場合にも付与する。本タスクでは拘束(鎖)のみを実装する。
+///   GAME_DESIGN 12章「Dで鎖を弾かれても反射は付与」のため、反射ウィンドウは共通Dに弾かれた場合にも開始する。
 /// - 移動を伴わないためスネア中も使用できる(スタン中・E突進中・死亡中などは行動ロックにより使用不可)。
-/// - 自身が死亡した場合は鎖・拘束を即時終了する。デス時は残りクールダウンを60%短縮する(GAME_DESIGN 7章)。
-/// - R反射タスク向けのpublic API: IsTetherActive / TetherTarget / TetherRemainingDuration。
+/// - 自身が死亡した場合は鎖・拘束・反射ウィンドウを即時終了する(死亡の瞬間の致死ダメージまでは反射する)。
+///   デス時は残りクールダウンを60%短縮する(GAME_DESIGN 7章)。
+/// - public API: IsTetherActive / TetherTarget / TetherRemainingDuration / IsReflectActive。
 /// NormalCast: Rキーを押している間は方向線(長さ=鎖の射程)のみを表示し、離した瞬間に発動 / QuickCast: 押した瞬間に発動。
 /// </summary>
 [DisallowMultipleComponent]
@@ -30,8 +33,12 @@ public sealed class VolbraakRController : MonoBehaviour
     [Header("Tether")]
     // 拘束中、敵がヴォルブラークから離れられる最大距離(Unity units)。
     [SerializeField, Min(0.1f)] private float _tetherMaxDistance = 4f;
-    // 拘束の持続時間(秒)。R反射(後続タスク)も同じ時間持続する予定。
+    // 拘束の持続時間(秒)。反射ウィンドウも同じ時間持続する。
     [SerializeField, Min(0f)] private float _tetherDuration = 3f;
+
+    [Header("Reflect")]
+    // 反射するダメージの倍率(1 = 受けた実ダメージと同量を確定ダメージで反射する)。
+    [SerializeField, Min(0f)] private float _reflectRatio = 1f;
 
     [Header("Cooldown")]
     [SerializeField, Min(0f)] private float _cooldown = 90f;
@@ -55,6 +62,8 @@ public sealed class VolbraakRController : MonoBehaviour
     [SerializeField] private bool _isTetherActive;
     [SerializeField] private float _remainingCooldown;
     [SerializeField] private float _remainingTetherDuration;
+    [SerializeField] private bool _isReflectActive;
+    [SerializeField] private float _remainingReflectDuration;
 
     private CharacterController _characterController;
     private PlayerMouseFacing _mouseFacing;
@@ -70,6 +79,8 @@ public sealed class VolbraakRController : MonoBehaviour
     private float _chainTraveledDistance;
     private Targetable _tetherTarget;
     private float _tetherEndTime;
+    // 反射ウィンドウの終了時刻(Time.time基準)。鎖の命中時に開始する(共通Dに弾かれた場合も開始する)。
+    private float _reflectEndTime;
     // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する。
     private double _cooldownEndTime;
 
@@ -81,6 +92,9 @@ public sealed class VolbraakRController : MonoBehaviour
 
     /// <summary>拘束の残り時間(秒)。拘束していない場合は0。</summary>
     public float TetherRemainingDuration => _isTetherActive ? Mathf.Max(0f, _tetherEndTime - Time.time) : 0f;
+
+    /// <summary>反射ウィンドウが有効か(その間、敵ヒーローから受けたダメージを確定ダメージで自動反射する)。</summary>
+    public bool IsReflectActive => Time.time < _reflectEndTime;
 
     private void Awake()
     {
@@ -95,7 +109,12 @@ public sealed class VolbraakRController : MonoBehaviour
         _rangeIndicator = SkillRangeIndicator.Create(transform, "Volbraak R Range Indicator");
 
         // 自身の死亡時に鎖を即時終了し、残りクールダウンを短縮する。
-        if (_selfHealth != null) _selfHealth.Died += OnSelfDied;
+        // 被ダメージ通知(DamageTaken)は反射ウィンドウ中の自動反射に使用する。
+        if (_selfHealth != null)
+        {
+            _selfHealth.Died += OnSelfDied;
+            _selfHealth.DamageTaken += OnDamageTaken;
+        }
 
         if (_groundLayer.value == 0 || _targetableLayer.value == 0)
         {
@@ -107,7 +126,11 @@ public sealed class VolbraakRController : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_selfHealth != null) _selfHealth.Died -= OnSelfDied;
+        if (_selfHealth != null)
+        {
+            _selfHealth.Died -= OnSelfDied;
+            _selfHealth.DamageTaken -= OnDamageTaken;
+        }
         if (_chainLine != null) Destroy(_chainLine.gameObject);
         if (_chainMaterial != null) Destroy(_chainMaterial);
     }
@@ -116,6 +139,8 @@ public sealed class VolbraakRController : MonoBehaviour
     {
         _remainingCooldown = (float)System.Math.Max(0.0, _cooldownEndTime - Time.timeAsDouble);
         _remainingTetherDuration = TetherRemainingDuration;
+        _isReflectActive = IsReflectActive;
+        _remainingReflectDuration = Mathf.Max(0f, _reflectEndTime - Time.time);
 
         if (_isChainFlying)
         {
@@ -301,14 +326,16 @@ public sealed class VolbraakRController : MonoBehaviour
 
     private void HandleChainHit(Targetable target)
     {
-        // 共通Dによる無効化: 鎖(拘束)は不発になる(クールダウンは消費)。
-        // GAME_DESIGN 12章「Dで鎖を弾かれても反射は付与」のため、R反射(後続タスク)は
-        // このブロックでも反射バフを付与する予定。本タスクでは拘束のみのため、ここで終了する。
+        // 鎖の命中で反射ウィンドウを開始する。
+        // GAME_DESIGN 12章「Dで鎖を弾かれても反射は付与」のため、共通Dに弾かれる場合でも先に開始する。
+        StartReflectWindow();
+
+        // 共通Dによる無効化: 鎖(拘束)は不発になる(クールダウンは消費。反射ウィンドウは付与済み)。
         CommonDController targetCommonD = target.GetComponentInParent<CommonDController>();
         if (targetCommonD != null && targetCommonD.TryBlockHardCC(transform))
         {
             if (_chainLine != null) _chainLine.enabled = false;
-            Debug.Log($"ヴォルブラーク R: {target.name} の共通Dに弾かれたため、拘束は不発になりました(反射は後続タスクで付与予定)。", this);
+            Debug.Log($"ヴォルブラーク R: {target.name} の共通Dに弾かれたため、拘束は不発になりました(反射ウィンドウは付与済み)。", this);
             return;
         }
 
@@ -362,6 +389,55 @@ public sealed class VolbraakRController : MonoBehaviour
         Debug.Log($"ヴォルブラーク R: {reason}、鎖を解除しました。", this);
     }
 
+    // 反射ウィンドウを開始する(持続時間は拘束と同じ_tetherDuration)。鎖の命中時に呼び出す。
+    private void StartReflectWindow()
+    {
+        _reflectEndTime = Time.time + _tetherDuration;
+        Debug.Log($"ヴォルブラーク R: 反射ウィンドウを開始しました({_tetherDuration:F1}秒)。", this);
+    }
+
+    // 反射ウィンドウを即時終了する(自身の死亡時)。
+    private void EndReflectWindow()
+    {
+        if (IsReflectActive) Debug.Log("ヴォルブラーク R: 反射ウィンドウを終了しました。", this);
+        _reflectEndTime = 0f;
+    }
+
+    // 自身が実ダメージを受けたときの通知(HealthController.DamageTaken)。
+    // 反射ウィンドウ中に敵ヒーロー(Character/TrainingDummy分類)から受けたダメージの実ダメージ量を、
+    // 攻撃者へ確定ダメージ(True)で自動反射する(GAME_DESIGN 12章)。
+    // - ミニオン・タワー・設置物(Targetableなし)・攻撃者不明(null)・自己ダメージは反射対象外。
+    // - 確定ダメージのためARでは軽減されない(攻撃者側のIIncomingDamageModifierの影響は受ける)。
+    // - 反射の再反射防止は後続タスクで実装する(現在は敵側に反射持ちがいないため再反射は発生しない)。
+    private void OnDamageTaken(DamageContext context, float actualDamage)
+    {
+        if (!IsReflectActive || actualDamage <= 0f) return;
+
+        Transform attacker = context.Attacker;
+        if (attacker == null) return;
+        // 自己ダメージは反射対象外。
+        if (attacker == transform || attacker.IsChildOf(transform)) return;
+
+        // 攻撃者の分類を確認し、敵ヒーロー(Character/TrainingDummy分類)以外からのダメージは反射しない。
+        Targetable attackerTargetable = attacker.GetComponentInParent<Targetable>();
+        if (attackerTargetable == null) return;
+        if (attackerTargetable.Classification != TargetClassification.Character &&
+            attackerTargetable.Classification != TargetClassification.TrainingDummy) return;
+
+        HealthController attackerHealth = attackerTargetable.Health != null
+            ? attackerTargetable.Health
+            : attackerTargetable.GetComponent<HealthController>();
+        if (attackerHealth == null || attackerHealth.IsDead) return;
+
+        float reflected = attackerHealth.TakeDamage(actualDamage * _reflectRatio, transform, DamageType.True);
+        if (reflected > 0f)
+        {
+            attackerTargetable.PlayHitFlash();
+            CombatTextManager.ShowDamageDealt(attackerTargetable.transform.position, reflected);
+            Debug.Log($"ヴォルブラーク R: {attackerTargetable.name} へ確定ダメージ {reflected:F1} を反射しました。", this);
+        }
+    }
+
     private void CancelChainFlight(string reason)
     {
         _isChainFlying = false;
@@ -369,11 +445,13 @@ public sealed class VolbraakRController : MonoBehaviour
         Debug.Log($"ヴォルブラーク R: {reason}。", this);
     }
 
-    // 自身の死亡時: 鎖・拘束を即時終了し、残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
+    // 自身の死亡時: 鎖・拘束・反射ウィンドウを即時終了し、残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
+    // (HealthControllerは死亡処理より前に被ダメージを通知するため、死亡の瞬間の致死ダメージまでは反射される)
     private void OnSelfDied()
     {
         if (_isChainFlying) CancelChainFlight("死亡により鎖を中断しました");
         if (_isTetherActive) EndTether("ヴォルブラークの死亡により");
+        EndReflectWindow();
 
         double remaining = _cooldownEndTime - Time.timeAsDouble;
         if (remaining > 0.0)
