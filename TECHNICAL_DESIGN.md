@@ -79,10 +79,12 @@ GameManager
 MatchState
 TeamType
 GameTick
+TopDownCameraController
 ```
 
 - 試合開始、勝敗、復活、ゲーム状態を管理する。
 - 状態は `Waiting`、`CharacterSelect`、`Playing`、`Finished` を持つ。
+- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俰瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
 
 ### Combat
 
