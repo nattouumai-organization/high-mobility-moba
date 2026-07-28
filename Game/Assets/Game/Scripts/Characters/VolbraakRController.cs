@@ -8,7 +8,9 @@ using UnityEngine;
 /// - 鎖はミニオン・タワーには当たらず、すり抜けて敵ヒーローだけを判定する。
 /// - 鎖が命中すると反射ウィンドウ(持続時間は拘束と同じ)が開始され、その間に敵ヒーロー
 ///   (Character/TrainingDummy分類)から受けたダメージの実ダメージ量を、攻撃者へ確定ダメージ(True)で自動反射する。
-///   ミニオン・タワー・設置物・自己ダメージ・攻撃者不明のダメージは反射しない(反射の再反射防止は後続タスクで実装する)。
+///   ミニオン・タワー・設置物・自己ダメージ・攻撃者不明のダメージは反射しない。
+/// - 反射で与えるダメージには反射フラグ(DamageContext.IsReflected)を付け、反射フラグ付きのダメージは再反射しない
+///   (GAME_DESIGN 12章「反射は再反射しない」。ミラー戦などで反射同士が無限にループするのを防ぐ)。
 /// - 対象が共通Dの無効化ウィンドウ中の場合、鎖(拘束)は不発になる(クールダウンは消費)。
 ///   GAME_DESIGN 12章「Dで鎖を弾かれても反射は付与」のため、反射ウィンドウは共通Dに弾かれた場合にも開始する。
 /// - 移動を伴わないためスネア中も使用できる(スタン中・E突進中・死亡中などは行動ロックにより使用不可)。
@@ -408,10 +410,14 @@ public sealed class VolbraakRController : MonoBehaviour
     // 攻撃者へ確定ダメージ(True)で自動反射する(GAME_DESIGN 12章)。
     // - ミニオン・タワー・設置物(Targetableなし)・攻撃者不明(null)・自己ダメージは反射対象外。
     // - 確定ダメージのためARでは軽減されない(攻撃者側のIIncomingDamageModifierの影響は受ける)。
-    // - 反射の再反射防止は後続タスクで実装する(現在は敵側に反射持ちがいないため再反射は発生しない)。
+    // - 反射で与えるダメージには反射フラグ(isReflected: true)を付け、反射フラグ付きのダメージ(再反射)は反射しない
+    //   (GAME_DESIGN 12章「反射は再反射しない」。ミラー戦などで反射同士が無限にループするのを防ぐ)。
     private void OnDamageTaken(DamageContext context, float actualDamage)
     {
         if (!IsReflectActive || actualDamage <= 0f) return;
+
+        // 反射によるダメージ(反射フラグ付き)は再反射しない(GAME_DESIGN 12章「反射は再反射しない」)。
+        if (context.IsReflected) return;
 
         Transform attacker = context.Attacker;
         if (attacker == null) return;
@@ -429,7 +435,7 @@ public sealed class VolbraakRController : MonoBehaviour
             : attackerTargetable.GetComponent<HealthController>();
         if (attackerHealth == null || attackerHealth.IsDead) return;
 
-        float reflected = attackerHealth.TakeDamage(actualDamage * _reflectRatio, transform, DamageType.True);
+        float reflected = attackerHealth.TakeDamage(actualDamage * _reflectRatio, transform, DamageType.True, isReflected: true);
         if (reflected > 0f)
         {
             attackerTargetable.PlayHitFlash();

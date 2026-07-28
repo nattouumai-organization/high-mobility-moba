@@ -13,9 +13,10 @@ public enum DamageType
 }
 
 /// <summary>
-/// 1回のダメージに関する情報(攻撃者・ダメージ種別・元ダメージ量)。
+/// 1回のダメージに関する情報(攻撃者・ダメージ種別・元ダメージ量・反射フラグ)。
 /// HealthControllerがHPへ適用する直前に、IIncomingDamageModifier(ゼルフWなど)へ渡す。
 /// 攻撃者が取得できないダメージはAttackerがnullになる。
+/// IsReflectedは反射によるダメージ(ヴォルブラークRの反射など)であることを表し、反射ダメージの再反射防止に使用する。
 /// </summary>
 public readonly struct DamageContext
 {
@@ -28,11 +29,15 @@ public readonly struct DamageContext
     /// <summary>軽減前の元ダメージ量。</summary>
     public readonly float BaseAmount;
 
-    public DamageContext(Transform attacker, DamageType type, float baseAmount)
+    /// <summary>反射によるダメージかどうか(ヴォルブラークRの反射など)。反射フラグ付きのダメージは再反射されない。</summary>
+    public readonly bool IsReflected;
+
+    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false)
     {
         Attacker = attacker;
         Type = type;
         BaseAmount = baseAmount;
+        IsReflected = isReflected;
     }
 }
 

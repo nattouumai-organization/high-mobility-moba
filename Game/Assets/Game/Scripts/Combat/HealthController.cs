@@ -16,6 +16,8 @@ using UnityEngine;
 /// 確定ダメージ(True)はARでは軽減されない分類。IIncomingDamageModifierによる変更はダメージ種別を問わず適用され、
 /// 軽減・無効化するかどうかは各コンポーネントが種別を見て判断する(ゼルフWはNormalのみ軽減、ヴォルブラークPは両方を無効化)。
 /// 実ダメージ(実際に減ったHP)が発生したときはDamageTakenイベントで(ダメージ情報, 実ダメージ量)を通知する(ヴォルブラークRの反射などが購読)。
+/// TakeDamageは反射ダメージかどうか(isReflected)も受け取れ、DamageContext.IsReflectedとして軽減判定(IIncomingDamageModifier)と
+/// 被ダメージ通知(DamageTaken)へ引き継ぐ(ヴォルブラークRの反射は反射フラグ付きのダメージを再反射しない)。
 /// HPreg(毎秒自動回復)はCharacterStats.CurrentHealthRegenを毎フレーム参照して回復する(死亡中は回復しない)。
 /// シールドは今回実装しない。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
@@ -143,11 +145,12 @@ public class HealthController : MonoBehaviour
     /// <param name="damage">元ダメージ量。</param>
     /// <param name="attacker">攻撃者のTransform。取得できない場合はnull(前方判定による軽減は行われない)。</param>
     /// <param name="damageType">ダメージ種別。既定は通常ダメージ(Normal)。確定ダメージ(True)はARでは軽減されない。</param>
+    /// <param name="isReflected">反射によるダメージかどうか。DamageContext.IsReflectedへ引き継がれ、反射ダメージの再反射防止(ヴォルブラークR)に使用する。既定はfalse。</param>
     /// <returns>
     /// 実際に減少したHP量(実ダメージ)。軽減後のダメージが基準で、残りHPを超えた過剰ダメージ分は含まない。
     /// 死亡済み・無効な値の場合は0を返す。
     /// </returns>
-    public float TakeDamage(float damage, Transform attacker, DamageType damageType = DamageType.Normal)
+    public float TakeDamage(float damage, Transform attacker, DamageType damageType = DamageType.Normal, bool isReflected = false)
     {
         if (_isDead || damage <= 0f)
         {
@@ -155,7 +158,7 @@ public class HealthController : MonoBehaviour
         }
 
         // 受けたダメージごとに、HPへ適用する直前の軽減判定(ゼルフWなど)を行う。
-        float modifiedDamage = ApplyIncomingDamageModifiers(new DamageContext(attacker, damageType, damage), damage);
+        float modifiedDamage = ApplyIncomingDamageModifiers(new DamageContext(attacker, damageType, damage, isReflected), damage);
         if (modifiedDamage <= 0f)
         {
             return 0f;
@@ -181,7 +184,7 @@ public class HealthController : MonoBehaviour
         // 死亡処理より前に通知するため、死亡の瞬間の致死ダメージも通知対象になる。
         if (actualDamage > 0f)
         {
-            DamageTaken?.Invoke(new DamageContext(attacker, damageType, damage), actualDamage);
+            DamageTaken?.Invoke(new DamageContext(attacker, damageType, damage, isReflected), actualDamage);
         }
 
         if (_currentHealth <= 0f)

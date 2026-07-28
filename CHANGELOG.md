@@ -20,6 +20,13 @@
 - 削除した要素
 ```
 
+## 2026-07-29
+
+### Changed
+
+- ヴォルブラークR(反射): 反射で与えるダメージに反射フラグを付け、反射フラグ付きのダメージ(再反射)は反射しないように更新(GAME_DESIGN 12章「反射は再反射しない」)。ミラー戦(ヴォルブラーク対ヴォルブラーク)などで両者の反射ウィンドウが有効な場合でも、反射同士が無限にループしない。
+- HealthController / DamageContext: ダメージが反射によるものかを表すIsReflectedフラグをDamageContextへ追加。TakeDamageのisReflected引数(既定false)から、軽減判定(IIncomingDamageModifier)と被ダメージ通知(DamageTaken)の両方へ引き継がれる。
+
 ## 2026-07-26
 
 ### Added
