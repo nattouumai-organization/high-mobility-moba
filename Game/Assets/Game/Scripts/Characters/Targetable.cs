@@ -20,7 +20,6 @@ public enum TargetClassification
 /// 通常攻撃から呼び出す被弾時の短時間フラッシュを持つ。
 /// ターゲット分類(Character / Minion / Tower / TrainingDummy)をInspectorで設定でき、
 /// 攻撃側(ゼルフPの与ダメージ回復など)が効果量の判定に使用する。
-/// 実行時生成の対象(タワーなど)は、InitializeRuntime()で分類・選択リング・本体Rendererをコードから設定できる(フェーズ5)。
 /// HealthControllerの死亡イベントを受け取り、死亡時は選択不可にして短時間後に本体を非表示化する。
 /// GameObject自体は無効化せず本体Rendererのみ非表示にするため、復活(Revive)イベントを受け取って元の見た目へ復元できる。
 /// </summary>
@@ -80,6 +79,15 @@ public class Targetable : MonoBehaviour
     /// <summary>自身のHealthController。持たない場合はnull。通常攻撃のダメージ処理から使用する。</summary>
     public HealthController Health => _healthController;
 
+    public void InitializeRuntime(TargetClassification classification,
+        GameObject ring, Renderer ringRenderer, Renderer bodyRenderer)
+    {
+        _targetClassification = classification;
+        if (ring != null) _selectionRing = ring;
+        if (ringRenderer != null) _ringRenderer = ringRenderer;
+        if (bodyRenderer != null) _bodyRenderer = bodyRenderer;
+    }
+
     private void Awake()
     {
         _collider = GetComponent<Collider>();
@@ -112,42 +120,6 @@ public class Targetable : MonoBehaviour
         {
             _healthController.Died -= HandleDied;
             _healthController.Revived -= HandleRevived;
-        }
-    }
-
-    /// <summary>
-    /// 実行時生成の対象(タワーなど)向けの初期化(フェーズ5のMapBuilderのタワー組み立てが使用)。
-    /// 分類・選択リング・本体Rendererをコードから設定し、Awakeで取得済みの参照(基本色など)を取り直す。
-    /// AddComponent直後(Awake・OnEnableの後)に呼び出す想定。
-    /// </summary>
-    public void InitializeRuntime(TargetClassification classification, GameObject selectionRing, Renderer selectionRingRenderer, Renderer bodyRenderer)
-    {
-        _classification = classification;
-        _selectionRing = selectionRing;
-        _selectionRingRenderer = selectionRingRenderer;
-        _bodyRenderer = bodyRenderer;
-
-        _collider = GetComponent<Collider>();
-        _healthController = GetComponent<HealthController>();
-
-        if (_bodyRenderer != null)
-        {
-            // 実行時はマテリアルのインスタンスへ色を設定するため、元のマテリアルアセットは変化しない。
-            _defaultColor = _bodyRenderer.material.color;
-        }
-
-        if (_selectionRing != null)
-        {
-            _selectionRing.SetActive(false);
-        }
-
-        // OnEnableが先に実行済みの場合に備えて、購読を確実にやり直す(二重購読はしない)。
-        if (_healthController != null)
-        {
-            _healthController.Died -= HandleDied;
-            _healthController.Revived -= HandleRevived;
-            _healthController.Died += HandleDied;
-            _healthController.Revived += HandleRevived;
         }
     }
 

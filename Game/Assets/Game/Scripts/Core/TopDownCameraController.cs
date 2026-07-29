@@ -8,11 +8,9 @@ using UnityEngine;
 ///   Spaceを押している間は即座にプレイヤー中心になり追従し、離すとその場でフリーモードへ戻る。
 /// - Yでロック/フリーを切り替える(フリー→ロック切替時は即座にプレイヤー中心へ戻る)。
 /// 追従対象は未設定なら自動検出する(PlayerClickMovement / PlayerInputHubを持つオブジェクト)。
-/// カメラの俯瞰角度・高さは、対象取得時のカメラ位置と対象の相対オフセットとして維持する(シーン設定のまま)。
+/// カメラの俰瞰角度・高さは、対象取得時のカメラ位置と対象の相対オフセットとして維持する(シーン設定のまま)。
 /// スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。
-/// フェーズ5: MapBuilderがあるシーンでは、対象取得時にシーンカメラの高さ・俯瞰角度から追従オフセットを計算し
-/// (開始地点が原点から離れていてもプレイヤーを画面中央に映す)、フリーモードのスクロールを
-/// マップ範囲+余白(Bounds Margin)の内側へ注視点基準でクランプする。
+/// マップ境界によるスクロール範囲のクランプは、マップ実装後に追加する。
 /// 入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用する。
 /// </summary>
 public class TopDownCameraController : MonoBehaviour
@@ -34,10 +32,6 @@ public class TopDownCameraController : MonoBehaviour
     // 画面端と判定するスクリーン端からのピクセル幅。
     [SerializeField, Min(1f)] private float _edgeThicknessPixels = 12f;
 
-    [Header("Map Bounds (フェーズ5)")]
-    // フリーモードのスクロールで、注視点がマップ端から外側へ出られる余白。
-    [SerializeField, Min(0f)] private float _boundsMargin = 2f;
-
     [Header("Debug (Runtime)")]
     [SerializeField] private CameraMode _mode = CameraMode.LockedFollow;
 
@@ -47,15 +41,12 @@ public class TopDownCameraController : MonoBehaviour
     // 画面端スクロールに使うXZ平面上の方向(カメラのY軸回転基準)。
     private Vector3 _scrollRight = Vector3.right;
     private Vector3 _scrollForward = Vector3.forward;
-    // マップ範囲のクランプに使用する(無いシーンではクランプしない)。
-    private MapBuilder _mapBuilder;
 
     /// <summary>現在のカメラモード。</summary>
     public CameraMode Mode => _mode;
 
     private void Start()
     {
-        _mapBuilder = FindFirstObjectByType<MapBuilder>();
         TryAcquireTarget();
         CacheScrollAxes();
     }
@@ -115,8 +106,17 @@ public class TopDownCameraController : MonoBehaviour
         }
 
         // 斜め(画面の角)の場合も移動速度が一定になるよう正規化する。
-        Vector3 nextPosition = transform.position + direction.normalized * (_edgeScrollSpeed * Time.deltaTime);
-        transform.position = ClampToMapBounds(nextPosition);
+        transform.position += direction.normalized * (_edgeScrollSpeed * Time.deltaTime);
+        // Map bounds clamp (Phase 5)
+        var _mb = FindFirstObjectByType<Map.MapBuilder>();
+        if (_mb != null)
+        {
+            const float _margin = 2f;
+            Vector3 _p = transform.position;
+            _p.x = Mathf.Clamp(_p.x, _mb.BoundsMin.x - _margin, _mb.BoundsMax.x + _margin);
+            _p.z = Mathf.Clamp(_p.z, _mb.BoundsMin.y - _margin, _mb.BoundsMax.y + _margin);
+            transform.position = _p;
+        }
     }
 
     // 追従対象と入力ハブを取得する。取得できた時点のカメラ位置から相対オフセットを記録する。
@@ -148,67 +148,14 @@ public class TopDownCameraController : MonoBehaviour
             if (_inputHub == null) _inputHub = _target.gameObject.AddComponent<PlayerInputHub>();
         }
 
-        // 俯瞰角度・高さを維持するため、最初に対象を取得した時点で追従オフセットを決める。
-        // マップがあるシーンでは、開始地点が原点から離れていてもプレイヤーを画面中央に映せるよう、
-        // シーンカメラの高さ・俯瞰角度からオフセットを計算する(カメラの初期位置には依存しない)。
+        // 俰瞰角度・高さを維持するため、最初に対象を取得した時点の相対位置をオフセットとして使う。
         if (!_hasOffset)
         {
-            _offset = _mapBuilder != null ? ComputeOffsetFromSceneCamera() : transform.position - _target.position;
+            _offset = transform.position - _target.position;
             _hasOffset = true;
         }
 
         return true;
-    }
-
-    // シーンカメラの高さ・俯瞰角度を維持したまま、プレイヤーを画面中央に映す相対オフセットを求める。
-    // カメラの向き(transform.forward)に沿って、対象の高さまでの距離だけ後ろへ下がった位置を使う。
-    private Vector3 ComputeOffsetFromSceneCamera()
-    {
-        Vector3 forward = transform.forward;
-        float height = transform.position.y - _target.position.y;
-
-        // ほぼ水平(または上向き)のカメラでは距離を計算できないため、現在の相対位置を維持する。
-        if (forward.y >= -0.01f || height <= 0f)
-        {
-            return transform.position - _target.position;
-        }
-
-        float distance = height / -forward.y;
-        return -forward * distance;
-    }
-
-    // フリーモードのスクロール位置を、注視点(カメラが映す地面上の点)がマップ範囲+余白の内側に収まるようクランプする。
-    private Vector3 ClampToMapBounds(Vector3 cameraPosition)
-    {
-        if (_mapBuilder == null)
-        {
-            return cameraPosition;
-        }
-
-        // カメラ位置→注視点のオフセットは一定のため、注視点基準でクランプしてからカメラ位置へ戻す。
-        Vector3 lookOffset = ComputeLookOffset(cameraPosition);
-        Vector3 lookPoint = cameraPosition + lookOffset;
-
-        Vector3 min = _mapBuilder.BoundsMin;
-        Vector3 max = _mapBuilder.BoundsMax;
-        lookPoint.x = Mathf.Clamp(lookPoint.x, min.x - _boundsMargin, max.x + _boundsMargin);
-        lookPoint.z = Mathf.Clamp(lookPoint.z, min.z - _boundsMargin, max.z + _boundsMargin);
-
-        return lookPoint - lookOffset;
-    }
-
-    // カメラ位置から、カメラの向きで地面(高さ0)と交わる注視点までのオフセットを求める。
-    private Vector3 ComputeLookOffset(Vector3 cameraPosition)
-    {
-        Vector3 forward = transform.forward;
-        if (forward.y >= -0.01f)
-        {
-            // 水平カメラでは注視点を計算できないため、真下を注視点として扱う。
-            return new Vector3(0f, -cameraPosition.y, 0f);
-        }
-
-        float distance = cameraPosition.y / -forward.y;
-        return forward * distance;
     }
 
     // 画面端スクロールに使う方向を、カメラのY軸回転に合わせたXZ平面上の右・前方向として求める。

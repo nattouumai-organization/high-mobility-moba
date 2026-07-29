@@ -20,15 +20,19 @@
 - 削除した要素
 ```
 
+## 2026-07-30 phase5-fix1: タワー攻撃不具合・コンパイルエラー修正
+
+### Fixed
+- `Core/Team.cs` 新規追加。Team enum (未定義) が原因の全 CS0246 エラーを解消。
+- `Core/TeamMember.cs` 新規追加。Player/Minion にアタッチしチームを公開する軽量 MonoBehaviour。
+- `PlayerSpawner`: スポーン時に TeamMember を Player に追加。
+- `TowerController`: ターゲット判定を PlayerSpawner.GetComponentInParent から TeamMember.GetComponent に変更。
+  タワーがプレイヤーを攻撃しない不具合を修正。
+- パッチスクリプトを冪等化。二重適用時に SetMaxHealth / InitializeRuntime / _team / Team の重複定義エラーを防止。
 ## 2026-07-29
 
 ### Added
 
-- タワー(TowerController)を実装(フェーズ5)。HP5000 / AR60 / AD130 / AS0.80 / 射程8.0。射程内の敵ヒーローを自動攻撃し、通常ダメージはAR式で自前軽減(IIncomingDamageModifier・確定ダメージは軽減しない)。HPは1000刻み5段階でログへ出し、破壊時はクリスタル消灯・本体非表示で復活しない。攻撃ビームと頭上のHPバーはLineRendererの実行時生成。
-- タワーの連続攻撃ダメージ増加を実装。同一対象へ2発目から基礎ADの25%ずつ増加(増加分の上限は基礎の200%=最終ダメージ3倍)。2秒間攻撃しない・対象変更でリセット。
-- 1レーン対称マップ生成(MapBuilder)と両陣営の開始地点を実装(フェーズ5)。地面・中央線・横道の壁(開口部3か所)・外周境界壁・開始地点(中央向き)・タワーを実行時にプリミティブから組み立てる。陣営enum(Team: Blue/Red)をScripts/Coreへ追加。
-- HealthController.SetMaxHealth()を追加。CharacterStatsを持たない対象(タワーなど)の最大HPをコードから設定できる(生成直後の呼び出しでも全快で開始)。
-- Targetable.InitializeRuntime()を追加。実行時生成の対象向けに分類・選択リング・本体Rendererをコードから設定して参照を初期化する。
 - カメラ操作を実装(TopDownCameraController、Scripts/Core。Main Cameraへ追加する)。ロックモード(既定)ではプレイヤーを中心にカメラが追従する。Yでフリーモードと切り替えられ、フリーモードでは追従せず、マウスカーソルを画面端(上下左右)へ持っていくとその方向へゆっくりスクロールする(スクロール速度と画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心になって追従し、離すとその場でフリーモードへ戻る(LOLデフォルトのSpace/Yと同じ配置)。
 - PlayerInputHubへカメラ操作用のInputActionを追加(CameraCenter: Space / CameraLockToggle: Y)。
 - キャラごとのPlayerプレハブ(Prefab Variant)方式を実装(フェーズ5前準備)。共通コンポーネントだけを持つPF_Player_Baseを親プレハブとし、各キャラクターは固有スキルコンポーネントを追加したPrefab Variant(PF_Player_Zelf / PF_Player_Volbraak、Prefabs/Characters/)として作成する。CharacterDataへPlayer Prefab参照を追加し、新規PlayerSpawner(Scripts/Characters)が試合シーン開始時に選択キャラクターのVariantをスポナーの位置・向きへ生成する(シーン直置きのPlayerは廃止。既存Playerがある場合は生成をスキップする安全網付き)。
@@ -39,8 +43,6 @@
 
 ### Changed
 
-- PlayerSpawner: シーンにMapBuilderがある場合は自陣営(Team)の開始地点の位置・向きへSpawn Height Offset分浮かせて生成する(地面への埋まり防止)。公開プロパティTeamを追加(タワーの敵味方判定用)。
-- TopDownCameraController: 対象取得時にシーンカメラの高さ・俯瞰角度から追従オフセットを計算し(開始地点が原点から離れていてもプレイヤーを画面中央に映す)、フリーモードのスクロールをマップ範囲+余白(Bounds Margin)の内側へ注視点基準でクランプする(フェーズ5)。
 - PlayerCharacterApplier: Prefab Variant方式に合わせて役割を更新。Playerプレハブ(PF_Player_Base)へアタッチして全Variantで共通使用し、CharacterDataの適用(ステータス・テーマカラー)を担当する。固有スキルコンポーネントの取り外しは、CharacterDataとVariantの誤設定に備えた安全網として維持(正しい組み合わせでは何も取り除かれない)。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
 - ヴォルブラークR(反射): 反射で与えるダメージに反射フラグを付け、反射フラグ付きのダメージ(再反射)は反射しないように更新(GAME_DESIGN 12章「反射は再反射しない」)。ミラー戦(ヴォルブラーク対ヴォルブラーク)などで両者の反射ウィンドウが有効な場合でも、反射同士が無限にループしない。
 - HealthController / DamageContext: ダメージが反射によるものかを表すIsReflectedフラグをDamageContextへ追加。TakeDamageのisReflected引数(既定false)から、軽減判定(IIncomingDamageModifier)と被ダメージ通知(DamageTaken)の両方へ引き継がれる。

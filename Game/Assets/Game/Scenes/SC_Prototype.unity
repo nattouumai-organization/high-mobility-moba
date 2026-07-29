@@ -129,6 +129,7 @@ GameObject:
   m_Component:
   - component: {fileID: 304994532}
   - component: {fileID: 304994531}
+  - component: {fileID: 304994533}
   m_Layer: 0
   m_Name: Map
   m_TagString: Untagged
@@ -178,6 +179,30 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &304994533
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304994530}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 12dd93e3fbd87d44e9e645e692cd7e9f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TowerController
+  _maxHealth: 5000
+  _armor: 60
+  _attackDamage: 130
+  _attackSpeed: 0.8
+  _attackRange: 8
+  _bonusPerHitPercent: 25
+  _maxBonusPercent: 200
+  _resetSeconds: 2
+  _healthStageSize: 1000
+  _beamDuration: 0.15
+  _healthBarHeight: 5.4
+  _healthBarWidth: 2.4
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

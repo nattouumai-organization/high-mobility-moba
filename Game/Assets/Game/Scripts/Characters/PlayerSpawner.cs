@@ -9,10 +9,7 @@ using UnityEngine;
 /// - シーンへPlayerが直接配置されている場合は生成をスキップする(移行前のシーンでも安全に動作する)。
 /// - 生成後のCharacterData適用(ステータス・テーマカラー・安全網のスキル整理)は、
 ///   プレハブ側のPlayerCharacterApplierが従来どおり行う。
-/// DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネントのAwakeより先に生成する
-/// (マップを生成するMapBuilder(-300)はさらに先に実行される)。
-/// フェーズ5: シーンにMapBuilderがある場合は、自陣営(Team)の開始地点の位置・向きへSpawn Height Offset分浮かせて生成し
-/// (地面への埋まり防止)、公開プロパティTeamをTowerControllerの敵味方判定へ提供する。
+/// DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネントのAwakeより先に生成する。
 /// </summary>
 [DefaultExecutionOrder(-200)]
 public sealed class PlayerSpawner : MonoBehaviour
@@ -20,19 +17,13 @@ public sealed class PlayerSpawner : MonoBehaviour
     [Header("フォールバック")]
     [Tooltip("キャラクター未選択でSC_Prototypeを直接起動した場合に使用するCharacterData(ZelfData想定)")]
     [SerializeField] private CharacterData _fallbackCharacterData;
+    [SerializeField] private Core.Team _team;
 
-    [Header("陣営 (フェーズ5)")]
-    [Tooltip("このスポナーが生成するPlayerの陣営。MapBuilderがあるシーンでは陣営の開始地点へ生成する")]
-    [SerializeField] private Team _team = Team.Blue;
-
-    [Tooltip("開始地点から浮かせる高さ。CharacterControllerが地面へ埋まらないようにする")]
-    [SerializeField, Min(0f)] private float _spawnHeightOffset = 1.1f;
+    /// <summary>This player's team. Used by TowerController for friend/foe detection.</summary>
+    public Core.Team Team => _team;
 
     /// <summary>生成したPlayerインスタンス。生成していない場合はnull。</summary>
     public GameObject SpawnedPlayer { get; private set; }
-
-    /// <summary>このスポナーの陣営。TowerControllerの敵味方判定が使用する。</summary>
-    public Team Team => _team;
 
     private void Awake()
     {
@@ -66,22 +57,12 @@ public sealed class PlayerSpawner : MonoBehaviour
             return;
         }
 
-        Vector3 spawnPosition = transform.position;
-        Quaternion spawnRotation = transform.rotation;
-
-        // フェーズ5: マップがあるシーンでは自陣営の開始地点へ生成する(地面へ埋まらないよう少し浮かせる)。
-        MapBuilder mapBuilder = FindFirstObjectByType<MapBuilder>();
-        Transform spawnPoint = mapBuilder != null ? mapBuilder.GetSpawnPoint(_team) : null;
-        if (spawnPoint != null)
-        {
-            spawnPosition = spawnPoint.position + Vector3.up * _spawnHeightOffset;
-            spawnRotation = spawnPoint.rotation;
-        }
-
-        SpawnedPlayer = Instantiate(prefab, spawnPosition, spawnRotation);
+        SpawnedPlayer = Instantiate(prefab, transform.position, transform.rotation);
+        var _tm = SpawnedPlayer.GetComponent<Core.TeamMember>() ?? SpawnedPlayer.AddComponent<Core.TeamMember>();
+        _tm.Team = _team;
         // "(Clone)"サフィックスを付けず、ヒエラルキー上で分かりやすい名前にする。
         SpawnedPlayer.name = prefab.name;
 
-        Debug.Log($"PlayerSpawner: '{selected.DisplayName}'(Id={selected.CharacterId})のPlayerプレハブ '{prefab.name}' を生成しました(陣営: {_team})。", this);
+        Debug.Log($"PlayerSpawner: '{selected.DisplayName}'(Id={selected.CharacterId})のPlayerプレハブ '{prefab.name}' を生成しました。", this);
     }
 }
