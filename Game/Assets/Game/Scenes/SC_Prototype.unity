@@ -119,6 +119,68 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &304994530
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 304994532}
+  - component: {fileID: 304994531}
+  m_Layer: 0
+  m_Name: Map
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &304994531
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304994530}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bd99dad6eface6440a6415669620d226, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MapBuilder
+  _mapWidth: 84
+  _mapDepth: 24
+  _laneWidth: 16
+  _wallHeight: 3
+  _wallThickness: 1
+  _sidePathWallExtent: 28
+  _sidePathGapCenters:
+  - -18
+  - 0
+  - 18
+  _sidePathGapWidth: 4
+  _blueBaseX: -33
+  _redBaseX: 33
+  _spawnOffsetFromBase: 2
+  _groundColor: {r: 0.22, g: 0.26, b: 0.22, a: 1}
+  _wallColor: {r: 0.35, g: 0.35, b: 0.38, a: 1}
+  _blueColor: {r: 0.25, g: 0.5, b: 1, a: 1}
+  _redColor: {r: 1, g: 0.35, b: 0.3, a: 1}
+--- !u!4 &304994532
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304994530}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: -0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -272,6 +334,7 @@ MonoBehaviour:
   _target: {fileID: 0}
   _edgeScrollSpeed: 8
   _edgeThicknessPixels: 12
+  _boundsMargin: 2
   _mode: 0
 --- !u!1 &410087039
 GameObject:
@@ -444,6 +507,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd6e7430ac5079c4382e2e1406b84220, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpawner
+  _team: 0
+  _spawnHeightOffset: 1.1
   _fallbackCharacterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
 --- !u!1 &1246788901
 GameObject:
@@ -1638,7 +1703,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!33 &1519420798
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -1745,3 +1810,4 @@ SceneRoots:
   - {fileID: 1357900002}
   - {fileID: 1260973275}
   - {fileID: 448836974}
+  - {fileID: 304994532}

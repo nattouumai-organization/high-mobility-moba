@@ -60,6 +60,7 @@ Assets/
       Gameplay/
     Scripts/
       Core/
+      Map/
       Combat/
       Characters/
       Skills/
@@ -77,14 +78,23 @@ Assets/
 ```text
 GameManager
 MatchState
-TeamType
 GameTick
+Team
 TopDownCameraController
 ```
 
 - 試合開始、勝敗、復活、ゲーム状態を管理する。
 - 状態は `Waiting`、`CharacterSelect`、`Playing`、`Finished` を持つ。
-- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俯瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
+- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、俯瞰角度・高さはシーン設定のまま維持する。対象との相対オフセットは、MapBuilderが無いシーンでは従来どおり対象取得時のカメラ位置との相対位置を使い、MapBuilderがあるシーンでは開始地点がシーンのカメラ位置から離れていてもプレイヤーを中心に映せるようシーンカメラの高さと俯瞰角度から計算する(フェーズ5)。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用する。フリーモードのスクロールは、シーンにMapBuilderがある場合のみマップ範囲(BoundsMin / BoundsMax)内へ注視点基準でクランプする(余白Bounds Margin既定2.0・Inspector設定。MapBuilderが無いシーンではクランプしない)(フェーズ5)。
+- `Team`(Scripts/Core)は青(Blue)/赤(Red)の陣営enum(フェーズ5。設計時のTeamType予定名をTeamとして実装)。マップの開始地点のほか、後続のタワー・本拠地・勝敗判定でも共通使用する。
+
+### Map
+
+```text
+MapBuilder
+```
+
+- `MapBuilder`(Scripts/Map)はフェーズ5の1レーン対称マップと各陣営の開始地点を実行時に生成する(SC_Prototypeの空オブジェクト"Map"へアタッチ。位置は原点推奨)。GAME_DESIGN 3章の座標を100ゲーム単位=1 Unity単位へ換算し、マップ中央(X=4,200 / Y=1,200)をワールド原点へ置く(unityX=(X-4200)/100、unityZ=(Y-1200)/100)。生成物: 地面84×24(GroundLayer・名前MapGround)、外周の壁、レーン(幅16)上下の横道の壁(開口部x=-18/0/+18・幅4で区切る。左右対称・壁はレーンの外側に置くためレーン幅は削らない)、開始地点SpawnPoint_Blue(x=-31)/SpawnPoint_Red(x=+31)(本拠地x=±33の少し前・互いの敵陣方向を向く・チーム色マーカー付き。GetSpawnPoint(Team)で取得)。寸法・開口部・色はInspector設定。レイヤーは名前で解決し(GroundLayerが無ければ従来の6番へフォールバックして警告)、壁はWallLayerが定義されていればそのレイヤー、無ければDefaultで生成する(壁のコライダーはCharacterControllerの移動を物理的に遮る。FlashControllerのWall Layerへ設定すればFの壁越え禁止にも使える)。旧テスト用のGroundがシーンに残っている場合は削除推奨の警告を出す。タワー(x=±16)・本拠地は後続タスクでこのマップ上へ実装する。DefaultExecutionOrder(-300)でPlayerSpawner(-200)より先に生成し、BoundsMin/BoundsMaxでマップ範囲を公開する(TopDownCameraControllerのスクロールクランプが使用)。
 
 ### Combat
 
@@ -167,7 +177,7 @@ VolbraakRController
 - `CharacterSelectionManager` は選択中のCharacterDataを保持する常駐マネージャー。DontDestroyOnLoadでシーン遷移後も参照でき、二重生成時は後から生成された方を破棄する(セーブデータ化はしない)。
 - `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。詳細パネルのスキル一覧はInspectorの短い一覧を優先し、未設定の場合はCharacterDataのP〜Rスキル説明から自動生成する。
 - `PlayerCharacterApplier` はPlayerプレハブ(PF_Player_Base)へアタッチして全Prefab Variantで共通使用し、シーン開始時にCharacterSelectionManagerが保持する選択中CharacterDataをCharacterStats.SetCharacterData()へ適用する(未選択でSC_Prototypeを直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用)。選択キャラクターがゼルフ以外の場合はゼルフ固有スキルコンポーネント(ZelfPassiveHeal / ZelfQ/W/E/RController)をDestroyImmediateで取り除き、移動・通常攻撃・共通D・Fなどの共通コンポーネントだけで動作させる(各キャラクターの固有スキルは実装後にこのクラスへ登録する)。同様に、ヴォルブラーク以外を選択した場合はヴォルブラーク固有のVolbraakPassiveShield(P)・VolbraakQController(Q)・VolbraakWController(W)・VolbraakEController(E)・VolbraakRController(R)を取り除く。DefaultExecutionOrder(-100)で他コンポーネントのAwakeより先に実行し、PlayerのRendererへテーマカラーも適用する(Inspectorで無効化可能)。Prefab Variant方式では各Variantは自分のスキルコンポーネントしか持たないため取り外しは通常何も行われず、CharacterDataとVariantの組み合わせをInspectorで誤設定した場合の安全網として機能する。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
-- `PlayerSpawner`(Scripts/Characters)は試合シーン(SC_Prototype)開始時に、キャラクター選択結果に応じたPlayerプレハブ(Prefab Variant)をスポナーの位置・向きへ生成する。選択中CharacterDataのPlayer Prefabを生成し、未選択で直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用する。シーンへPlayerが直接配置されている場合は生成をスキップする(移行前シーン用の安全網)。DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネント(TopDownCameraController / SkillRangePreviewなど)のAwakeより先に生成する。
+- `PlayerSpawner`(Scripts/Characters)は試合シーン(SC_Prototype)開始時に、キャラクター選択結果に応じたPlayerプレハブ(Prefab Variant)を生成する。シーンにMapBuilderがある場合は自陣(Team・既定Blue、Inspector設定)の開始地点(SpawnPoint_Blue / SpawnPoint_Red)の位置・向きへ生成し(地面からSpawn Height Offset・既定1.1だけ浮かせる)、無い場合は従来どおりスポナーの位置・向きへ生成する(復活位置は生成位置を引き継ぐ)(フェーズ5)。選択中CharacterDataのPlayer Prefabを生成し、未選択で直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用する。シーンへPlayerが直接配置されている場合は生成をスキップする(移行前シーン用の安全網)。DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネント(TopDownCameraController / SkillRangePreviewなど)のAwakeより先に生成する(マップ生成のMapBuilderは-300でさらに先に動く)。
 - `PlayerLayerMaskFallback` はPlayerCharacterApplierのAwakeから呼ばれる静的ヘルパー。Player配下の全コンポーネントの `_groundLayer` / `_targetableLayer` フィールドを調べ、未設定(Nothing)のものだけをレイヤー名(GroundLayer / TargetableLayer、無ければ6 / 7番)から自動補正する。Inspector設定済みの値は上書きせず、FlashControllerのWall Layerのような意図的な未設定フィールドは対象外。Prefab Variantへスキルコンポーネントを追加し直した際のLayerMask未設定によるスキル不発を防ぐ安全網。
 - Playerプレハブ構成(Prefabs/Characters/): `PF_Player_Base` がすべてのキャラクター共通のコンポーネント(移動・視点・ターゲット選択・通常攻撃・HP/復活・共通D・Fフラッシュ・PlayerInputHub・PlayerCharacterApplierなど)だけを持つ親プレハブ。各キャラクターは `PF_Player_Zelf`(ZelfPassiveHeal / ZelfQ/W/E/RControllerを追加)・`PF_Player_Volbraak`(VolbraakPassiveShield / VolbraakQ/W/E/RControllerを追加)のようにPrefab Variantとして作成し、CharacterData(Data/Characters/)のPlayer Prefabへ設定する。新キャラクターの追加手順: CharacterData作成 → PF_Player_BaseからPrefab Variant作成 → 固有スキルコンポーネントを追加(LayerMaskなどのInspector設定も忘れずに) → CharacterDataへVariantとFallbackを設定 → キャラクター選択画面の一覧へ登録。
 - `VolbraakPassiveShield`(Scripts/Characters)はヴォルブラークP(初撃無効化)を管理する。IIncomingDamageModifierとしてHealthControllerからHPへ適用する直前に呼び出され、一定時間(Recharge Duration、既定10秒)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(Normal / True)を問わず完全無効化する(ダメージ0)。シールドは消費まで永続し、ミニオン(TargetClassification.Minion)の攻撃では剥がれない(無効化もされず通常どおり受ける)。タワー(Tower分類)の攻撃も1回無効化するがPを消費する(タワー本体はフェーズ5実装予定。攻撃者のTargetable分類で判定するため実装後そのまま機能する)。攻撃者不明(null)のダメージは無効化の対象。被弾(実際にHPが減るダメージ)があるたびに無被弾タイマーをリセットする(ミニオンからの被弾も含む)。シールド展開中はPlayerの周囲へLineRendererのリングを実行時生成で表示し(Inspectorで無効化可能)、死亡中は再展開せず復活時は展開済みで復活する。
