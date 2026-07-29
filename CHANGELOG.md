@@ -20,11 +20,20 @@
 - 削除した要素
 ```
 
-## 2026-07-30 phase5-fix2: using指令不足修正
+## 2026-07-30 phase5-fix3: API名全面修正
 
 ### Fixed
-- TowerController / NexusController: `using Combat;` `using Characters;` を追加。CS0246 エラーを解消。
-- fix1の内容を継続: Team.cs / TeamMember.cs / 冪等パッチ。
+- TowerController / NexusControllerのAPI参照対応表:
+  | 誤った名前(修正前) | 正しい名前(修正後) |
+  |---|---|
+  | `HealthController.OnDeath` | `.Died` |
+  | `DamageContext.DamageType` | `.Type` |
+  | `Targetable.IsTargetable` | `!t.IsDead` |
+  | `Targetable.TargetClassification` | `.Classification` |
+  | InitializeRuntimeパッチ: `_targetClassification` | `_classification` |
+  | InitializeRuntimeパッチ: `_ringRenderer` | `_selectionRingRenderer` |
+  | `using Combat;` / `using Characters;` | 删除(ネームスペースなし) |
+- DamageInfo.cs を ZIP に同梱。
 
 ## 2026-07-29
 

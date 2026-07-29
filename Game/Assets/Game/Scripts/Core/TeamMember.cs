@@ -3,9 +3,8 @@ using UnityEngine;
 namespace Core
 {
     /// <summary>
-    /// Marks a GameObject as belonging to a team.
-    /// Attached to players (by PlayerSpawner) and minions (by MinionController).
-    /// TowerController / NexusController use GetComponent<TeamMember>() for friend/foe detection.
+    /// どのチームに属するかを保持するコンポーネント。
+    /// Tower/Nexus/Player/Minion に Add して TeamMember.Team でチーム判定する。
     /// </summary>
     public class TeamMember : MonoBehaviour
     {

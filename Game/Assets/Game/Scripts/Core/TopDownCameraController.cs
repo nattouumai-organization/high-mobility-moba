@@ -107,16 +107,13 @@ public class TopDownCameraController : MonoBehaviour
 
         // 斜め(画面の角)の場合も移動速度が一定になるよう正規化する。
         transform.position += direction.normalized * (_edgeScrollSpeed * Time.deltaTime);
-        // Map bounds clamp (Phase 5)
         var _mb = FindFirstObjectByType<Map.MapBuilder>();
-        if (_mb != null)
-        {
+        if (_mb != null) {
             const float _mg = 2f;
             Vector3 _cp = transform.position;
             _cp.x = Mathf.Clamp(_cp.x, _mb.BoundsMin.x - _mg, _mb.BoundsMax.x + _mg);
             _cp.z = Mathf.Clamp(_cp.z, _mb.BoundsMin.y - _mg, _mb.BoundsMax.y + _mg);
-            transform.position = _cp;
-        }
+            transform.position = _cp; }
     }
 
     // 追従対象と入力ハブを取得する。取得できた時点のカメラ位置から相対オフセットを記録する。

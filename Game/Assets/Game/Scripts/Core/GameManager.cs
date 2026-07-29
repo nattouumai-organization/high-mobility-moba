@@ -1,38 +1,19 @@
 using UnityEngine;
 
-namespace Core
+/// <summary>
+/// ゲーム全体の状態(進行中/終了)を管理する。
+/// NexusController.HandleNexusDeath から OnNexusDestroyed を呼ぶ。
+/// </summary>
+public class GameManager : MonoBehaviour
 {
-    public class GameManager : MonoBehaviour
+    public enum MatchState { Playing, Finished }
+
+    public MatchState State { get; private set; } = MatchState.Playing;
+
+    public void OnNexusDestroyed(Core.Team winner)
     {
-        public enum MatchState { Waiting, CharacterSelect, Playing, Finished }
-
-        [SerializeField] private MatchState _state = MatchState.Waiting;
-        public MatchState State => _state;
-
-        public static GameManager Instance { get; private set; }
-
-        private void Awake()
-        {
-            if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-            Instance = this;
-        }
-        private void OnDestroy() { if (Instance == this) Instance = null; }
-
-        public void StartMatch()
-        {
-            if (_state == MatchState.Playing) return;
-            _state = MatchState.Playing;
-            Debug.Log("[GameManager] Match started.");
-        }
-
-        /// <summary>Called by NexusController when a nexus is destroyed.</summary>
-        public void OnNexusDestroyed(Team winner)
-        {
-            if (_state == MatchState.Finished) return;
-            _state = MatchState.Finished;
-            Team loser = winner == Team.Blue ? Team.Red : Team.Blue;
-            Debug.Log(string.Format("[GameManager] Match over! Winner={0} Loser={1}", winner, loser));
-            // TODO Phase 5 Task 7: result UI
-        }
+        if (State == MatchState.Finished) return;
+        State = MatchState.Finished;
+        Debug.Log(string.Format("[GameManager] Match finished! Winner = {0}", winner));
     }
 }

@@ -82,9 +82,9 @@ public class Targetable : MonoBehaviour
     public void InitializeRuntime(TargetClassification classification,
         GameObject ring, Renderer ringRenderer, Renderer bodyRenderer)
     {
-        _targetClassification = classification;
+        _classification = classification;
         if (ring != null) _selectionRing = ring;
-        if (ringRenderer != null) _ringRenderer = ringRenderer;
+        if (ringRenderer != null) _selectionRingRenderer = ringRenderer;
         if (bodyRenderer != null) _bodyRenderer = bodyRenderer;
     }
 

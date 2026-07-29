@@ -78,6 +78,7 @@ Assets/
 GameManager
 MatchState
 Team
+Team
 TeamMember
 GameTick
 TopDownCameraController
@@ -148,7 +149,7 @@ VolbraakRController
 - 視点仕様: Playerは移動している方向へ視点が向き、ブリンクした場合はブリンクした方向を向くことを基本とする。視点方向は各移動・スキル処理がPlayerMouseFacingのpublic APIへ明示的に方向を渡して指定する(ブリンク方向と視点方向が異なる例外スキルも、渡す方向を変えるだけで実装できる)。スキル間の連携(ゼルフE→Qのクールダウンリセットなど)もReflectionではなく、各コンポーネントが公開するpublicメソッド・プロパティの直接呼び出しで行う。
 - `CharacterStats` は移動速度に加えて、攻撃速度(毎秒の攻撃回数)と攻撃射程(Unity units)の基礎値を管理する。Current Attack Speed = Base Attack Speed × (1 + Bonus Attack Speed Percent / 100)、Attack Interval = 1 / Current Attack Speed。最大HP(Current Max Health = Base + Bonus、1未満にならない)と攻撃力(Current Attack Damage = Base + Bonus、0未満にならない)の基礎値も管理する。現在HPはHealthControllerが保持する。
 - `PlayerBasicAttackController` は選択中のターゲットへの通常攻撃を管理する。攻撃間隔ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え(攻撃者としてPlayerのTransformを渡す通常ダメージ)、被弾フラッシュを発生させる。HealthControllerが返す実ダメージ量を使って、ダメージ表示(CombatTextManager)とゼルフPの与ダメージ回復(ZelfPassiveHeal)へ通知する。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外のターゲットを選択した場合はPlayerClickMovementのMoveToPosition()で射程内まで自動接近してから攻撃する。ターゲットが死亡した場合は攻撃を停止し、PlayerTargetSelectorが選択を解除する。将来的にミニオンなども扱うBasicAttackControllerへ発展させる。
-- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後に本体Rendererのみを非表示化する(GameObjectは無効化せず、復活イベントを受けて本体・Colliderを元へ戻す)。また、ターゲット分類(TargetClassification: Character / Minion / Tower / TrainingDummy)をInspectorで保持し、攻撃側(ゼルフPなど)が効果量の判定に使用する。InitializeRuntime(分類,ring,rR,bR)で実行時生成対象を初期化できる。
+- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後に本体Rendererのみを非表示化する(GameObjectは無効化せず、復活イベントを受けて本体・Colliderを元へ戻す)。また、ターゲット分類(TargetClassification: Character / Minion / Tower / TrainingDummy)をInspectorで保持し、攻撃側(ゼルフPなど)が効果量の判定に使用する。InitializeRuntime(分類,ring,rR,bR)で実行時初期化。プロパティ: Classification / IsDead(IsTargetableは不存在)。
 - `PlayerDeathHandler` はPlayerの死亡イベントを受け取り、PlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerと見た目(Renderer)を無効化する。復活イベントを受け取った場合は、無効化したコンポーネントと見た目を元へ戻し、移動を停止した状態で復活する(復活までの時間と復活位置はRespawnControllerが管理)。
 - `WorldHealthBar`(Scripts/UI)はHealthControllerのHP変化・死亡イベントを購読し、World Space Canvas上のUI ImageのFill AmountでHPバーを表示する。バーは毎フレームMain Cameraの向きに揃え、対象の死亡時はCanvasの無効化で非表示になり、復活時に再表示される。
 - `ZelfPassiveHeal`(Scripts/Characters)はゼルフP(与ダメージ回復)を管理する。通常攻撃から実ダメージ量とターゲット分類を受け取り、Character 5% / Minion 2.5% / Tower 0%(テスト用のTrainingDummy分類はCharacterと同じ5%。いずれもInspector設定)で自身のHealthControllerを回復する。死亡中は回復せず、最大HPを超えない。実際にHPが増えた場合のみ緑色の回復表示を要求する。
@@ -161,10 +162,10 @@ VolbraakRController
 - `CharacterSelectionManager` は選択中のCharacterDataを保持する常駐マネージャー。DontDestroyOnLoadでシーン遷移後も参照でき、二重生成時は後から生成された方を破棄する(セーブデータ化はしない)。
 - `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。詳細パネルのスキル一覧はInspectorの短い一覧を優先し、未設定の場合はCharacterDataのP〜Rスキル説明から自動生成する。
 - `PlayerCharacterApplier` はPlayerプレハブ(PF_Player_Base)へアタッチして全Prefab Variantで共通使用し、シーン開始時にCharacterSelectionManagerが保持する選択中CharacterDataをCharacterStats.SetCharacterData()へ適用する(未選択でSC_Prototypeを直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用)。選択キャラクターがゼルフ以外の場合はゼルフ固有スキルコンポーネント(ZelfPassiveHeal / ZelfQ/W/E/RController)をDestroyImmediateで取り除き、移動・通常攻撃・共通D・Fなどの共通コンポーネントだけで動作させる(各キャラクターの固有スキルは実装後にこのクラスへ登録する)。同様に、ヴォルブラーク以外を選択した場合はヴォルブラーク固有のVolbraakPassiveShield(P)・VolbraakQController(Q)・VolbraakWController(W)・VolbraakEController(E)・VolbraakRController(R)を取り除く。DefaultExecutionOrder(-100)で他コンポーネントのAwakeより先に実行し、PlayerのRendererへテーマカラーも適用する(Inspectorで無効化可能)。Prefab Variant方式では各Variantは自分のスキルコンポーネントしか持たないため取り外しは通常何も行われず、CharacterDataとVariantの組み合わせをInspectorで誤設定した場合の安全網として機能する。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
-- `PlayerSpawner`(Scripts/Characters)は試合シーン(SC_Prototype)開始時に、キャラクター選択結果に応じたPlayerプレハブ(Prefab Variant)をスポナーの位置・向きへ生成する。選択中CharacterDataのPlayer Prefabを生成し、未選択で直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用する。シーンへPlayerが直接配置されている場合は生成をスキップする(移行前シーン用の安全網)。DefaultExecutionOrder(-200)により、他コンポーネントのAwakeより先に生成する(MapBuilderは-300)。Teamプロパティを保持し生成したPlayerにTeamMemberを付与する。
+- `PlayerSpawner`(Scripts/Characters)は試合シーン(SC_Prototype)開始時に、キャラクター選択結果に応じたPlayerプレハブ(Prefab Variant)をスポナーの位置・向きへ生成する。選択中CharacterDataのPlayer Prefabを生成し、未選択で直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用する。シーンへPlayerが直接配置されている場合は生成をスキップする(移行前シーン用の安全網)。DefaultExecutionOrder(-200)。Teamプロパティを保持し生成したPlayerにTeamMemberを付与する。MapBuilderは-300。
 - `PlayerLayerMaskFallback` はPlayerCharacterApplierのAwakeから呼ばれる静的ヘルパー。Player配下の全コンポーネントの `_groundLayer` / `_targetableLayer` フィールドを調べ、未設定(Nothing)のものだけをレイヤー名(GroundLayer / TargetableLayer、無ければ6 / 7番)から自動補正する。Inspector設定済みの値は上書きせず、FlashControllerのWall Layerのような意図的な未設定フィールドは対象外。Prefab Variantへスキルコンポーネントを追加し直した際のLayerMask未設定によるスキル不発を防ぐ安全網。
 - Playerプレハブ構成(Prefabs/Characters/): `PF_Player_Base` がすべてのキャラクター共通のコンポーネント(移動・視点・ターゲット選択・通常攻撃・HP/復活・共通D・Fフラッシュ・PlayerInputHub・PlayerCharacterApplierなど)だけを持つ親プレハブ。各キャラクターは `PF_Player_Zelf`(ZelfPassiveHeal / ZelfQ/W/E/RControllerを追加)・`PF_Player_Volbraak`(VolbraakPassiveShield / VolbraakQ/W/E/RControllerを追加)のようにPrefab Variantとして作成し、CharacterData(Data/Characters/)のPlayer Prefabへ設定する。新キャラクターの追加手順: CharacterData作成 → PF_Player_BaseからPrefab Variant作成 → 固有スキルコンポーネントを追加(LayerMaskなどのInspector設定も忘れずに) → CharacterDataへVariantとFallbackを設定 → キャラクター選択画面の一覧へ登録。
-- `VolbraakPassiveShield`(Scripts/Characters)はヴォルブラークP(初撃無効化)を管理する。IIncomingDamageModifierとしてHealthControllerからHPへ適用する直前に呼び出され、一定時間(Recharge Duration、既定10秒)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(Normal / True)を問わず完全無効化する(ダメージ0)。シールドは消費まで永続し、ミニオン(TargetClassification.Minion)の攻撃では剥がれない(無効化もされず通常どおり受ける)。タワー(Tower分類)の攻撃も1回無効化するがPを消費する(タワー本体はTowerController(フェーズ5実装済み)。TeamMemberで敵味方判定するためそのまま機能する)。攻撃者不明(null)のダメージは無効化の対象。被弾(実際にHPが減るダメージ)があるたびに無被弾タイマーをリセットする(ミニオンからの被弾も含む)。シールド展開中はPlayerの周囲へLineRendererのリングを実行時生成で表示し(Inspectorで無効化可能)、死亡中は再展開せず復活時は展開済みで復活する。
+- `VolbraakPassiveShield`(Scripts/Characters)はヴォルブラークP(初撃無効化)を管理する。IIncomingDamageModifierとしてHealthControllerからHPへ適用する直前に呼び出され、一定時間(Recharge Duration、既定10秒)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(Normal / True)を問わず完全無効化する(ダメージ0)。シールドは消費まで永続し、ミニオン(TargetClassification.Minion)の攻撃では剥がれない(無効化もされず通常どおり受ける)。タワー(Tower分類)の攻撃も1回無効化するがPを消費する(タワー本体はフェーズ5実装予定。攻撃者のTargetable分類で判定するため実装後そのまま機能する)。攻撃者不明(null)のダメージは無効化の対象。被弾(実際にHPが減るダメージ)があるたびに無被弾タイマーをリセットする(ミニオンからの被弾も含む)。シールド展開中はPlayerの周囲へLineRendererのリングを実行時生成で表示し(Inspectorで無効化可能)、死亡中は再展開せず復活時は展開済みで復活する。
 - `VolbraakQController`(Scripts/Characters)はヴォルブラークQ(地面叩きと亀裂)を管理する。Qキーでマウスカーソル方向へ地面を叩き、前方の帯状範囲(長さ4×幅1.6、Inspector設定)へ範囲ダメージ(基礎25+AD×0.8)を与える。叩いた場所には亀裂が残り(既定4秒)、亀裂上の敵(Tower分類を除く)へCrowdControlController.ApplySlow経由でスロウ(既定35%)を短い持続で掛け直しながら継続付与する(複数スロウは最も強い1つだけが有効になるLoL方式)。同時に複数の亀裂は存在せず、再発動時は古い亀裂が即時消滅する。移動を伴わないためスネア中も使用でき、スタン中・死亡中などは行動ロックにより使用不可。自身の死亡時は展開中の亀裂を即時終了する。亀裂はLineRendererの枠+ジグザグ線をシーン直下へ実行時生成して表示し(地面に固定)、NormalCastではQキー押下中に方向線のみを表示する。GroundとTargetableのLayerMaskはInspectorで設定し(ZelfQControllerと同じ設定)、FlashControllerがレイヤー未設定時に流用できるようGroundLayerMask/TargetableLayerMaskを公開プロパティとして提供する。
 - `VolbraakWController`(Scripts/Characters)はヴォルブラークW(シールドと時限爆発)を管理する。Wキーで即時発動(対象・方向指定なしの自己バフのためプレビューなし)し、HPシールド(基礎80+AD×0.8、発動時のADでスナップショット)を獲得する。IIncomingDamageModifierとしてダメージ種別(Normal / True)を問わず吸収し、通常ダメージはAR軽減式(×100/(100+AR))を適用したHP換算値でシールドを消費する(吸収しきれない分だけHPへ通す)。ヴォルブラークPのシールド展開中にミニオン以外から攻撃を受けた場合はWでは吸収せずPの初撃無効化を優先する(コンポーネントの適用順に依存しない)。発動から一定時間後(既定3秒)に自動爆発し、周囲(半径2.5)の対象へ範囲ダメージ(基礎40+AD×0.9)を与える(手動爆発なし。シールドが途中で割れても爆発は発生する)。爆発で実際に与えたダメージ×回復率(Character/Tower/TrainingDummy 5%・Minion 2.5%、Inspector設定)を自身へ回復する。移動を伴わないためスネア中も使用でき、スタン中・死亡中などは行動ロックにより使用不可(展開済みシールド・爆発の進行はロック中も継続)。自身の死亡時はシールド・爆発を中止する(爆発しない)。シールド中はPlayerの周囲へ青系リングを、爆発時は爆発半径のリングを短時間表示する(LineRenderer実行時生成)。TargetableのLayerMaskはInspectorで設定する(ZelfQControllerと同じ設定)。クールダウンは既定12秒でTime.timeAsDouble基準。
 - `VolbraakEController`(Scripts/Characters)はヴォルブラークE(突進とスタン)を管理する。NormalCastではEキー押下中に方向線(長さ=突進距離)のみを表示し、離した瞬間にマウスカーソル方向へ突進する(距離5.5・0.6秒。CharacterControllerを一時無効化して直接移動・地面追従・終了時のめり込み解消はZelfEControllerと同じ方式)。当たったTargetable(自身を除く)へダメージ(基礎40+AD×0.7)とスタン(既定1秒)を与え、突進はそこで停止する(敵を突進方向へ少し押し出してヴォルブラークは敵の手前に止まる。Tower分類と共通Dに弾かれた相手は押し出さない)。スタンはCrowdControlController.ApplyStun経由で適用し、戻り値がtrue(共通Dによる無効化)の場合はダメージも適用しない(「共通Dで弾かれた場合は両方不発」)。Tower分類にはスタンを掛けずダメージのみ与える。移動スキルのためスネア中・スタン中は使用不可。突進中はAbilityLockControllerへロック(理由: VolbraakEDash)を追加して通常攻撃・他スキルの入力を禁止し、死亡時は突進を即時中断してロックを解除する。突進の軌跡はTrailRendererで表示する。GroundとTargetableのLayerMaskはInspectorで設定する(ZelfQControllerと同じ設定)。クールダウンは既定12秒でTime.timeAsDouble基準。
@@ -189,7 +190,7 @@ CrowdControlEffect
 
 ### Map
 
-- MapBuilder: DefaultExecutionOrder(-300)。BoundsMin/BoundsMax/GetSpawnPoint/GetTower/GetNexusを公開。
+- MapBuilder(DefaultExecutionOrder -300): BoundsMin/BoundsMax/GetSpawnPoint/GetTower/GetNexusを公開。
 - Team enum: Blue=0/Red=1。TeamMember: MonoBehaviourでチームを公開。GameManager: OnNexusDestroyed(winner)でMatchState=Finished。
 
 ### Minions / Structures
@@ -203,9 +204,8 @@ NexusController
 ```
 
 - WaveControllerが20秒ごとに5体のミニオンを出現させる。
-- TowerController(フェーズ5): HP5000/AR60/AD130/AS0.80/射程8.0。IIncomingDamageModifierでAR軽減+MinionAbsenceMultiplier(0.1)。TeamMemberで敵味方判定。破壊時に敵陣NexusController.OnGuardTowerDestroyed()を呼ぶ。
-- NexusController(フェーズ5): HP6000/AR50。タワー存存中は全ダメージーTargetable無効。破壊後にAR軽減適用。OnNexusDestroyedで勝敗通知。
-- MinionController(スタブ): Team+TeamMember公開。
+- TowerControllerが敵ヒーローを優先して攻撃する。
+- NexusControllerはタワー破壊後にのみダメージを受ける。
 
 ## 5. データ設計
 

@@ -21,6 +21,7 @@ namespace Structures
 
         private HealthController _health;
         private Targetable       _targetable;
+        private Collider         _col;
         private bool             _guardTowerDestroyed;
         private bool             _nexusDestroyed;
 
@@ -28,38 +29,50 @@ namespace Structures
         public bool IsVulnerable => _guardTowerDestroyed;
         public bool IsDestroyed  => _nexusDestroyed;
 
+        // --------------------------------------------------------
         public void OnGuardTowerDestroyed()
         {
             if (_guardTowerDestroyed) return;
             _guardTowerDestroyed = true;
-            Debug.Log("[Nexus] Guard tower destroyed – " + _team + " nexus is now VULNERABLE.");
+            Debug.Log("[Nexus] Guard tower destroyed – " + _team + " nexus is VULNERABLE.");
             ApplyCrystalColor(_colorVulnerable);
             _targetable.enabled = true;
-            if (_targetable.TryGetComponent<Collider>(out var col)) col.enabled = true;
+            if (_col != null) _col.enabled = true;
         }
 
+        // --------------------------------------------------------
         private void Awake()
         {
             _health     = GetComponent<HealthController>();
             _targetable = GetComponent<Targetable>();
+            _col        = GetComponent<Collider>();
+
+            // SetMaxHealth は patch_cs.py で HealthController に追加されます。
             _health.SetMaxHealth(_maxHp);
+
+            // InitializeRuntime は patch_cs.py で Targetable に追加されます。
             _targetable.InitializeRuntime(
                 TargetClassification.Tower, null, null,
                 _crystalRenderer != null ? _crystalRenderer : GetComponentInChildren<Renderer>());
-            _health.OnDeath += HandleNexusDeath;
 
+            // 正しいイベント名: Died
+            _health.Died += HandleNexusDeath;
+
+            // タワー生存中は非ターゲット・非コリジョン
             _guardTowerDestroyed = false;
             _targetable.enabled = false;
-            if (_targetable.TryGetComponent<Collider>(out var col)) col.enabled = false;
+            if (_col != null) _col.enabled = false;
         }
 
-        public float ModifyIncomingDamage(DamageContext ctx, float damage)
+        // IIncomingDamageModifier: 正しいシグネチャ
+        public float ModifyIncomingDamage(DamageContext context, float currentAmount)
         {
-            if (!_guardTowerDestroyed) return 0f;
-            if (ctx.DamageType == DamageType.True) return damage;
-            return damage * 100f / (100f + _armor);
+            if (!_guardTowerDestroyed) return 0f;      // タワー健在中は全ダメージ無効
+            if (context.Type == DamageType.True) return currentAmount;  // 確定ダメージは素通し
+            return currentAmount * 100f / (100f + _armor);
         }
 
+        // --------------------------------------------------------
         private void HandleNexusDeath()
         {
             if (_nexusDestroyed) return;
