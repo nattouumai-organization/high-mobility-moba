@@ -148,24 +148,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd99dad6eface6440a6415669620d226, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapBuilder
-  _mapWidth: 84
-  _mapDepth: 24
-  _laneWidth: 16
-  _wallHeight: 3
-  _wallThickness: 1
-  _sidePathWallExtent: 28
-  _sidePathGapCenters:
+  _halfLength: 35
+  _halfWidth: 10
+  _laneWallZ: 8.5
+  _laneWallHalfLength: 28
+  _openingCenters:
   - -18
   - 0
   - 18
-  _sidePathGapWidth: 4
-  _blueBaseX: -33
-  _redBaseX: 33
-  _spawnOffsetFromBase: 2
-  _groundColor: {r: 0.22, g: 0.26, b: 0.22, a: 1}
-  _wallColor: {r: 0.35, g: 0.35, b: 0.38, a: 1}
-  _blueColor: {r: 0.25, g: 0.5, b: 1, a: 1}
-  _redColor: {r: 1, g: 0.35, b: 0.3, a: 1}
+  _openingWidth: 4
+  _wallHeight: 3
+  _wallThickness: 1
+  _spawnPointX: 31
+  _towerX: 16
+  _blueTeamColor: {r: 0.25, g: 0.5, b: 1, a: 1}
+  _redTeamColor: {r: 1, g: 0.35, b: 0.3, a: 1}
 --- !u!4 &304994532
 Transform:
   m_ObjectHideFlags: 0
@@ -507,9 +504,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd6e7430ac5079c4382e2e1406b84220, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpawner
+  _fallbackCharacterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
   _team: 0
   _spawnHeightOffset: 1.1
-  _fallbackCharacterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
 --- !u!1 &1246788901
 GameObject:
   m_ObjectHideFlags: 0
@@ -1004,7 +1001,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1246788901}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 629bb84fb6aa18a498f23678c0d65bc6, type: 3}
   m_Name: 

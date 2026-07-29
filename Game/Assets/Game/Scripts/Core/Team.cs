@@ -1,12 +1,9 @@
 /// <summary>
-/// フェーズ5: 青/赤の陣営。設計時のTeamType予定名をTeamとして実装した。
-/// マップの開始地点のほか、後続のタワー・本拠地・勝敗判定でも共通使用する。
+/// 陣営(青/赤)。開始地点・タワーの対応付けと、TowerController・PlayerSpawnerの敵味方判定に使用する(フェーズ5)。
+/// 将来のミニオン・本拠地・オンライン対戦でも同じ陣営定義を再利用する。
 /// </summary>
 public enum Team
 {
-    /// <summary>青陣営(マップ左側。本拠地x=-33)。</summary>
-    Blue,
-
-    /// <summary>赤陣営(マップ右側。本拠地x=+33)。</summary>
-    Red,
+    Blue = 0,
+    Red = 1,
 }

@@ -1,250 +1,308 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// フェーズ5: 1レーン対称マップと各陣営の開始地点を実行時に生成する。
-/// SC_Prototypeの空オブジェクト"Map"へアタッチする(位置は原点推奨。回転は想定しない)。
-/// - GAME_DESIGN 3章の座標を100ゲーム単位=1 Unity単位へ換算し、マップ中央(X=4,200 / Y=1,200)を
-///   このオブジェクトの位置へ置く(unityX=(X-4200)/100、unityZ=(Y-1200)/100)。
-/// - 生成物: 地面84×24(GroundLayer・名前MapGround)、外周の壁、レーン(幅16)上下の横道の壁
-///   (開口部x=-18/0/+18・幅4で区切る。左右対称・壁はレーンの外側に置く)、
-///   開始地点SpawnPoint_Blue(x=-31)/SpawnPoint_Red(x=+31)(互いの敵陣方向を向く・チーム色マーカー付き)。
-/// - レイヤーは名前で解決する。GroundLayerが無ければ従来の6番へフォールバックして警告。
-///   壁はWallLayerが定義されていればそのレイヤー、無ければDefaultで生成する
-///   (壁のコライダーはCharacterControllerの移動を物理的に遮る。FlashControllerのWall Layerへ
-///   設定すればFの壁越え禁止にも使える)。
-/// - タワー(x=±16)・本拠地(x=±33)は後続タスクでこのマップ上へ実装する。
-/// DefaultExecutionOrder(-300)によりPlayerSpawner(-200)や他コンポーネントより先に生成する。
+/// フェーズ5: SC_Prototypeの1レーン対称マップ(GAME_DESIGN 3章)を実行時にプリミティブから生成する。
+/// 100ゲーム単位=1.0 Unity単位・中央原点で、地面・中央線・横道の壁(開口部付き)・外周の境界壁・
+/// 両陣営の開始地点(中央向きの床マーカー付き)・両陣営のタワー(TowerController)を組み立てる。
+/// - GetSpawnPoint(Team): 陣営の開始地点Transform(PlayerSpawnerが使用)。
+/// - GetTower(Team): 陣営のTowerController。
+/// - BoundsMin / BoundsMax: マップ範囲(TopDownCameraControllerのスクロールクランプが使用)。
+/// DefaultExecutionOrder(-300)により、PlayerSpawner(-200)やPlayerを自動検出する他コンポーネントより先に生成する。
+/// 旧Ground(手動配置のPlane)がシーンへ残っている場合は警告を出す(重なるため手動で削除する)。
+/// タワーはCapsuleCollider→TowerController→HealthController→Targetableの順で構成する
+/// (HealthControllerはAwakeでIIncomingDamageModifierをキャッシュするため、TowerControllerを先に追加する)。
 /// </summary>
 [DefaultExecutionOrder(-300)]
 public sealed class MapBuilder : MonoBehaviour
 {
-    [Header("マップ寸法(Unity単位。100ゲーム単位=1)")]
-    // X方向の全幅(GAME_DESIGN: 8400)。
-    [SerializeField, Min(1f)] private float _mapWidth = 84f;
-    // Z方向の全奥行(GAME_DESIGN: 2400)。
-    [SerializeField, Min(1f)] private float _mapDepth = 24f;
-    // レーン幅(GAME_DESIGN: 1600)。横道の壁はこの外側に置くためレーン幅は削らない。
-    [SerializeField, Min(1f)] private float _laneWidth = 16f;
+    [Header("マップ寸法 (100ゲーム単位 = 1.0 Unity単位)")]
+    [Tooltip("地面のX方向の半分の長さ(GAME_DESIGN: 全長7000 = 70.0)")]
+    [SerializeField, Min(1f)] private float _halfLength = 35f;
 
-    [Header("壁")]
-    [SerializeField, Min(0.5f)] private float _wallHeight = 3f;
-    [SerializeField, Min(0.1f)] private float _wallThickness = 1f;
+    [Tooltip("地面のZ方向の半分の幅(GAME_DESIGN: 全幅2000 = 20.0)")]
+    [SerializeField, Min(1f)] private float _halfWidth = 10f;
 
-    [Header("横道(レーン上下)の壁")]
-    // 横道の壁のX方向の範囲(±)。外周壁との間が左右の通路になる。
-    [SerializeField, Min(0f)] private float _sidePathWallExtent = 28f;
-    // 開口部(レーン↔横道の出入口)の中心X座標。左右対称にすること。
-    [SerializeField] private float[] _sidePathGapCenters = { -18f, 0f, 18f };
-    // 開口部の幅。
-    [SerializeField, Min(0f)] private float _sidePathGapWidth = 4f;
+    [Header("横道の壁")]
+    [Tooltip("横道の壁のZ位置(±)")]
+    [SerializeField] private float _laneWallZ = 8.5f;
 
-    [Header("開始地点")]
-    // 青本拠地のX座標(GAME_DESIGN: 900)。
-    [SerializeField] private float _blueBaseX = -33f;
-    // 赤本拠地のX座標(GAME_DESIGN: 7500)。
-    [SerializeField] private float _redBaseX = 33f;
-    // 本拠地位置から敵陣方向へどれだけ離して開始地点を置くか。
-    [SerializeField, Min(0f)] private float _spawnOffsetFromBase = 2f;
+    [Tooltip("横道の壁のX範囲(±)")]
+    [SerializeField] private float _laneWallHalfLength = 28f;
 
-    [Header("色")]
-    [SerializeField] private Color _groundColor = new Color(0.22f, 0.26f, 0.22f);
-    [SerializeField] private Color _wallColor = new Color(0.35f, 0.35f, 0.38f);
-    [SerializeField] private Color _blueColor = new Color(0.25f, 0.5f, 1f);
-    [SerializeField] private Color _redColor = new Color(1f, 0.35f, 0.3f);
+    [Tooltip("開口部の中心X位置")]
+    [SerializeField] private float[] _openingCenters = { -18f, 0f, 18f };
 
-    // 既存プロジェクトのGroundLayer番号(TagManagerで定義済み)。
-    private const int FallbackGroundLayer = 6;
-    private const float GroundThickness = 0.2f;
-    private const float MinSegmentLength = 0.01f;
+    [Tooltip("開口部の幅")]
+    [SerializeField, Min(0.5f)] private float _openingWidth = 4f;
+
+    [Tooltip("壁の高さ")]
+    [SerializeField, Min(0.5f)] private float _wallHeight = 2f;
+
+    [Tooltip("壁の厚さ")]
+    [SerializeField, Min(0.1f)] private float _wallThickness = 0.5f;
+
+    [Header("開始地点とタワー")]
+    [Tooltip("開始地点のX位置(±。青が-X、赤が+X)")]
+    [SerializeField] private float _spawnPointX = 31f;
+
+    [Tooltip("タワーのX位置(±。青が-X、赤が+X)")]
+    [SerializeField] private float _towerX = 16f;
+
+    [Header("陣営カラー")]
+    [SerializeField] private Color _blueTeamColor = new Color(0.25f, 0.5f, 1f, 1f);
+    [SerializeField] private Color _redTeamColor = new Color(1f, 0.35f, 0.3f, 1f);
 
     private Transform _blueSpawnPoint;
     private Transform _redSpawnPoint;
-    private bool _built;
+    private TowerController _blueTower;
+    private TowerController _redTower;
 
-    /// <summary>マップ範囲(XZ)の最小値。TopDownCameraControllerのスクロールクランプなどが使用する。</summary>
-    public Vector2 BoundsMin => new Vector2(transform.position.x - _mapWidth * 0.5f, transform.position.z - _mapDepth * 0.5f);
+    private int _groundLayer;
+    private int _wallLayer;
+    private int _targetableLayer;
 
-    /// <summary>マップ範囲(XZ)の最大値。</summary>
-    public Vector2 BoundsMax => new Vector2(transform.position.x + _mapWidth * 0.5f, transform.position.z + _mapDepth * 0.5f);
+    /// <summary>マップ範囲の最小コーナー(地面の高さ0)。カメラのスクロールクランプが使用する。</summary>
+    public Vector3 BoundsMin => new Vector3(-_halfLength, 0f, -_halfWidth);
 
-    private void Awake()
-    {
-        Build();
-    }
+    /// <summary>マップ範囲の最大コーナー(地面の高さ0)。カメラのスクロールクランプが使用する。</summary>
+    public Vector3 BoundsMax => new Vector3(_halfLength, 0f, _halfWidth);
 
-    /// <summary>
-    /// 指定陣営の開始地点を返す(位置・向きを持つTransform)。未生成なら先にマップを生成する。
-    /// </summary>
+    /// <summary>陣営の開始地点。PlayerSpawnerが生成位置・向きに使用する。生成前はnull。</summary>
     public Transform GetSpawnPoint(Team team)
     {
-        Build();
         return team == Team.Blue ? _blueSpawnPoint : _redSpawnPoint;
     }
 
-    private void Build()
+    /// <summary>陣営のタワー。生成前はnull。</summary>
+    public TowerController GetTower(Team team)
     {
-        if (_built)
-        {
-            return;
-        }
-        _built = true;
+        return team == Team.Blue ? _blueTower : _redTower;
+    }
+
+    private void Awake()
+    {
+        _groundLayer = ResolveLayer("GroundLayer", 6);
+        _targetableLayer = ResolveLayer("TargetableLayer", 7);
+
+        // 壁は将来のF(壁越え禁止)判定用にWallLayerを優先し、無ければGroundLayerを使う。
+        int wallLayer = LayerMask.NameToLayer("WallLayer");
+        _wallLayer = wallLayer >= 0 ? wallLayer : _groundLayer;
 
         WarnIfLegacyGroundExists();
 
-        int groundLayer = ResolveLayer("GroundLayer", FallbackGroundLayer, true);
-        int wallLayer = ResolveLayer("WallLayer", 0, false);
+        BuildGround();
+        BuildCenterLine();
+        BuildLaneWalls();
+        BuildBoundaryWalls();
 
-        CreateGround(groundLayer);
-        CreateOuterWalls(wallLayer);
-        CreateSidePathWalls(wallLayer);
-        _blueSpawnPoint = CreateSpawnPoint(Team.Blue);
-        _redSpawnPoint = CreateSpawnPoint(Team.Red);
+        _blueSpawnPoint = BuildSpawnPoint(Team.Blue, new Vector3(-_spawnPointX, 0f, 0f), _blueTeamColor);
+        _redSpawnPoint = BuildSpawnPoint(Team.Red, new Vector3(_spawnPointX, 0f, 0f), _redTeamColor);
 
-        Debug.Log($"MapBuilder: 1レーン対称マップ({_mapWidth}×{_mapDepth})と各陣営の開始地点を生成しました。", this);
+        _blueTower = BuildTower(Team.Blue, new Vector3(-_towerX, 0f, 0f), _blueTeamColor);
+        _redTower = BuildTower(Team.Red, new Vector3(_towerX, 0f, 0f), _redTeamColor);
+
+        Debug.Log("MapBuilder: 1レーン対称マップを生成しました(開始地点±" + _spawnPointX + " / タワー±" + _towerX + ")。", this);
     }
 
-    // 地面。上面がy=0になるように配置する(既存の移動・スキルのGroundレイキャストと整合)。
-    private void CreateGround(int layer)
+    // 地面: 上面が高さ0になるCube。右クリック移動のレイキャスト対象(GroundLayer)。
+    private void BuildGround()
     {
-        CreateBox("MapGround", new Vector3(0f, -GroundThickness * 0.5f, 0f), new Vector3(_mapWidth, GroundThickness, _mapDepth), layer, _groundColor);
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        ground.name = "MapGround";
+        ground.transform.SetParent(transform, false);
+        ground.transform.localScale = new Vector3(_halfLength * 2f, 0.2f, _halfWidth * 2f);
+        ground.transform.position = new Vector3(0f, -0.1f, 0f);
+        ground.layer = _groundLayer;
+        SetColor(ground, new Color(0.22f, 0.27f, 0.22f, 1f));
     }
 
-    // 外周の壁。北・南(±Z)は角を埋めるため壁卲2枚分だけ幅を広げる。
-    private void CreateOuterWalls(int layer)
+    // 中央線: マップ中央(x=0)の目印。Colliderは持たない。
+    private void BuildCenterLine()
     {
-        float halfWidth = _mapWidth * 0.5f;
-        float halfDepth = _mapDepth * 0.5f;
-        float y = _wallHeight * 0.5f;
-
-        Vector3 horizontalSize = new Vector3(_mapWidth + _wallThickness * 2f, _wallHeight, _wallThickness);
-        CreateBox("Wall_North", new Vector3(0f, y, halfDepth + _wallThickness * 0.5f), horizontalSize, layer, _wallColor);
-        CreateBox("Wall_South", new Vector3(0f, y, -(halfDepth + _wallThickness * 0.5f)), horizontalSize, layer, _wallColor);
-
-        Vector3 verticalSize = new Vector3(_wallThickness, _wallHeight, _mapDepth);
-        CreateBox("Wall_East", new Vector3(halfWidth + _wallThickness * 0.5f, y, 0f), verticalSize, layer, _wallColor);
-        CreateBox("Wall_West", new Vector3(-(halfWidth + _wallThickness * 0.5f), y, 0f), verticalSize, layer, _wallColor);
+        GameObject line = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        line.name = "CenterLine";
+        line.transform.SetParent(transform, false);
+        line.transform.localScale = new Vector3(0.2f, 0.02f, _halfWidth * 2f);
+        line.transform.position = new Vector3(0f, 0.01f, 0f);
+        RemoveCollider(line);
+        SetColor(line, new Color(0.9f, 0.9f, 0.9f, 1f));
     }
 
-    // レーン上下の横道を区切る壁。開口部で分割したセグメントを±Zへ対称に生成する。
-    private void CreateSidePathWalls(int layer)
+    // 横道の壁: z=±_laneWallZに、開口部(3か所)を空けたセグメントを並べる。
+    private void BuildLaneWalls()
     {
-        float z = _laneWidth * 0.5f + _wallThickness * 0.5f;
-        float y = _wallHeight * 0.5f;
-        List<Vector2> segments = CalculateWallSegments();
+        float segmentStart = -_laneWallHalfLength;
+        float half = _openingWidth * 0.5f;
+        int index = 0;
 
-        for (int i = 0; i < segments.Count; i++)
+        foreach (float center in _openingCenters)
         {
-            float centerX = (segments[i].x + segments[i].y) * 0.5f;
-            float length = segments[i].y - segments[i].x;
-            Vector3 size = new Vector3(length, _wallHeight, _wallThickness);
-            CreateBox($"Wall_SidePathNorth_{i}", new Vector3(centerX, y, z), size, layer, _wallColor);
-            CreateBox($"Wall_SidePathSouth_{i}", new Vector3(centerX, y, -z), size, layer, _wallColor);
+            BuildWallSegmentPair(segmentStart, center - half, ref index);
+            segmentStart = center + half;
         }
+        BuildWallSegmentPair(segmentStart, _laneWallHalfLength, ref index);
     }
 
-    // 横道壁のX範囲(±_sidePathWallExtent)から開口部を除いたセグメント一覧を返す(x=始点、y=終点)。
-    private List<Vector2> CalculateWallSegments()
+    // 同じX範囲の壁セグメントをz=+側と-側の両方へ作る。
+    private void BuildWallSegmentPair(float startX, float endX, ref int index)
     {
-        var segments = new List<Vector2>();
-        float cursor = -_sidePathWallExtent;
-
-        float[] centers = _sidePathGapCenters != null ? (float[])_sidePathGapCenters.Clone() : new float[0];
-        System.Array.Sort(centers);
-
-        foreach (float center in centers)
+        if (endX - startX <= 0.01f)
         {
-            float gapStart = center - _sidePathGapWidth * 0.5f;
-            float gapEnd = center + _sidePathGapWidth * 0.5f;
-            if (gapStart > cursor + MinSegmentLength)
-            {
-                segments.Add(new Vector2(cursor, gapStart));
-            }
-            cursor = Mathf.Max(cursor, gapEnd);
+            return;
         }
 
-        if (_sidePathWallExtent > cursor + MinSegmentLength)
+        foreach (float sign in new[] { 1f, -1f })
         {
-            segments.Add(new Vector2(cursor, _sidePathWallExtent));
+            GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            wall.name = "LaneWall_" + index + (sign > 0f ? "_North" : "_South");
+            wall.transform.SetParent(transform, false);
+            wall.transform.localScale = new Vector3(endX - startX, _wallHeight, _wallThickness);
+            wall.transform.position = new Vector3((startX + endX) * 0.5f, _wallHeight * 0.5f, _laneWallZ * sign);
+            wall.layer = _wallLayer;
+            SetColor(wall, new Color(0.45f, 0.42f, 0.38f, 1f));
         }
 
-        return segments;
+        index++;
     }
 
-    // 開始地点。本拠地の少し前(敵陣方向)に置き、敵陣方向を向く。チーム色の薄いマーカー付き。
-    private Transform CreateSpawnPoint(Team team)
+    // 外周の境界壁: マップ外へ出られないよう4辺を囲う。
+    private void BuildBoundaryWalls()
     {
-        bool isBlue = team == Team.Blue;
-        float baseX = isBlue ? _blueBaseX : _redBaseX;
-        float x = baseX + (isBlue ? _spawnOffsetFromBase : -_spawnOffsetFromBase);
-        Vector3 forward = isBlue ? Vector3.right : Vector3.left;
+        float t = _wallThickness;
+        BuildBoundaryWall("Boundary_East", new Vector3(_halfLength + t * 0.5f, _wallHeight * 0.5f, 0f), new Vector3(t, _wallHeight, _halfWidth * 2f + t * 2f));
+        BuildBoundaryWall("Boundary_West", new Vector3(-_halfLength - t * 0.5f, _wallHeight * 0.5f, 0f), new Vector3(t, _wallHeight, _halfWidth * 2f + t * 2f));
+        BuildBoundaryWall("Boundary_North", new Vector3(0f, _wallHeight * 0.5f, _halfWidth + t * 0.5f), new Vector3(_halfLength * 2f, _wallHeight, t));
+        BuildBoundaryWall("Boundary_South", new Vector3(0f, _wallHeight * 0.5f, -_halfWidth - t * 0.5f), new Vector3(_halfLength * 2f, _wallHeight, t));
+    }
 
-        var spawnPoint = new GameObject(isBlue ? "SpawnPoint_Blue" : "SpawnPoint_Red");
-        spawnPoint.transform.SetParent(transform, false);
-        spawnPoint.transform.localPosition = new Vector3(x, 0f, 0f);
-        spawnPoint.transform.localRotation = Quaternion.LookRotation(forward, Vector3.up);
+    private void BuildBoundaryWall(string wallName, Vector3 position, Vector3 scale)
+    {
+        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.name = wallName;
+        wall.transform.SetParent(transform, false);
+        wall.transform.localScale = scale;
+        wall.transform.position = position;
+        wall.layer = _wallLayer;
+        SetColor(wall, new Color(0.35f, 0.33f, 0.3f, 1f));
+    }
 
-        GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+    // 開始地点: 中央を向いた空オブジェクト+陣営色の床マーカー(Colliderなし)。
+    private Transform BuildSpawnPoint(Team team, Vector3 position, Color teamColor)
+    {
+        GameObject point = new GameObject("SpawnPoint_" + team);
+        point.transform.SetParent(transform, false);
+        point.transform.position = position;
+
+        // マップ中央(原点)の方向を向く。PlayerSpawnerが生成時の向きに使用する。
+        Vector3 toCenter = -position;
+        toCenter.y = 0f;
+        if (toCenter.sqrMagnitude > 0.0001f)
+        {
+            point.transform.rotation = Quaternion.LookRotation(toCenter.normalized, Vector3.up);
+        }
+
+        GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         marker.name = "Marker";
-        // マーカーは見た目だけの目印なのでコライダーは削除する(クリック移動・射程判定を邪魔しない)。
-        Destroy(marker.GetComponent<Collider>());
-        marker.transform.SetParent(spawnPoint.transform, false);
+        marker.transform.SetParent(point.transform, false);
+        marker.transform.localScale = new Vector3(1.6f, 0.02f, 1.6f);
         marker.transform.localPosition = new Vector3(0f, 0.02f, 0f);
-        marker.transform.localScale = new Vector3(3f, 0.04f, 3f);
-        ApplyColor(marker, isBlue ? _blueColor : _redColor);
+        RemoveCollider(marker);
+        SetColor(marker, teamColor);
 
-        return spawnPoint.transform;
+        return point.transform;
     }
 
-    private GameObject CreateBox(string boxName, Vector3 localPosition, Vector3 localScale, int layer, Color color)
+    // タワー: プリミティブ(本体+クリスタル+選択リング)から組み立て、戦闘用コンポーネントを構成する。
+    private TowerController BuildTower(Team team, Vector3 position, Color teamColor)
     {
-        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        box.name = boxName;
-        box.layer = layer;
-        box.transform.SetParent(transform, false);
-        box.transform.localPosition = localPosition;
-        box.transform.localScale = localScale;
-        ApplyColor(box, color);
-        return box;
+        GameObject tower = new GameObject("Tower_" + team);
+        tower.transform.SetParent(transform, false);
+        tower.transform.position = position;
+        tower.layer = _targetableLayer;
+
+        // 本体(円柱)。子プリミティブのColliderは削除し、クリック判定はルートのCapsuleColliderへ集約する。
+        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        body.name = "Body";
+        body.transform.SetParent(tower.transform, false);
+        body.transform.localScale = new Vector3(1.6f, 1.8f, 1.6f);
+        body.transform.localPosition = new Vector3(0f, 1.8f, 0f);
+        body.layer = _targetableLayer;
+        RemoveCollider(body);
+        SetColor(body, new Color(0.5f, 0.5f, 0.55f, 1f));
+
+        // クリスタル(頂部の球)。陣営色にし、破壊時はTowerControllerが暗くする。
+        GameObject crystal = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        crystal.name = "Crystal";
+        crystal.transform.SetParent(tower.transform, false);
+        crystal.transform.localScale = new Vector3(1.1f, 1.1f, 1.1f);
+        crystal.transform.localPosition = new Vector3(0f, 4.3f, 0f);
+        crystal.layer = _targetableLayer;
+        RemoveCollider(crystal);
+        SetColor(crystal, teamColor);
+
+        // 選択リング(足元)。表示制御と色はTargetableが行う。
+        GameObject ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        ring.name = "SelectionRing";
+        ring.transform.SetParent(tower.transform, false);
+        ring.transform.localScale = new Vector3(2.6f, 0.02f, 2.6f);
+        ring.transform.localPosition = new Vector3(0f, 0.05f, 0f);
+        RemoveCollider(ring);
+
+        // クリック選択・攻撃射程判定用のCollider(タワー全体を覆うカプセル)。
+        CapsuleCollider towerCollider = tower.AddComponent<CapsuleCollider>();
+        towerCollider.center = new Vector3(0f, 2.4f, 0f);
+        towerCollider.radius = 0.9f;
+        towerCollider.height = 4.8f;
+
+        // HealthControllerはAwakeでIIncomingDamageModifierをキャッシュするため、TowerControllerを先に追加する。
+        TowerController controller = tower.AddComponent<TowerController>();
+        tower.AddComponent<HealthController>();
+        Targetable targetable = tower.AddComponent<Targetable>();
+
+        targetable.InitializeRuntime(
+            TargetClassification.Tower,
+            ring,
+            ring.GetComponent<Renderer>(),
+            body.GetComponent<Renderer>());
+
+        controller.Initialize(team, teamColor, crystal.GetComponent<Renderer>());
+
+        return controller;
     }
 
-    private static void ApplyColor(GameObject target, Color color)
-    {
-        Renderer targetRenderer = target.GetComponent<Renderer>();
-        if (targetRenderer != null)
-        {
-            targetRenderer.material.color = color;
-        }
-    }
-
-    // レイヤーを名前で解決する。未定義ならフォールバック番号を使う。
-    private int ResolveLayer(string layerName, int fallbackLayer, bool warnFallback)
-    {
-        int layer = LayerMask.NameToLayer(layerName);
-        if (layer >= 0)
-        {
-            return layer;
-        }
-
-        if (warnFallback)
-        {
-            Debug.LogWarning($"MapBuilder: レイヤー'{layerName}'が未定義のため{fallbackLayer}番を使用します。Tags & Layersで定義してください。", this);
-        }
-        else
-        {
-            Debug.Log($"MapBuilder: レイヤー'{layerName}'が未定義のためDefaultで壁を生成します(FlashControllerのWall LayerでFの壁越えを禁止する場合は定義してください)。", this);
-        }
-
-        return fallbackLayer;
-    }
-
-    // 旧テスト用のGroundが残っているとマップと重なるため、削除推奨の警告を出す。
+    // 手動配置の旧Groundが残っているとマップの地面と重なるため、警告を出す(自動削除はしない)。
     private void WarnIfLegacyGroundExists()
     {
         GameObject legacyGround = GameObject.Find("Ground");
         if (legacyGround != null)
         {
-            Debug.LogWarning("MapBuilder: 旧テスト用の'Ground'がシーンに残っています。MapBuilderの地面と重なるため削除を推奨します。", legacyGround);
+            Debug.LogWarning("MapBuilder: シーンに旧Ground '" + legacyGround.name + "' が残っています。マップの地面(MapGround)と重なるため、シーンから削除してください。", legacyGround);
+        }
+    }
+
+    // レイヤー名からレイヤー番号を取得する。無ければ既定番号(試作の運用: GroundLayer=6 / TargetableLayer=7)を使う。
+    private static int ResolveLayer(string layerName, int fallback)
+    {
+        int layer = LayerMask.NameToLayer(layerName);
+        return layer >= 0 ? layer : fallback;
+    }
+
+    private static void SetColor(GameObject target, Color color)
+    {
+        Renderer targetRenderer = target.GetComponent<Renderer>();
+        if (targetRenderer != null)
+        {
+            // 実行時はマテリアルのインスタンスへ色を設定するため、元のマテリアルアセットは変化しない。
+            targetRenderer.material.color = color;
+        }
+    }
+
+    private static void RemoveCollider(GameObject target)
+    {
+        Collider targetCollider = target.GetComponent<Collider>();
+        if (targetCollider != null)
+        {
+            Destroy(targetCollider);
         }
     }
 }

@@ -20,6 +20,7 @@ using UnityEngine;
 /// 被ダメージ通知(DamageTaken)へ引き継ぐ(ヴォルブラークRの反射は反射フラグ付きのダメージを再反射しない)。
 /// HPreg(毎秒自動回復)はCharacterStats.CurrentHealthRegenを毎フレーム参照して回復する(死亡中は回復しない)。
 /// シールドは今回実装しない。
+/// SetMaxHealth()で、CharacterStatsを持たない対象(タワーなど)の最大HPをコードから設定できる(フェーズ5)。
 /// 将来的にTECHNICAL_DESIGN.mdのHealthComponent / DamageSystemへ発展させる想定。
 /// </summary>
 public class HealthController : MonoBehaviour
@@ -220,6 +221,30 @@ public class HealthController : MonoBehaviour
         }
 
         return actualHeal;
+    }
+
+    /// <summary>
+    /// CharacterStatsを持たない対象(タワーなど)の最大HPをコードから設定する(フェーズ5のMapBuilderのタワー組み立てが使用)。
+    /// 生成直後(Startの初期化前)の呼び出しではStartが新しい最大HPで全快初期化する。
+    /// Start後の呼び出しでは最大HPの動的変化と同じルール(増加分は現在HPへ加算・減少時はクランプ)で即時反映する。
+    /// CharacterStatsを持つ対象では最大HPはCharacterStats側が管理するため使用しない。
+    /// </summary>
+    public void SetMaxHealth(float maxHealth)
+    {
+        if (_characterStats != null)
+        {
+            Debug.LogWarning("HealthController: CharacterStatsを持つ対象の最大HPはCharacterStats側で管理するため、SetMaxHealthは使用されません。", this);
+            return;
+        }
+
+        _maxHealth = Mathf.Max(1f, maxHealth);
+
+        // Startの初期化後(前回値が記録済み)の呼び出しは、Updateを待たずに即時反映する。
+        if (_lastKnownMaxHealth > 0f && !Mathf.Approximately(_lastKnownMaxHealth, MaxHealth))
+        {
+            HandleMaxHealthChanged(_lastKnownMaxHealth, MaxHealth);
+            _lastKnownMaxHealth = MaxHealth;
+        }
     }
 
     /// <summary>

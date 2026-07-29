@@ -24,24 +24,23 @@
 
 ### Added
 
+- タワー(TowerController)を実装(フェーズ5)。HP5000 / AR60 / AD130 / AS0.80 / 射程8.0。射程内の敵ヒーローを自動攻撃し、通常ダメージはAR式で自前軽減(IIncomingDamageModifier・確定ダメージは軽減しない)。HPは1000刻み5段階でログへ出し、破壊時はクリスタル消灯・本体非表示で復活しない。攻撃ビームと頭上のHPバーはLineRendererの実行時生成。
+- タワーの連続攻撃ダメージ増加を実装。同一対象へ2発目から基礎ADの25%ずつ増加(増加分の上限は基礎の200%=最終ダメージ3倍)。2秒間攻撃しない・対象変更でリセット。
+- 1レーン対称マップ生成(MapBuilder)と両陣営の開始地点を実装(フェーズ5)。地面・中央線・横道の壁(開口部3か所)・外周境界壁・開始地点(中央向き)・タワーを実行時にプリミティブから組み立てる。陣営enum(Team: Blue/Red)をScripts/Coreへ追加。
+- HealthController.SetMaxHealth()を追加。CharacterStatsを持たない対象(タワーなど)の最大HPをコードから設定できる(生成直後の呼び出しでも全快で開始)。
+- Targetable.InitializeRuntime()を追加。実行時生成の対象向けに分類・選択リング・本体Rendererをコードから設定して参照を初期化する。
 - カメラ操作を実装(TopDownCameraController、Scripts/Core。Main Cameraへ追加する)。ロックモード(既定)ではプレイヤーを中心にカメラが追従する。Yでフリーモードと切り替えられ、フリーモードでは追従せず、マウスカーソルを画面端(上下左右)へ持っていくとその方向へゆっくりスクロールする(スクロール速度と画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心になって追従し、離すとその場でフリーモードへ戻る(LOLデフォルトのSpace/Yと同じ配置)。
 - PlayerInputHubへカメラ操作用のInputActionを追加(CameraCenter: Space / CameraLockToggle: Y)。
 - キャラごとのPlayerプレハブ(Prefab Variant)方式を実装(フェーズ5前準備)。共通コンポーネントだけを持つPF_Player_Baseを親プレハブとし、各キャラクターは固有スキルコンポーネントを追加したPrefab Variant(PF_Player_Zelf / PF_Player_Volbraak、Prefabs/Characters/)として作成する。CharacterDataへPlayer Prefab参照を追加し、新規PlayerSpawner(Scripts/Characters)が試合シーン開始時に選択キャラクターのVariantをスポナーの位置・向きへ生成する(シーン直置きのPlayerは廃止。既存Playerがある場合は生成をスキップする安全網付き)。
-- フェーズ5: 1レーン対称マップを実装(MapBuilder新規、Scripts/Map)。GAME_DESIGN 3章の座標を100ゲーム単位=1 Unity単位へ換算し(マップ中央=ワールド原点)、地面84×24(GroundLayer)・外周の壁・レーン(幅16)上下の横道(開口部x=-18/0/+18・幅4、左右対称)をシーンの空オブジェクト"Map"から実行時に生成する。壁はWallLayerが定義されていればそのレイヤー、無ければDefaultで生成し、CharacterControllerの移動を物理的に遮る(FlashControllerのWall Layerへ設定すればFの壁越え禁止にも使える)。寸法・開口部・色はInspector設定。
-- フェーズ5: 各陣営の開始地点を実装(Team enum新規、Scripts/Core)。MapBuilderが本拠地(x=±33)の少し前(x=±31)へSpawnPoint_Blue/SpawnPoint_Redをチーム色マーカー付きで生成し、互いの敵陣方向を向く。PlayerSpawnerへTeam設定(既定Blue)とSpawn Height Offset(既定1.1)を追加し、シーンにMapBuilderがある場合は自陣の開始地点へPlayerを生成する(無い場合は従来どおりスポナーの位置。復活位置は生成位置を引き継ぐ)。
 
 ### Fixed
 
 - Prefab Variant移行後に全スキルが「マウスカーソルがGroundを指していないため発動しません」等で不発になる問題を修正。Variantへ追加し直したスキルコンポーネントのGround/Targetable LayerMaskが未設定(Nothing)のままになることが原因。新規PlayerLayerMaskFallback(Scripts/Characters)をPlayerCharacterApplierのAwakeから呼び出し、未設定の_groundLayer/_targetableLayerのみをレイヤー名(GroundLayer/TargetableLayer、無ければ6/7番)から自動補正する(Inspector設定済みの値は上書きしない。FlashControllerのWall Layerなど意図的な未設定は対象外)。
-- フェーズ4完了チェック(ドキュメント修正・インゲーム仕様が正): TECHNICAL_DESIGN.mdのゼルフW記述を実装に合わせて更新(周囲W Damage Radius 2.0へ合計AD×150%のティックダメージ・Character/TrainingDummy初回命中時のQ即時リセット+同一対象ロック解除・W発動中の通常攻撃/Q/E/R入力ロックを追記。旧記述「攻撃機能は持たず、W中も通常攻撃・Q・Eを制限しない」を削除)。
-- フェーズ4完了チェック: TECHNICAL_DESIGN.mdのゼルフE記述を実装に合わせて更新(「End Extension 0.75」を実装どおりのダッシュ後ウェーブ(Wave Distance 3.0 / Wave Speed 10)へ修正し、命中時のClearLockout(命中対象)を追記)。GAME_DESIGN.mdのゼルフE説明も同様に更新(「経路と終点の少し先」→ダッシュ経路とダッシュ後の前方ウェーブ(距離300)、「Qの同一対象ロックは解除しない」→命中した対象のロックを解除する)。
-- フェーズ4完了チェック: TECHNICAL_DESIGN.mdのRespawnController記述の復活時間を実装に合わせて更新(「SC_Prototypeでは1秒」→既定4秒。GAME_DESIGN 7章のLv1〜2準拠)。
-- フェーズ4完了チェック: TECHNICAL_DESIGN.mdのクラス一覧へ実在クラスを追加(Characters: PlayerClickMovement・PlayerInputHub・ZelfRController・CommonDController・FlashController / Combat: CrowdControlController・AbilityLockController)し、命名規則の例を実名へ修正(PF_Zelf→PF_Player_Zelf、ZelfSkillQController→ZelfQController)。誤字修正(「俰瞰」→「俯瞰」、CrowdControlController.csコメントの「行動妓害」→「行動妨害」)。
-- フェーズ4完了チェック: TASKS.mdの「キャラクター選択画面を実装する」をPhase 7からPhase 4(フェーズ4前準備)へ移動。KEYMAP.mdへ本作実装の補足(キャスト方式の現状・カメラスクロールは画面端マウスのみ)を追記。
 
 ### Changed
 
-- TopDownCameraController: フリーモードの画面端スクロールを、シーンにMapBuilderがある場合のみマップ範囲内へ注視点基準でクランプするように更新(余白Bounds Margin既定2.0、Inspector設定。予定していたマップ境界クランプの実装)。あわせて、MapBuilderがあるシーンでは開始地点がシーンのカメラ位置から離れていてもプレイヤーを中心に映せるよう、追従オフセットをシーンカメラの高さと俯瞰角度から計算するように更新(MapBuilderが無いシーンは従来どおり)。
+- PlayerSpawner: シーンにMapBuilderがある場合は自陣営(Team)の開始地点の位置・向きへSpawn Height Offset分浮かせて生成する(地面への埋まり防止)。公開プロパティTeamを追加(タワーの敵味方判定用)。
+- TopDownCameraController: 対象取得時にシーンカメラの高さ・俯瞰角度から追従オフセットを計算し(開始地点が原点から離れていてもプレイヤーを画面中央に映す)、フリーモードのスクロールをマップ範囲+余白(Bounds Margin)の内側へ注視点基準でクランプする(フェーズ5)。
 - PlayerCharacterApplier: Prefab Variant方式に合わせて役割を更新。Playerプレハブ(PF_Player_Base)へアタッチして全Variantで共通使用し、CharacterDataの適用(ステータス・テーマカラー)を担当する。固有スキルコンポーネントの取り外しは、CharacterDataとVariantの誤設定に備えた安全網として維持(正しい組み合わせでは何も取り除かれない)。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
 - ヴォルブラークR(反射): 反射で与えるダメージに反射フラグを付け、反射フラグ付きのダメージ(再反射)は反射しないように更新(GAME_DESIGN 12章「反射は再反射しない」)。ミラー戦(ヴォルブラーク対ヴォルブラーク)などで両者の反射ウィンドウが有効な場合でも、反射同士が無限にループしない。
 - HealthController / DamageContext: ダメージが反射によるものかを表すIsReflectedフラグをDamageContextへ追加。TakeDamageのisReflected引数(既定false)から、軽減判定(IIncomingDamageModifier)と被ダメージ通知(DamageTaken)の両方へ引き継がれる。
