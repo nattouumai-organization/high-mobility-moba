@@ -4,7 +4,7 @@ namespace Core
 {
     /// <summary>
     /// どのチームに属するかを保持するコンポーネント。
-    /// Tower/Nexus/Player/Minion に Add して TeamMember.Team でチーム判定する。
+    /// Tower / Nexus / Player / Minion に Add してチーム判定に使用する。
     /// </summary>
     public class TeamMember : MonoBehaviour
     {

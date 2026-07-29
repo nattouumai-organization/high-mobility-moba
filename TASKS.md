@@ -2,6 +2,7 @@
 
 ## タスク1: マップの実装
 - [x] MapBuilder でランタイム生成（1レーン対称マップ）
+- [x] 地面 Plane のレイヤーを GroundLayer に自動設定
 - [x] 開始地点（GetSpawnPoint）・境界（BoundsMin/BoundsMax）を公開
 - [x] TopDownCameraController にマップ境界クランプを追加
 
@@ -25,24 +26,20 @@
 - [x] タワー破壊後のみ被ダメージ、GameManager.OnNexusDestroyed で勝敗通知
 - [x] TowerController 破壊時に敵陣NexusController.OnGuardTowerDestroyed()
 
-## fix1: コンパイルエラー修正（Team/TeamMember 未定義）
-- [x] Core/Team.cs 追加（Team enum が未定義で CS0246 全件発生していた）
-- [x] Core/TeamMember.cs 追加
-- [x] 冪等パッチ（二重適用防止）
+## fix1〜fix3: コンパイルエラー修正
+- [x] Team.cs / TeamMember.cs 追加
+- [x] using Combat; / using Characters; 削除（namespace なしのトップレベルクラスのため）
+- [x] API名全修正: Died / .Type / !IsDead / .Classification
+- [x] InitializeRuntimeパッチフィールド名修正
+- [x] DamageInfo.cs 同梱
 
-## fix2: using ディレクティブ不足修正
-- [x] TowerController / NexusController に `using Combat;` `using Characters;` を追加
-- [x] → ただしこれらの namespace は存在しなかったため fix3 で再修正
-
-## fix3: 正しい API 名に全面修正
-- [x] `using Combat;` `using Characters;` を削除（namespace なし→直接参照）
-- [x] HealthController.OnDeath  → .Died
-- [x] DamageContext.DamageType  → .Type
-- [x] Targetable.IsTargetable   → !t.IsDead
-- [x] Targetable.TargetClassification → .Classification
-- [x] InitializeRuntime パッチ: _targetClassification → _classification / _ringRenderer → _selectionRingRenderer
-- [x] IIncomingDamageModifier シグネチャ: ModifyIncomingDamage(DamageContext context, float currentAmount)
-- [x] DamageInfo.cs を ZIP に同梱
+## fix4: フィールド未生成 / Ground レイヤー未設定 修正
+- [x] MapBuilder: 地面のレイヤーを GroundLayer へ自動設定 → 右クリック移動・スキル発動修正
+- [x] MapBuilder: Inspector 未割り当て時はタワー・ネクサスのビジュアルプリミティブを自動生成
+   • Tower: Cylinder, チームカラー (Blue=青/Red=赤)
+   • Nexus: Cube, チームカラー (タワーより暗め)
+- [x] MapBuilder: GroundLayer が見つからない場合はフォールバック番号 6 を使用して警告表示
+- [x] NexusController: _crystalRenderer 未設定時に GetComponentInChildren<Renderer>() で代替
 
 ## タスク7: 勝敗UI・ゲームループリスタート（未実装）
 - [ ] 勝敗 UI（リザルト画面）

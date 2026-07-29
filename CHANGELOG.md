@@ -20,20 +20,13 @@
 - 削除した要素
 ```
 
-## 2026-07-30 phase5-fix3: API名全面修正
+## 2026-07-30 phase5-fix4: Groundレイヤー・タワービジュアル修正
 
 ### Fixed
-- TowerController / NexusControllerのAPI参照対応表:
-  | 誤った名前(修正前) | 正しい名前(修正後) |
-  |---|---|
-  | `HealthController.OnDeath` | `.Died` |
-  | `DamageContext.DamageType` | `.Type` |
-  | `Targetable.IsTargetable` | `!t.IsDead` |
-  | `Targetable.TargetClassification` | `.Classification` |
-  | InitializeRuntimeパッチ: `_targetClassification` | `_classification` |
-  | InitializeRuntimeパッチ: `_ringRenderer` | `_selectionRingRenderer` |
-  | `using Combat;` / `using Characters;` | 删除(ネームスペースなし) |
-- DamageInfo.cs を ZIP に同梱。
+- MapBuilder: 地面 Plane のレイヤーを GroundLayer へ自動設定。右クリック移動・全スキルの発動が正常化。
+- MapBuilder: Inspector 未割り当て時に Tower(Cylinder)・ Nexus(Cube) プリミティブを自動生成。
+- NexusController: _crystalRenderer 未設定時に GetComponentInChildren で代替。
+- fix1~fix3 の内容を継続。
 
 ## 2026-07-29
 

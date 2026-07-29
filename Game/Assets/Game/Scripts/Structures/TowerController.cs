@@ -21,7 +21,7 @@ namespace Structures
 
         [Header("Minion Absence Damage Reduction")]
         [SerializeField] private float _minionCheckRadius = 9.0f;
-        [Tooltip("Normal damage multiplier when no friendly minion is nearby. 0.1 = 90 % reduction.")]
+        [Tooltip("Normal damage multiplier when no friendly minion is nearby. 0.1 = 90% reduction.")]
         [SerializeField] private float _minionAbsenceMultiplier = 0.1f;
 
         [Header("Team")]
@@ -39,23 +39,22 @@ namespace Structures
         public Team Team        => _team;
         public bool IsDestroyed => _destroyed;
 
+        /// <summary>MapBuilder (コード生成時) から呼び出してチームを設定する。</summary>
         public void Initialize(Team team) { _team = team; }
 
-        // --------------------------------------------------------
         private void Awake()
         {
             _health     = GetComponent<HealthController>();
             _targetable = GetComponent<Targetable>();
 
-            // SetMaxHealth は patch_cs.py で HealthController に追加されます。
             _health.SetMaxHealth(_maxHp);
 
-            // InitializeRuntime は patch_cs.py で Targetable に追加されます。
+            // Renderer が存在する場合のみ InitializeRuntime へ渡す(null セーフ)
             _targetable.InitializeRuntime(
-                TargetClassification.Tower, null, null,
+                TargetClassification.Tower,
+                null, null,
                 GetComponentInChildren<Renderer>());
 
-            // 正しいイベント名: Died
             _health.Died += HandleDeath;
         }
 
@@ -70,17 +69,15 @@ namespace Structures
                 FireAtTarget();
         }
 
-        // IIncomingDamageModifier: 正しいシグネチャ
+        // IIncomingDamageModifier
         public float ModifyIncomingDamage(DamageContext context, float currentAmount)
         {
-            // 確定ダメージは 0 で完全無効
-            if (context.Type == DamageType.True) return 0f;
+            if (context.Type == DamageType.True) return 0f;  // 確定ダメージ完全無効
             float reduced = currentAmount * 100f / (100f + _armor);
             if (!_hasMinionNearby) reduced *= _minionAbsenceMultiplier;
             return reduced;
         }
 
-        // --------------------------------------------------------
         private void CheckMinionPresence()
         {
             _hasMinionNearby = false;
@@ -110,7 +107,6 @@ namespace Structures
                 float dist = Vector3.Distance(transform.position, t.transform.position);
                 if (dist > _attackRange) continue;
 
-                // 正しいプロパティ名: Classification (TargetClassification は存在しない)
                 bool isHero = t.Classification == TargetClassification.Character
                            || t.Classification == TargetClassification.TrainingDummy;
 
@@ -141,15 +137,18 @@ namespace Structures
             _consecutiveResetTimer = _consecutiveResetDelay;
             _attackCooldown = 1f / _attackSpeed;
 
-            Debug.Log(string.Format("[Tower-{0}] HP {1:F0}/{2:F0} target={3} minion={4}",
+            Debug.Log(string.Format(
+                "[Tower-{0}] HP {1:F0}/{2:F0} target={3} minion={4}",
                 _team, _health.CurrentHealth, _maxHp,
-                _currentTarget != null ? _currentTarget.name : "none", _hasMinionNearby));
+                _currentTarget != null ? _currentTarget.name : "none",
+                _hasMinionNearby));
         }
 
         private void HandleDeath()
         {
             _destroyed = true;
             Debug.Log("[Tower] Destroyed – " + _team);
+
             var mb = FindFirstObjectByType<Map.MapBuilder>();
             if (mb != null)
             {

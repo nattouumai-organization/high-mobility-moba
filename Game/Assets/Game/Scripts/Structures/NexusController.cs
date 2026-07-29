@@ -29,7 +29,6 @@ namespace Structures
         public bool IsVulnerable => _guardTowerDestroyed;
         public bool IsDestroyed  => _nexusDestroyed;
 
-        // --------------------------------------------------------
         public void OnGuardTowerDestroyed()
         {
             if (_guardTowerDestroyed) return;
@@ -40,45 +39,43 @@ namespace Structures
             if (_col != null) _col.enabled = true;
         }
 
-        // --------------------------------------------------------
         private void Awake()
         {
             _health     = GetComponent<HealthController>();
             _targetable = GetComponent<Targetable>();
             _col        = GetComponent<Collider>();
 
-            // SetMaxHealth は patch_cs.py で HealthController に追加されます。
             _health.SetMaxHealth(_maxHp);
 
-            // InitializeRuntime は patch_cs.py で Targetable に追加されます。
-            _targetable.InitializeRuntime(
-                TargetClassification.Tower, null, null,
-                _crystalRenderer != null ? _crystalRenderer : GetComponentInChildren<Renderer>());
+            // _crystalRenderer が未設定の場合は自身の Renderer を使用
+            Renderer r = _crystalRenderer != null
+                ? _crystalRenderer
+                : GetComponentInChildren<Renderer>();
+            _targetable.InitializeRuntime(TargetClassification.Tower, null, null, r);
 
-            // 正しいイベント名: Died
             _health.Died += HandleNexusDeath;
 
             // タワー生存中は非ターゲット・非コリジョン
             _guardTowerDestroyed = false;
-            _targetable.enabled = false;
+            _targetable.enabled  = false;
             if (_col != null) _col.enabled = false;
         }
 
-        // IIncomingDamageModifier: 正しいシグネチャ
+        // IIncomingDamageModifier
         public float ModifyIncomingDamage(DamageContext context, float currentAmount)
         {
-            if (!_guardTowerDestroyed) return 0f;      // タワー健在中は全ダメージ無効
+            if (!_guardTowerDestroyed) return 0f;              // タワー生存中は全ダメージ無効
             if (context.Type == DamageType.True) return currentAmount;  // 確定ダメージは素通し
             return currentAmount * 100f / (100f + _armor);
         }
 
-        // --------------------------------------------------------
         private void HandleNexusDeath()
         {
             if (_nexusDestroyed) return;
             _nexusDestroyed = true;
             ApplyCrystalColor(_colorBroken);
             Debug.Log("[Nexus] DESTROYED – " + _team + " loses!");
+
             Team winner = _team == Team.Blue ? Team.Red : Team.Blue;
             var gm = FindFirstObjectByType<GameManager>();
             if (gm != null) gm.OnNexusDestroyed(winner);
@@ -87,7 +84,10 @@ namespace Structures
 
         private void ApplyCrystalColor(Color c)
         {
-            if (_crystalRenderer != null) _crystalRenderer.material.color = c;
+            Renderer r = _crystalRenderer != null
+                ? _crystalRenderer
+                : GetComponentInChildren<Renderer>();
+            if (r != null) r.material.color = c;
         }
     }
 }
