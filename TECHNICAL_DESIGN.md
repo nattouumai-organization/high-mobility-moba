@@ -84,7 +84,7 @@ TopDownCameraController
 
 - 試合開始、勝敗、復活、ゲーム状態を管理する。
 - 状態は `Waiting`、`CharacterSelect`、`Playing`、`Finished` を持つ。
-- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俰瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
+- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俯瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
 
 ### Combat
 
@@ -97,6 +97,8 @@ DamageEvent
 DamageType
 DamageContext
 IIncomingDamageModifier
+CrowdControlController
+AbilityLockController
 StatusEffectController
 CooldownController
 ```
@@ -105,7 +107,7 @@ CooldownController
 - 確定ダメージは朧Rの処刑とヴォルブラークRの反射のみ。
 - ダメージ計算式：`FinalDamage = RawDamage * 100 / (100 + AR)`。
 - 試作では `HealthController`(Scripts/Combat)が現在HP・被ダメージ・回復の土台・HP変化通知・死亡イベントを管理する。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象(TrainingDummy)はInspectorのMax Healthを最大HPとして使用する。TakeDamage / Healは実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、ダメージを与えた側が実ダメージ量を取得できる。Revive()で死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。TakeDamageは攻撃者のTransformとダメージ種別(DamageType.Normal / True。Scripts/Combat/DamageInfo.cs)も受け取れ、HPへ適用する直前に同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減など)がDamageContext(攻撃者・ダメージ種別・元ダメージ・反射フラグ)を使ってダメージ量を変更できる。通常ダメージ(Normal)はAR(防御力)による軽減式 FinalDamage = RawDamage × 100 / (100 + AR) で軽減され、確定ダメージ(True)はARでは軽減されない(ヴォルブラークRの反射ダメージが使用)。従来のTakeDamage(ダメージ量のみ)は攻撃者なしの通常ダメージとして互換動作する。実ダメージ(実際に減ったHP)が発生したときは(ダメージ情報・実ダメージ量)をDamageTakenイベントで通知する(ヴォルブラークRの反射が購読。死亡処理より前に通知するため致死ダメージも通知対象)。TakeDamageは反射ダメージかどうか(isReflected・既定false)も受け取れ、DamageContext.IsReflectedとして軽減判定と被ダメージ通知へ引き継がれる(反射ダメージの再反射防止に使用)。将来的にHealthComponent / DamageSystemへ発展させる。
-- 試作では `RespawnController`(Scripts/Combat)が死亡した対象の復活を管理する。死亡イベントを受けてRespawn Delay秒(SC_Prototypeでは1秒、Inspector設定)後に初期位置・初期向きへ戻し、HealthController.Revive()で全快する。Player・TrainingDummy・AttackDummyで共通利用し、将来のキャラクター・ミニオンにも再利用できる。
+- 試作では `RespawnController`(Scripts/Combat)が死亡した対象の復活を管理する。死亡イベントを受けてRespawn Delay秒(既定4秒=GAME_DESIGN 7章のLv1〜2。レベル連動はレベルシステム実装後の後続タスク。TrainingDummyなどテスト用の対象は1秒程度の短い値でよい。Inspector設定)後に初期位置・初期向きへ戻し、HealthController.Revive()で全快する。Player・TrainingDummy・AttackDummyで共通利用し、将来のキャラクター・ミニオンにも再利用できる。
 
 ### Characters
 
@@ -115,6 +117,8 @@ CharacterStats
 CharacterData
 BasicAttackController
 CharacterSkillController
+PlayerClickMovement
+PlayerInputHub
 PlayerTargetSelector
 PlayerMouseFacing
 PlayerBasicAttackController
@@ -125,6 +129,9 @@ ZelfPassiveHeal
 ZelfQController
 ZelfWController
 ZelfEController
+ZelfRController
+CommonDController
+FlashController
 CharacterSelectionManager
 CharacterSelectionUI
 PlayerCharacterApplier
@@ -152,8 +159,8 @@ VolbraakRController
 - `WorldHealthBar`(Scripts/UI)はHealthControllerのHP変化・死亡イベントを購読し、World Space Canvas上のUI ImageのFill AmountでHPバーを表示する。バーは毎フレームMain Cameraの向きに揃え、対象の死亡時はCanvasの無効化で非表示になり、復活時に再表示される。
 - `ZelfPassiveHeal`(Scripts/Characters)はゼルフP(与ダメージ回復)を管理する。通常攻撃から実ダメージ量とターゲット分類を受け取り、Character 5% / Minion 2.5% / Tower 0%(テスト用のTrainingDummy分類はCharacterと同じ5%。いずれもInspector設定)で自身のHealthControllerを回復する。死亡中は回復せず、最大HPを超えない。実際にHPが増えた場合のみ緑色の回復表示を要求する。
 - `ZelfQController`(Scripts/Characters)はゼルフQを管理する。Qの対象はマウス下の有効なTargetableのみで、PlayerTargetSelectorの選択対象は対象決定に使用しない(マウス下に有効な対象がいない場合、またはTower分類の対象にはQを発動しない)。対象がQ射程外の場合は自動接近してQ射程内に入った時点で自動発動し、自動接近は右クリック入力・対象の死亡・無効化・破棄・Tower分類への変化で中止する。射程内ならブリンクして `Base Damage + Current Attack Damage × AD Ratio` のダメージを与え(攻撃者としてPlayerのTransformを渡す通常ダメージ)、Q成功対象へ同一対象ロック(Same Target Lockout)を設定し、分類別クールダウン処理(Character / TrainingDummy: 即時リセット、Minion: 残り50%短縮)を行う。視点は自動接近中は移動方向へ、ブリンク後はブリンクした方向へPlayerMouseFacing.SetLookDirection()で明示的に向ける(ブリンク移動量がほぼゼロの場合のみ対象方向へフォールバック)。与ダメージ表示はCombatTextManager.ShowDamageDealt()、ゼルフP回復はZelfPassiveHeal.NotifyDamageDealt()の直接呼び出しで行い、Reflectionは使用しない。スキル間連携用のpublic APIとして、ResetCooldown()(Qの残りクールダウンだけを即時0にする。Same Target Lockout・自動接近状態は変更しない)、CancelPendingApproach()(自動接近中であれば中止)、GroundLayerMask / TargetableLayerMask(LayerMask設定の共有用読み取り専用プロパティ)を公開する。参照・レイヤー・数値はSC_PrototypeシーンのPlayerのInspector設定として保存する。
-- `ZelfWController`(Scripts/Characters)はゼルフW(前方ダメージ軽減)を管理する。Wキー(Input System)で発動し、Duration 0.75秒 / Cooldown 10秒 / Front Angle 120度 / Damage Reduction 55%(いずれもInspector設定)。IIncomingDamageModifierとしてHealthControllerからHP適用直前に呼び出され、W持続中に受けたダメージごとに、ダメージを受けた瞬間のtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で前方判定して通常ダメージだけを軽減する(背後・側面・攻撃者不明・確定ダメージは軽減しない)。攻撃・CC・CC無効化・無敵・対象指定不可の機能は持たず、W中も移動・回転・通常攻撃・Q・Eを制限しない。持続中は前方に青い扇形のLineRenderer防御エフェクトを実行時生成で表示する(子オブジェクトのローカル座標描画で回転に追従、終了時に非表示)。
-- `ZelfEController`(Scripts/Characters)はゼルフE(方向ダッシュ)を管理する。Eキー(Input System)でマウス下のGround地点の方向へDash Distance 4.0をDash Duration 0.18秒でダッシュする(Hit Radius 0.60 / End Extension 0.75 / Base Damage 20 / AD Ratio 50% / Cooldown 8秒、いずれもInspector設定。Groundを指していない・近すぎる・CD中は不発動)。発動時にPlayerClickMovementを停止してZelfQController.CancelPendingApproach()でQ自動接近を中止し、ダッシュ中はCharacterControllerを無効化して位置を直接更新する(GroundレイキャストでY座標維持、終了時に対象と重なっていればダッシュ方向へ押し出し補正。NavMesh不使用)。命中判定は経路+終点先End ExtensionをHit RadiusのカプセルでTargetableLayerのみ判定し、同一TargetableにはE 1回につき1回だけ `Base Damage + Current Attack Damage × AD Ratio` の通常ダメージをHealthController経由・攻撃者情報付きで与える(Tower分類にも与える。被弾フラッシュ・ダメージ表示・ゼルフP回復は既存経路)。Character分類(TrainingDummy含む)へ1体以上命中した場合のみZelfQController.ResetCooldown()を呼ぶ。ダッシュ中は青いTrailRendererの残像を表示し、終了後短時間で消える。LayerMask未設定時はZelfQControllerのGroundLayerMask / TargetableLayerMaskを自動使用する。
+- `ZelfWController`(Scripts/Characters)はゼルフW(前方ダメージ軽減)を管理する。Wキー(Input System)で発動し、Duration 0.75秒 / Cooldown 10秒 / Front Angle 120度 / Damage Reduction 55%(いずれもInspector設定)。IIncomingDamageModifierとしてHealthControllerからHP適用直前に呼び出され、W持続中に受けたダメージごとに、ダメージを受けた瞬間のtransform.forwardと攻撃者への水平方向(Y軸高さは含めない)で前方判定して通常ダメージだけを軽減する(背後・側面・攻撃者不明・確定ダメージは軽減しない)。持続中は周囲W Damage Radius 2.0以内の全Targetableへ、合計がAD×W Total AD Ratio 150%になるダメージをW Tick Interval 0.1秒ごとに均等に与え、Character/TrainingDummy分類への初回命中時にZelfQController.ResetCooldown()と同一対象ロック解除(ClearLockout)を即時実行する(Qリセットは1回のW発動につき1回)。W発動中はAbilityLockControllerへロックを追加して通常攻撃・Q・E・Rの入力を禁止し、W終了時に解除する(移動・回転は制限しない)。CC・CC無効化・無敵・対象指定不可の機能は持たない。持続中は前方に青い扇形のLineRenderer防御エフェクトを実行時生成で表示する(子オブジェクトのローカル座標描画で回転に追従、終了時に非表示)。
+- `ZelfEController`(Scripts/Characters)はゼルフE(方向ダッシュ)を管理する。Eキー(Input System)でマウス下のGround地点の方向へDash Distance 4.0をDash Duration 0.18秒でダッシュする(Hit Radius 0.60 / Wave Distance 3.0 / Wave Speed 10 / Base Damage 20 / AD Ratio 50% / Cooldown 8秒、いずれもInspector設定。Groundを指していない・近すぎる・CD中は不発動)。発動時にPlayerClickMovementを停止してZelfQController.CancelPendingApproach()でQ自動接近を中止し、ダッシュ中はCharacterControllerを無効化して位置を直接更新する(GroundレイキャストでY座標維持、終了時に対象と重なっていればダッシュ方向へ押し出し補正。NavMesh不使用)。命中判定はダッシュ経路と、ダッシュ終了後に前方へ飛ぶウェーブ(Post-Dash Wave: 終点からWave Distance先までWave Speedで前進。自身の死亡で中断)の経路をHit RadiusのカプセルでTargetableLayerのみ判定し、同一TargetableにはE 1回につき1回だけ `Base Damage + Current Attack Damage × AD Ratio` の通常ダメージをHealthController経由・攻撃者情報付きで与える(Tower分類にも与える。被弾フラッシュ・ダメージ表示・ゼルフP回復は既存経路)。Character分類(TrainingDummy含む)へ命中した瞬間にZelfQController.ResetCooldown()とClearLockout(命中対象)を即時実行する(ウェーブ終了を待たない。ミニオン・タワーだけへの命中ではリセットしない)。ダッシュ中は青いTrailRendererの残像を表示し、終了後短時間で消える。LayerMask未設定時はZelfQControllerのGroundLayerMask / TargetableLayerMaskを自動使用する。
 - `DummyAutoAttack`(Scripts/Characters)は攻撃ダミー(AttackDummy)用の自動攻撃。Inspectorで設定した攻撃対象(PlayerのHealthController)が攻撃射程内の場合のみ、攻撃間隔ごとに即時ダメージを与え(攻撃者として自身のTransformを渡す通常ダメージ。PlayerのゼルフWの前方判定対象になる)、実ダメージ量を受けた側の頭上に黄色で表示する。攻撃力・攻撃速度・射程はInspector設定(試作は10 / 1 / 2)。射程判定はPlayerの通常攻撃と同じく対象Colliderの最も近い点との水平距離で行い、自身または対象の死亡中は攻撃しない。
 - `FloatingCombatText` / `CombatTextManager`(Scripts/UI)は再利用可能なフローティング戦闘テキスト。CombatTextManagerがShowDamageDealt(赤・攻撃対象の頭上・例: 60) / ShowDamageTaken(黄・受けた側の頭上・例: -10) / ShowHeal(緑・例: +3)のstatic APIで表示要求を受け取り(プレイヤー視点で1回のダメージにつき表示は1つ)、対象の頭上のワールド空間にWorld Space Canvas+標準Text(LegacyRuntimeフォント)の整数テキストを生成する(重なり軽減のランダム横方向オフセット付き)。FloatingCombatTextは上方向移動・フェードアウト・Main Cameraへの向き揃え(裏返らない)を行い、表示終了後に自身を安全に削除する。プール処理は未実装だが生成箇所を集約してあり、将来プールへ置き換えやすい。将来のキャラクター・ミニオン・タワーからも共通利用できる。
 - `CharacterData`(Scripts/Characters)はキャラクター固有の固定情報(ID・表示名・役割・説明・テーマカラー・Character Status)、基礎ステータス・成長値、P/Q/W/E/Rのスキル説明を保持するScriptableObject。Data/Characters/へZelfData.asset・VolbraakData.assetを作成済み。SC_Prototype開始時はPlayerCharacterApplierが選択中のCharacterDataをPlayerへ適用する(フェーズ4前準備)。各キャラクターのPlayerプレハブ(Prefab Variant)への参照(Player Prefab)も保持し、PlayerSpawnerが試合シーン開始時の生成に使用する(フェーズ5前準備)。
@@ -275,8 +282,8 @@ Scene: SC_Xxx
 
 ```text
 ZelfData
-PF_Zelf
-ZelfSkillQController
+PF_Player_Zelf
+ZelfQController
 TowerController
 IsDead
 CanCastSkill

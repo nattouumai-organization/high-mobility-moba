@@ -31,6 +31,11 @@
 ### Fixed
 
 - Prefab Variant移行後に全スキルが「マウスカーソルがGroundを指していないため発動しません」等で不発になる問題を修正。Variantへ追加し直したスキルコンポーネントのGround/Targetable LayerMaskが未設定(Nothing)のままになることが原因。新規PlayerLayerMaskFallback(Scripts/Characters)をPlayerCharacterApplierのAwakeから呼び出し、未設定の_groundLayer/_targetableLayerのみをレイヤー名(GroundLayer/TargetableLayer、無ければ6/7番)から自動補正する(Inspector設定済みの値は上書きしない。FlashControllerのWall Layerなど意図的な未設定は対象外)。
+- フェーズ4完了チェック(ドキュメント修正・インゲーム仕様が正): TECHNICAL_DESIGN.mdのゼルフW記述を実装に合わせて更新(周囲W Damage Radius 2.0へ合計AD×150%のティックダメージ・Character/TrainingDummy初回命中時のQ即時リセット+同一対象ロック解除・W発動中の通常攻撃/Q/E/R入力ロックを追記。旧記述「攻撃機能は持たず、W中も通常攻撃・Q・Eを制限しない」を削除)。
+- フェーズ4完了チェック: TECHNICAL_DESIGN.mdのゼルフE記述を実装に合わせて更新(「End Extension 0.75」を実装どおりのダッシュ後ウェーブ(Wave Distance 3.0 / Wave Speed 10)へ修正し、命中時のClearLockout(命中対象)を追記)。GAME_DESIGN.mdのゼルフE説明も同様に更新(「経路と終点の少し先」→ダッシュ経路とダッシュ後の前方ウェーブ(距離300)、「Qの同一対象ロックは解除しない」→命中した対象のロックを解除する)。
+- フェーズ4完了チェック: TECHNICAL_DESIGN.mdのRespawnController記述の復活時間を実装に合わせて更新(「SC_Prototypeでは1秒」→既定4秒。GAME_DESIGN 7章のLv1〜2準拠)。
+- フェーズ4完了チェック: TECHNICAL_DESIGN.mdのクラス一覧へ実在クラスを追加(Characters: PlayerClickMovement・PlayerInputHub・ZelfRController・CommonDController・FlashController / Combat: CrowdControlController・AbilityLockController)し、命名規則の例を実名へ修正(PF_Zelf→PF_Player_Zelf、ZelfSkillQController→ZelfQController)。誤字修正(「俰瞰」→「俯瞰」、CrowdControlController.csコメントの「行動妓害」→「行動妨害」)。
+- フェーズ4完了チェック: TASKS.mdの「キャラクター選択画面を実装する」をPhase 7からPhase 4(フェーズ4前準備)へ移動。KEYMAP.mdへ本作実装の補足(キャスト方式の現状・カメラスクロールは画面端マウスのみ)を追記。
 
 ### Changed
 
