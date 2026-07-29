@@ -20,15 +20,12 @@
 - 削除した要素
 ```
 
-## 2026-07-30 phase5-fix1: タワー攻撃不具合・コンパイルエラー修正
+## 2026-07-30 phase5-fix2: using指令不足修正
 
 ### Fixed
-- `Core/Team.cs` 新規追加。Team enum (未定義) が原因の全 CS0246 エラーを解消。
-- `Core/TeamMember.cs` 新規追加。Player/Minion にアタッチしチームを公開する軽量 MonoBehaviour。
-- `PlayerSpawner`: スポーン時に TeamMember を Player に追加。
-- `TowerController`: ターゲット判定を PlayerSpawner.GetComponentInParent から TeamMember.GetComponent に変更。
-  タワーがプレイヤーを攻撃しない不具合を修正。
-- パッチスクリプトを冪等化。二重適用時に SetMaxHealth / InitializeRuntime / _team / Team の重複定義エラーを防止。
+- TowerController / NexusController: `using Combat;` `using Characters;` を追加。CS0246 エラーを解消。
+- fix1の内容を継続: Team.cs / TeamMember.cs / 冪等パッチ。
+
 ## 2026-07-29
 
 ### Added

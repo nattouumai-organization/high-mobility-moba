@@ -30,9 +30,9 @@ namespace Map
         public Vector2 BoundsMin => new Vector2(-_halfLength, -_halfWidth);
         public Vector2 BoundsMax => new Vector2( _halfLength,  _halfWidth);
 
-        public Transform               GetSpawnPoint(Team team) => team == Team.Blue ? _blueSpawn : _redSpawn;
-        public Structures.TowerController GetTower(Team team)  => team == Team.Blue ? _blueTower : _redTower;
-        public Structures.NexusController GetNexus(Team team)  => team == Team.Blue ? _blueNexus : _redNexus;
+        public Transform                  GetSpawnPoint(Team team) => team == Team.Blue ? _blueSpawn  : _redSpawn;
+        public Structures.TowerController GetTower     (Team team) => team == Team.Blue ? _blueTower  : _redTower;
+        public Structures.NexusController GetNexus     (Team team) => team == Team.Blue ? _blueNexus  : _redNexus;
 
         private void Awake() { BuildMap(); }
 

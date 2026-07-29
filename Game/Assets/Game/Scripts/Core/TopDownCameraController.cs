@@ -111,11 +111,11 @@ public class TopDownCameraController : MonoBehaviour
         var _mb = FindFirstObjectByType<Map.MapBuilder>();
         if (_mb != null)
         {
-            const float _margin = 2f;
-            Vector3 _p = transform.position;
-            _p.x = Mathf.Clamp(_p.x, _mb.BoundsMin.x - _margin, _mb.BoundsMax.x + _margin);
-            _p.z = Mathf.Clamp(_p.z, _mb.BoundsMin.y - _margin, _mb.BoundsMax.y + _margin);
-            transform.position = _p;
+            const float _mg = 2f;
+            Vector3 _cp = transform.position;
+            _cp.x = Mathf.Clamp(_cp.x, _mb.BoundsMin.x - _mg, _mb.BoundsMax.x + _mg);
+            _cp.z = Mathf.Clamp(_cp.z, _mb.BoundsMin.y - _mg, _mb.BoundsMax.y + _mg);
+            transform.position = _cp;
         }
     }
 

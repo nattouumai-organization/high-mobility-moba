@@ -26,15 +26,13 @@ namespace Core
         }
 
         /// <summary>Called by NexusController when a nexus is destroyed.</summary>
-        /// <param name="winner">The team that destroyed the enemy nexus (winning team).</param>
         public void OnNexusDestroyed(Team winner)
         {
             if (_state == MatchState.Finished) return;
             _state = MatchState.Finished;
             Team loser = winner == Team.Blue ? Team.Red : Team.Blue;
-            Debug.Log(string.Format(
-                "[GameManager] Match over!  Winner: {0}   Loser: {1}", winner, loser));
-            // TODO Phase 5 Task 7: show result UI / return to lobby.
+            Debug.Log(string.Format("[GameManager] Match over! Winner={0} Loser={1}", winner, loser));
+            // TODO Phase 5 Task 7: result UI
         }
     }
 }

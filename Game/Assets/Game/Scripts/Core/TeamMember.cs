@@ -3,18 +3,13 @@ using UnityEngine;
 namespace Core
 {
     /// <summary>
-    /// Lightweight component that marks a GameObject as belonging to a team.
-    /// Attach to players (added by PlayerSpawner) and minions.
-    /// TowerController / NexusController use this to distinguish friend from foe.
+    /// Marks a GameObject as belonging to a team.
+    /// Attached to players (by PlayerSpawner) and minions (by MinionController).
+    /// TowerController / NexusController use GetComponent<TeamMember>() for friend/foe detection.
     /// </summary>
     public class TeamMember : MonoBehaviour
     {
         [SerializeField] private Team _team;
-
-        public Team Team
-        {
-            get => _team;
-            set => _team = value;
-        }
+        public Team Team { get => _team; set => _team = value; }
     }
 }

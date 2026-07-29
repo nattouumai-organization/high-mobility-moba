@@ -18,8 +18,6 @@ public sealed class PlayerSpawner : MonoBehaviour
     [Tooltip("キャラクター未選択でSC_Prototypeを直接起動した場合に使用するCharacterData(ZelfData想定)")]
     [SerializeField] private CharacterData _fallbackCharacterData;
     [SerializeField] private Core.Team _team;
-
-    /// <summary>This player's team. Used by TowerController for friend/foe detection.</summary>
     public Core.Team Team => _team;
 
     /// <summary>生成したPlayerインスタンス。生成していない場合はnull。</summary>
