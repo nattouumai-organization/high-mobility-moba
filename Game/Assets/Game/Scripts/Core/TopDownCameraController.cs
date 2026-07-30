@@ -66,10 +66,12 @@ public class TopDownCameraController : MonoBehaviour
         if (followNow)
         {
             transform.position = _target.position + _offset;
+            ApplyMapClamp();
             return;
         }
 
         HandleEdgeScroll();
+        ApplyMapClamp();
     }
 
     // Yでロック/フリーモードを切り替える。フリー→ロックの切替時は同じフレームで即座にプレイヤー中心へ戻る。
@@ -107,13 +109,6 @@ public class TopDownCameraController : MonoBehaviour
 
         // 斜め(画面の角)の場合も移動速度が一定になるよう正規化する。
         transform.position += direction.normalized * (_edgeScrollSpeed * Time.deltaTime);
-        var _mb = FindFirstObjectByType<Map.MapBuilder>();
-        if (_mb != null) {
-            const float _mg = 2f;
-            Vector3 _cp = transform.position;
-            _cp.x = Mathf.Clamp(_cp.x, _mb.BoundsMin.x - _mg, _mb.BoundsMax.x + _mg);
-            _cp.z = Mathf.Clamp(_cp.z, _mb.BoundsMin.y - _mg, _mb.BoundsMax.y + _mg);
-            transform.position = _cp; }
     }
 
     // 追従対象と入力ハブを取得する。取得できた時点のカメラ位置から相対オフセットを記録する。
@@ -171,5 +166,19 @@ public class TopDownCameraController : MonoBehaviour
             forward.y = 0f;
         }
         _scrollForward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+    }
+    // マップ境界によるスクロール範囲のクランプ。MapBuilderがあるシーンでのみ動作する。
+    private void ApplyMapClamp()
+    {
+        MapBuilder map = MapBuilder.Instance;
+        if (map == null)
+        {
+            return;
+        }
+
+        Vector3 position = transform.position;
+        position.x = Mathf.Clamp(position.x, map.CameraMinX, map.CameraMaxX);
+        position.z = Mathf.Clamp(position.z, map.CameraMinZ, map.CameraMaxZ);
+        transform.position = position;
     }
 }

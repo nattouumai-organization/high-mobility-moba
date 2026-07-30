@@ -1,201 +1,201 @@
 using UnityEngine;
-using Core;
 
-namespace Map
+/// <summary>
+/// 試合マップを実行時に生成するビルダー(SC_Prototypeの空オブジェクトへアタッチする)。
+/// GAME_DESIGN.md 3章のマップ仕様(横8,400 x 縦2,400)を1:100スケール(84 x 24ユニット)で再現する。
+/// - 地面Plane(GroundLayer)を生成し、右クリック移動・スキルの地面Raycastが機能するようにする。
+/// - 各チームの本拠地(中央からX±33 = 設計のX900/7,500)と、レーン中間の1本目のタワー
+///   (中央からX±16 = 設計のX2,600/5,800)を設計どおりの位置へ自動生成する。
+///   (以前の修正でタワーが本拠地のすぐ隣へ生成され、1本目のタワーが消えていた問題を修正)
+/// - Inspectorへ既存のオブジェクトを割り当てた場合、該当の自動生成はスキップする。
+/// - カメラのスクロール範囲(TopDownCameraControllerのクランプ)と、
+///   PlayerSpawner / GameManagerが使うスポーン位置を提供する。
+/// DefaultExecutionOrder(-300)により、GameManager(-250)・PlayerSpawner(-200)より先に生成する。
+/// </summary>
+[DefaultExecutionOrder(-300)]
+public class MapBuilder : MonoBehaviour
 {
-    /// <summary>
-    /// ゲームマップを実行時に構築するコンポーネント。
-    ///
-    /// ■ 地面レイヤーの自動設定
-    ///   生成する地面 Plane のレイヤーを「GroundLayer」へ自動設定する。
-    ///   Unity プロジェクトに「GroundLayer」というレイヤーが存在しない場合は
-    ///   フォールバック番号(既定値 6)を使用する。
-    ///   PlayerClickMovement / ZelfQController などの _groundLayer は
-    ///   PlayerLayerMaskFallback が自動補正するため、地面の layer さえ合えば動作する。
-    ///
-    /// ■ タワー / ネクサスの自動生成
-    ///   Inspector で TowerController / NexusController を割り当てていない場合、
-    ///   シリンダー(タワー)・キューブ(ネクサス)のプリミティブを自動生成して
-    ///   必要なコンポーネントを追加する。
-    ///   既に割り当てられている場合は何もしない(Prefab 運用と共存できる)。
-    /// </summary>
-    [DefaultExecutionOrder(-300)]
-    public class MapBuilder : MonoBehaviour
+    /// <summary>シーン上のMapBuilder。カメラ・スポナーが参照する。無い場合はnull。</summary>
+    public static MapBuilder Instance { get; private set; }
+
+    [Header("マップサイズ(1:100スケール)")]
+    [SerializeField, Min(10f)] private float _mapLength = 84f;
+    [SerializeField, Min(4f)] private float _mapWidth = 24f;
+
+    [Header("構造物の位置(中央からのX距離)")]
+    [SerializeField, Min(1f)] private float _nexusOffsetX = 33f;
+    [SerializeField, Min(1f)] private float _towerOffsetX = 16f;
+
+    [Header("レイヤー")]
+    [SerializeField] private string _groundLayerName = "GroundLayer";
+    [SerializeField] private string _targetableLayerName = "TargetableLayer";
+
+    [Header("既存オブジェクト(未設定なら自動生成)")]
+    [SerializeField] private GameObject _existingGround;
+    [SerializeField] private GameObject _blueTower;
+    [SerializeField] private GameObject _redTower;
+    [SerializeField] private GameObject _blueNexus;
+    [SerializeField] private GameObject _redNexus;
+
+    private int _groundLayer = 6;
+    private int _targetableLayer = 7;
+
+    /// <summary>地面のレイヤー番号。</summary>
+    public int GroundLayer => _groundLayer;
+
+    /// <summary>タワー・ミニオンなど攻撃対象のレイヤー番号。</summary>
+    public int TargetableLayer => _targetableLayer;
+
+    /// <summary>カメラのスクロール範囲(TopDownCameraControllerが参照)。</summary>
+    public float CameraMinX => -_mapLength * 0.5f;
+    public float CameraMaxX => _mapLength * 0.5f;
+    public float CameraMinZ => -_mapWidth * 0.5f - 15f;
+    public float CameraMaxZ => _mapWidth * 0.5f + 5f;
+
+    private void Awake()
     {
-        // ---- マップサイズ ----
-        [Header("Map Size")]
-        [SerializeField] private float _halfLength = 20f;
-        [SerializeField] private float _halfWidth  = 10f;
-        [SerializeField] private float _laneWidth  = 3f;
-
-        // ---- スポーン地点 ----
-        [Header("Spawn Points (auto-created if null)")]
-        [SerializeField] private Transform _blueSpawn;
-        [SerializeField] private Transform _redSpawn;
-
-        // ---- 構造物 (null = 自動生成) ----
-        [Header("Towers (auto-created if null)")]
-        [SerializeField] private Structures.TowerController _blueTower;
-        [SerializeField] private Structures.TowerController _redTower;
-
-        [Header("Nexus (auto-created if null)")]
-        [SerializeField] private Structures.NexusController _blueNexus;
-        [SerializeField] private Structures.NexusController _redNexus;
-
-        // ---- マテリアル ----
-        [Header("Materials (optional)")]
-        [SerializeField] private Material _laneMaterial;
-        [SerializeField] private Material _terrainMaterial;
-
-        // ---- Ground レイヤー設定 ----
-        [Header("Ground Layer")]
-        [Tooltip("Unityプロジェクト内の地面レイヤー名。見つからない場合は FallbackIndex を使用する。")]
-        [SerializeField] private string _groundLayerName = "GroundLayer";
-        [Tooltip("GroundLayer という名前のレイヤーが存在しない場合のフォールバックレイヤー番号。")]
-        [SerializeField] private int _groundLayerFallbackIndex = 6;
-
-        // ---- 公開プロパティ ----
-        public Vector2 BoundsMin => new Vector2(-_halfLength, -_halfWidth);
-        public Vector2 BoundsMax => new Vector2( _halfLength,  _halfWidth);
-
-        public Transform                  GetSpawnPoint(Team team) => team == Team.Blue ? _blueSpawn  : _redSpawn;
-        public Structures.TowerController GetTower     (Team team) => team == Team.Blue ? _blueTower  : _redTower;
-        public Structures.NexusController GetNexus     (Team team) => team == Team.Blue ? _blueNexus  : _redNexus;
-
-        // ---- 初期化 ----
-        private void Awake()
+        if (Instance != null && Instance != this)
         {
-            int groundLayer = ResolveGroundLayer();
-            BuildGround(groundLayer);
-            BuildLane();
-            EnsureSpawnPoints();
-            EnsureTower(ref _blueTower, Team.Blue,  new Vector3(-_halfLength + 5f, 0f, 0f));
-            EnsureTower(ref _redTower,  Team.Red,   new Vector3( _halfLength - 5f, 0f, 0f));
-            EnsureNexus(ref _blueNexus, Team.Blue,  new Vector3(-_halfLength + 2f, 0f, 0f));
-            EnsureNexus(ref _redNexus,  Team.Red,   new Vector3( _halfLength - 2f, 0f, 0f));
+            Debug.LogWarning("MapBuilder: 複数のMapBuilderが存在するため、後から起動したものは無効化します。", this);
+            enabled = false;
+            return;
         }
 
-        // ---- Ground レイヤー解決 ----
-        private int ResolveGroundLayer()
+        Instance = this;
+
+        _groundLayer = ResolveLayer(_groundLayerName, 6);
+        _targetableLayer = ResolveLayer(_targetableLayerName, 7);
+
+        BuildGround();
+        BuildStructures();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
         {
-            int idx = LayerMask.NameToLayer(_groundLayerName);
-            if (idx >= 0)
-            {
-                Debug.Log(string.Format("[MapBuilder] Ground layer '{0}' = {1}", _groundLayerName, idx));
-                return idx;
-            }
-            Debug.LogWarning(string.Format(
-                "[MapBuilder] レイヤー '{0}' が見つかりません。フォールバック番号 {1} を使用します。\n"
-                + "Unity Editor の Project Settings > Tags and Layers で '{0}' レイヤーを作成してください。",
-                _groundLayerName, _groundLayerFallbackIndex));
-            return _groundLayerFallbackIndex;
+            Instance = null;
+        }
+    }
+
+    /// <summary>ヒーローのスポーン位置(本拠地の少し前・レーンやや下)。高さ(Y)は呼び出し側が維持する。</summary>
+    public Vector3 GetHeroSpawnPosition(Team team)
+    {
+        float sign = team == Team.Blue ? -1f : 1f;
+        return new Vector3(sign * (_nexusOffsetX - 3f), 0f, -2.5f);
+    }
+
+    /// <summary>ミニオンウェーブのスポーン位置(本拠地の少し前)。</summary>
+    public Vector3 GetMinionSpawnPosition(Team team)
+    {
+        float sign = team == Team.Blue ? -1f : 1f;
+        return new Vector3(sign * (_nexusOffsetX - 3f), 0f, 0f);
+    }
+
+    private static int ResolveLayer(string layerName, int fallbackLayerNumber)
+    {
+        int layer = LayerMask.NameToLayer(layerName);
+        return layer >= 0 ? layer : fallbackLayerNumber;
+    }
+
+    private void BuildGround()
+    {
+        if (_existingGround != null)
+        {
+            _existingGround.layer = _groundLayer;
+            Debug.Log("MapBuilder: 既存の地面のレイヤーを設定しました。", this);
+            return;
         }
 
-        // ---- 地面生成 ----
-        private void BuildGround(int groundLayer)
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.name = "Ground (MapBuilder)";
+        ground.transform.position = Vector3.zero;
+        ground.transform.localScale = new Vector3(_mapLength / 10f, 1f, _mapWidth / 10f);
+        ground.layer = _groundLayer;
+        SetColor(ground, new Color(0.33f, 0.42f, 0.33f, 1f));
+        Debug.Log($"MapBuilder: 地面({_mapLength} x {_mapWidth})をレイヤー{_groundLayer}({LayerMask.LayerToName(_groundLayer)})で生成しました。", this);
+    }
+
+    private void BuildStructures()
+    {
+        _blueTower = EnsureTower(_blueTower, Team.Blue);
+        _redTower = EnsureTower(_redTower, Team.Red);
+        _blueNexus = EnsureNexus(_blueNexus, Team.Blue);
+        _redNexus = EnsureNexus(_redNexus, Team.Red);
+    }
+
+    private GameObject EnsureTower(GameObject existing, Team team)
+    {
+        if (existing != null)
         {
-            var ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            ground.name = "Ground";
-            ground.transform.SetParent(transform);
-            ground.transform.localPosition = Vector3.zero;
-            ground.transform.localScale = new Vector3(_halfLength * 0.2f, 1f, _halfWidth * 0.2f);
-
-            // ★ 地面のレイヤーを GroundLayer に設定 (PlayerClickMovement の raycast がヒットするために必要)
-            ground.layer = groundLayer;
-
-            if (_terrainMaterial != null)
-                ground.GetComponent<Renderer>().material = _terrainMaterial;
-
-            Debug.Log(string.Format("[MapBuilder] Ground plane created on layer {0}.", groundLayer));
+            return existing;
         }
 
-        // ---- レーン生成 ----
-        private void BuildLane()
+        float sign = team == Team.Blue ? -1f : 1f;
+        Vector3 position = new Vector3(sign * _towerOffsetX, 2f, 0f);
+
+        GameObject tower = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        tower.name = $"{team} Tower (1st)";
+        tower.transform.position = position;
+        tower.transform.localScale = new Vector3(2.4f, 2f, 2.4f);
+        tower.layer = _targetableLayer;
+        SetColor(tower, team.GetTeamColor());
+
+        HealthController health = tower.AddComponent<HealthController>();
+        health.SetMaxHealth(5000f);
+
+        TeamMember member = tower.AddComponent<TeamMember>();
+        member.SetTeam(team);
+
+        Targetable targetable = tower.AddComponent<Targetable>();
+        targetable.InitializeRuntime(TargetClassification.Tower, tower.GetComponent<Renderer>());
+
+        TowerController controller = tower.AddComponent<TowerController>();
+        controller.Initialize(team);
+
+        Debug.Log($"MapBuilder: {team}チームの1本目のタワーをX={position.x}へ生成しました。", this);
+        return tower;
+    }
+
+    private GameObject EnsureNexus(GameObject existing, Team team)
+    {
+        if (existing != null)
         {
-            var lane = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            lane.name = "Lane";
-            lane.transform.SetParent(transform);
-            lane.transform.localPosition = new Vector3(0f, 0.01f, 0f);
-            lane.transform.localScale = new Vector3(_halfLength * 2f, 0.02f, _laneWidth);
-            Destroy(lane.GetComponent<BoxCollider>());
-            if (_laneMaterial != null)
-                lane.GetComponent<Renderer>().material = _laneMaterial;
+            return existing;
         }
 
-        // ---- スポーン地点 ----
-        private void EnsureSpawnPoints()
+        float sign = team == Team.Blue ? -1f : 1f;
+        Vector3 position = new Vector3(sign * _nexusOffsetX, 2f, 0f);
+
+        GameObject nexus = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        nexus.name = $"{team} Nexus";
+        nexus.transform.position = position;
+        nexus.transform.localScale = new Vector3(4f, 4f, 4f);
+        nexus.layer = _targetableLayer;
+        SetColor(nexus, Color.Lerp(team.GetTeamColor(), Color.black, 0.35f));
+
+        HealthController health = nexus.AddComponent<HealthController>();
+        health.SetMaxHealth(6000f);
+
+        TeamMember member = nexus.AddComponent<TeamMember>();
+        member.SetTeam(team);
+
+        Targetable targetable = nexus.AddComponent<Targetable>();
+        targetable.InitializeRuntime(TargetClassification.Tower, nexus.GetComponent<Renderer>());
+
+        NexusController controller = nexus.AddComponent<NexusController>();
+        controller.Initialize(team);
+
+        Debug.Log($"MapBuilder: {team}チームの本拠地をX={position.x}へ生成しました。", this);
+        return nexus;
+    }
+
+    private static void SetColor(GameObject target, Color color)
+    {
+        Renderer renderer = target.GetComponent<Renderer>();
+        if (renderer != null)
         {
-            if (_blueSpawn == null)
-            {
-                var go = new GameObject("BlueSpawn");
-                go.transform.SetParent(transform);
-                go.transform.localPosition = new Vector3(-_halfLength + 2f, 0f, 0f);
-                _blueSpawn = go.transform;
-            }
-            if (_redSpawn == null)
-            {
-                var go = new GameObject("RedSpawn");
-                go.transform.SetParent(transform);
-                go.transform.localPosition = new Vector3(_halfLength - 2f, 0f, 0f);
-                _redSpawn = go.transform;
-            }
-        }
-
-        // ---- タワー自動生成 ----
-        private void EnsureTower(
-            ref Structures.TowerController field, Team team, Vector3 localPos)
-        {
-            if (field != null) return;  // Inspector 設定済みなら何もしない
-
-            // シリンダーでタワー外観を作成
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            go.name = team + "_Tower";
-            go.transform.SetParent(transform);
-            go.transform.localPosition = localPos;
-            go.transform.localScale = new Vector3(1.5f, 2.5f, 1.5f);
-
-            // チームカラー
-            go.GetComponent<Renderer>().material.color =
-                team == Team.Blue ? new Color(0.3f, 0.5f, 1f) : new Color(1f, 0.3f, 0.3f);
-
-            // TeamMember
-            var tm = go.AddComponent<TeamMember>();
-            tm.Team = team;
-
-            // HealthController + Targetable は RequireComponent で TowerController が自動追加する
-            var tower = go.AddComponent<Structures.TowerController>();
-            tower.Initialize(team);
-
-            field = tower;
-            Debug.Log(string.Format("[MapBuilder] {0} Tower auto-created at {1}.", team, localPos));
-        }
-
-        // ---- ネクサス自動生成 ----
-        private void EnsureNexus(
-            ref Structures.NexusController field, Team team, Vector3 localPos)
-        {
-            if (field != null) return;  // Inspector 設定済みなら何もしない
-
-            // キューブでネクサス外観を作成
-            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            go.name = team + "_Nexus";
-            go.transform.SetParent(transform);
-            go.transform.localPosition = localPos;
-            go.transform.localScale = new Vector3(2f, 2f, 2f);
-
-            // チームカラー(タワーより暗め)
-            go.GetComponent<Renderer>().material.color =
-                team == Team.Blue ? new Color(0.1f, 0.2f, 0.8f) : new Color(0.8f, 0.1f, 0.1f);
-
-            // TeamMember
-            var tm = go.AddComponent<TeamMember>();
-            tm.Team = team;
-
-            // HealthController + Targetable は RequireComponent で NexusController が自動追加する
-            var nexus = go.AddComponent<Structures.NexusController>();
-
-            field = nexus;
-            Debug.Log(string.Format("[MapBuilder] {0} Nexus auto-created at {1}.", team, localPos));
+            renderer.material.color = color;
         }
     }
 }

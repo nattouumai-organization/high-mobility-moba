@@ -79,15 +79,6 @@ public class Targetable : MonoBehaviour
     /// <summary>自身のHealthController。持たない場合はnull。通常攻撃のダメージ処理から使用する。</summary>
     public HealthController Health => _healthController;
 
-    public void InitializeRuntime(TargetClassification classification,
-        GameObject ring, Renderer ringRenderer, Renderer bodyRenderer)
-    {
-        _classification = classification;
-        if (ring != null) _selectionRing = ring;
-        if (ringRenderer != null) _selectionRingRenderer = ringRenderer;
-        if (bodyRenderer != null) _bodyRenderer = bodyRenderer;
-    }
-
     private void Awake()
     {
         _collider = GetComponent<Collider>();
@@ -130,6 +121,33 @@ public class Targetable : MonoBehaviour
     public Vector3 GetClosestPoint(Vector3 position)
     {
         return _collider != null ? _collider.ClosestPoint(position) : transform.position;
+    }
+
+    /// <summary>
+    /// 実行時生成オブジェクト(タワー・本拠地・ミニオンなど)用の初期化。
+    /// HealthControllerを先にAddComponentした後で呼び出し、分類と本体Rendererを設定する。
+    /// </summary>
+    public void InitializeRuntime(TargetClassification classification, Renderer bodyRenderer, GameObject selectionRing = null, Renderer selectionRingRenderer = null)
+    {
+        _classification = classification;
+        _bodyRenderer = bodyRenderer;
+        _selectionRing = selectionRing;
+        _selectionRingRenderer = selectionRingRenderer;
+
+        if (_bodyRenderer != null)
+        {
+            _defaultColor = _bodyRenderer.material.color;
+        }
+
+        if (_collider == null)
+        {
+            _collider = GetComponent<Collider>();
+        }
+
+        if (_healthController == null)
+        {
+            _healthController = GetComponent<HealthController>();
+        }
     }
 
     /// <summary>選択状態を設定し、選択リングの表示と本体色を切り替える。</summary>

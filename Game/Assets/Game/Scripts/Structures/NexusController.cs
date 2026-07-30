@@ -1,93 +1,83 @@
 using UnityEngine;
-using Core;
 
-namespace Structures
+/// <summary>
+/// 本拠地(GAME_DESIGN.md 4章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
+/// - HP6,000 / AR50 / HPregなし。
+/// - 同チームの1本目のタワーが破壊されるまで全ダメージ無効(IIncomingDamageModifierで0にする)。
+/// - AR(50)はCharacterStatsを持たないためIIncomingDamageModifierとして自前で適用する。
+/// - 破壊されるとGameManagerへ通知し、相手チームの勝利となる。
+/// </summary>
+public class NexusController : MonoBehaviour, IIncomingDamageModifier
 {
-    [RequireComponent(typeof(HealthController))]
-    [RequireComponent(typeof(Targetable))]
-    public class NexusController : MonoBehaviour, IIncomingDamageModifier
+    [Header("戦闘(GAME_DESIGN.md 4章)")]
+    [SerializeField] private Team _team = Team.Blue;
+    [SerializeField, Min(0f)] private float _armor = 50f;
+
+    private HealthController _health;
+    private bool _isDestroyed;
+
+    /// <summary>所属チーム。</summary>
+    public Team Team => _team;
+
+    /// <summary>同チームのタワーが残っている間は無敵。</summary>
+    public bool IsInvulnerable => !TowerController.IsTowerDestroyed(_team);
+
+    /// <summary>MapBuilderが生成直後に呼び出す初期化。</summary>
+    public void Initialize(Team team)
     {
-        [Header("Stats")]
-        [SerializeField] private float _maxHp = 6000f;
-        [SerializeField] private float _armor = 50f;
-
-        [Header("Team")]
-        [SerializeField] private Team _team;
-
-        [Header("Visuals")]
-        [SerializeField] private Renderer _crystalRenderer;
-        [SerializeField] private Color _colorVulnerable = new Color(1f, 0.7f, 0f);
-        [SerializeField] private Color _colorBroken     = new Color(0.35f, 0.35f, 0.35f);
-
-        private HealthController _health;
-        private Targetable       _targetable;
-        private Collider         _col;
-        private bool             _guardTowerDestroyed;
-        private bool             _nexusDestroyed;
-
-        public Team Team         => _team;
-        public bool IsVulnerable => _guardTowerDestroyed;
-        public bool IsDestroyed  => _nexusDestroyed;
-
-        public void OnGuardTowerDestroyed()
+        _team = team;
+        _health = GetComponent<HealthController>();
+        if (_health != null)
         {
-            if (_guardTowerDestroyed) return;
-            _guardTowerDestroyed = true;
-            Debug.Log("[Nexus] Guard tower destroyed – " + _team + " nexus is VULNERABLE.");
-            ApplyCrystalColor(_colorVulnerable);
-            _targetable.enabled = true;
-            if (_col != null) _col.enabled = true;
+            // HealthController.AwakeのキャッシュはこのAddComponentより先に実行済みのため再取得させる。
+            _health.RefreshDamageModifiers();
+            _health.Died += HandleDied;
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (_health != null)
+        {
+            _health.Died -= HandleDied;
+        }
+    }
+
+    /// <summary>
+    /// 受けるダメージの軽減(IIncomingDamageModifier)。
+    /// タワーが破壊されるまで本拠地は攻撃できない(全ダメージ0)。その後はAR(50)で通常ダメージを軽減する。
+    /// </summary>
+    public float ModifyIncomingDamage(DamageContext context, float currentAmount)
+    {
+        if (IsInvulnerable)
+        {
+            return 0f;
         }
 
-        private void Awake()
+        if (context.Type == DamageType.Normal && _armor > 0f)
         {
-            _health     = GetComponent<HealthController>();
-            _targetable = GetComponent<Targetable>();
-            _col        = GetComponent<Collider>();
-
-            _health.SetMaxHealth(_maxHp);
-
-            // _crystalRenderer が未設定の場合は自身の Renderer を使用
-            Renderer r = _crystalRenderer != null
-                ? _crystalRenderer
-                : GetComponentInChildren<Renderer>();
-            _targetable.InitializeRuntime(TargetClassification.Tower, null, null, r);
-
-            _health.Died += HandleNexusDeath;
-
-            // タワー生存中は非ターゲット・非コリジョン
-            _guardTowerDestroyed = false;
-            _targetable.enabled  = false;
-            if (_col != null) _col.enabled = false;
+            currentAmount = currentAmount * 100f / (100f + _armor);
         }
 
-        // IIncomingDamageModifier
-        public float ModifyIncomingDamage(DamageContext context, float currentAmount)
+        return currentAmount;
+    }
+
+    private void HandleDied()
+    {
+        if (_isDestroyed)
         {
-            if (!_guardTowerDestroyed) return 0f;              // タワー生存中は全ダメージ無効
-            if (context.Type == DamageType.True) return currentAmount;  // 確定ダメージは素通し
-            return currentAmount * 100f / (100f + _armor);
+            return;
         }
 
-        private void HandleNexusDeath()
-        {
-            if (_nexusDestroyed) return;
-            _nexusDestroyed = true;
-            ApplyCrystalColor(_colorBroken);
-            Debug.Log("[Nexus] DESTROYED – " + _team + " loses!");
+        _isDestroyed = true;
 
-            Team winner = _team == Team.Blue ? Team.Red : Team.Blue;
-            var gm = FindFirstObjectByType<GameManager>();
-            if (gm != null) gm.OnNexusDestroyed(winner);
-            else Debug.Log(string.Format("[Nexus] Match over. Winner={0}", winner));
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.NotifyNexusDestroyed(_team);
         }
-
-        private void ApplyCrystalColor(Color c)
+        else
         {
-            Renderer r = _crystalRenderer != null
-                ? _crystalRenderer
-                : GetComponentInChildren<Renderer>();
-            if (r != null) r.material.color = c;
+            Debug.Log($"NexusController: {_team}チームの本拠地が破壊されました({_team.Opponent()}チームの勝利)。", this);
         }
     }
 }

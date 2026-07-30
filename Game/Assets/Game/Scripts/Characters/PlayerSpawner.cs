@@ -17,8 +17,6 @@ public sealed class PlayerSpawner : MonoBehaviour
     [Header("フォールバック")]
     [Tooltip("キャラクター未選択でSC_Prototypeを直接起動した場合に使用するCharacterData(ZelfData想定)")]
     [SerializeField] private CharacterData _fallbackCharacterData;
-    [SerializeField] private Core.Team _team;
-    public Core.Team Team => _team;
 
     /// <summary>生成したPlayerインスタンス。生成していない場合はnull。</summary>
     public GameObject SpawnedPlayer { get; private set; }
@@ -55,9 +53,17 @@ public sealed class PlayerSpawner : MonoBehaviour
             return;
         }
 
-        SpawnedPlayer = Instantiate(prefab, transform.position, transform.rotation);
-        var _tm = SpawnedPlayer.GetComponent<Core.TeamMember>() ?? SpawnedPlayer.AddComponent<Core.TeamMember>();
-        _tm.Team = _team;
+        // MapBuilderがあるシーンでは、本拠地前のスポーン位置を使用する(高さはスポナーの値を維持)。1v1プロトタイプの操作ヒーローはBlue所属。
+        Vector3 spawnPosition = transform.position;
+        Quaternion spawnRotation = transform.rotation;
+        if (MapBuilder.Instance != null)
+        {
+            Vector3 mapSpawn = MapBuilder.Instance.GetHeroSpawnPosition(Team.Blue);
+            spawnPosition = new Vector3(mapSpawn.x, transform.position.y, mapSpawn.z);
+            spawnRotation = Quaternion.LookRotation(Vector3.right);
+        }
+
+        SpawnedPlayer = Instantiate(prefab, spawnPosition, spawnRotation);
         // "(Clone)"サフィックスを付けず、ヒエラルキー上で分かりやすい名前にする。
         SpawnedPlayer.name = prefab.name;
 

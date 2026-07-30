@@ -77,16 +77,14 @@ Assets/
 ```text
 GameManager
 MatchState
-Team
-Team
-TeamMember
+TeamType
 GameTick
 TopDownCameraController
 ```
 
 - 試合開始、勝敗、復活、ゲーム状態を管理する。
 - 状態は `Waiting`、`CharacterSelect`、`Playing`、`Finished` を持つ。
-- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俯瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
+- `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俰瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
 
 ### Combat
 
@@ -106,7 +104,7 @@ CooldownController
 - 通常ダメージはARで軽減する。
 - 確定ダメージは朧Rの処刑とヴォルブラークRの反射のみ。
 - ダメージ計算式：`FinalDamage = RawDamage * 100 / (100 + AR)`。
-- 試作では `HealthController`(Scripts/Combat)が現在HP・被ダメージ・回復の土台・HP変化通知・死亡イベントを管理する。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象(TrainingDummy)はInspectorのMax Healthを最大HPとして使用する。TakeDamage / Healは実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、ダメージを与えた側が実ダメージ量を取得できる。Revive()で死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。TakeDamageは攻撃者のTransformとダメージ種別(DamageType.Normal / True。Scripts/Combat/DamageInfo.cs)も受け取れ、HPへ適用する直前に同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減など)がDamageContext(攻撃者・ダメージ種別・元ダメージ・反射フラグ)を使ってダメージ量を変更できる。通常ダメージ(Normal)はAR(防御力)による軽減式 FinalDamage = RawDamage × 100 / (100 + AR) で軽減され、確定ダメージ(True)はARでは軽減されない(ヴォルブラークRの反射ダメージが使用)。従来のTakeDamage(ダメージ量のみ)は攻撃者なしの通常ダメージとして互換動作する。実ダメージ(実際に減ったHP)が発生したときは(ダメージ情報・実ダメージ量)をDamageTakenイベントで通知する(ヴォルブラークRの反射が購読。死亡処理より前に通知するため致死ダメージも通知対象)。TakeDamageは反射ダメージかどうか(isReflected・既定false)も受け取れ、DamageContext.IsReflectedとして軽減判定と被ダメージ通知へ引き継がれる(反射ダメージの再反射防止に使用)。SetMaxHealth(float)でCharacterStatsを持たない対象の最大HPを設定。将来的にHealthComponent / DamageSystemへ発展させる。
+- 試作では `HealthController`(Scripts/Combat)が現在HP・被ダメージ・回復の土台・HP変化通知・死亡イベントを管理する。CharacterStatsを持つ対象はCurrent Max Healthを、持たない対象(TrainingDummy)はInspectorのMax Healthを最大HPとして使用する。TakeDamage / Healは実際に適用したダメージ量・回復量(残りHP・最大HPを超えない値)を返し、ダメージを与えた側が実ダメージ量を取得できる。Revive()で死亡状態から現在HPを全快して復活でき、復活イベントで見た目・操作の復元を各コンポーネントへ通知する。TakeDamageは攻撃者のTransformとダメージ種別(DamageType.Normal / True。Scripts/Combat/DamageInfo.cs)も受け取れ、HPへ適用する直前に同じGameObject上のIIncomingDamageModifier(ゼルフWの前方ダメージ軽減など)がDamageContext(攻撃者・ダメージ種別・元ダメージ・反射フラグ)を使ってダメージ量を変更できる。通常ダメージ(Normal)はAR(防御力)による軽減式 FinalDamage = RawDamage × 100 / (100 + AR) で軽減され、確定ダメージ(True)はARでは軽減されない(ヴォルブラークRの反射ダメージが使用)。従来のTakeDamage(ダメージ量のみ)は攻撃者なしの通常ダメージとして互換動作する。実ダメージ(実際に減ったHP)が発生したときは(ダメージ情報・実ダメージ量)をDamageTakenイベントで通知する(ヴォルブラークRの反射が購読。死亡処理より前に通知するため致死ダメージも通知対象)。TakeDamageは反射ダメージかどうか(isReflected・既定false)も受け取れ、DamageContext.IsReflectedとして軽減判定と被ダメージ通知へ引き継がれる(反射ダメージの再反射防止に使用)。将来的にHealthComponent / DamageSystemへ発展させる。
 - 試作では `RespawnController`(Scripts/Combat)が死亡した対象の復活を管理する。死亡イベントを受けてRespawn Delay秒(SC_Prototypeでは1秒、Inspector設定)後に初期位置・初期向きへ戻し、HealthController.Revive()で全快する。Player・TrainingDummy・AttackDummyで共通利用し、将来のキャラクター・ミニオンにも再利用できる。
 
 ### Characters
@@ -149,7 +147,7 @@ VolbraakRController
 - 視点仕様: Playerは移動している方向へ視点が向き、ブリンクした場合はブリンクした方向を向くことを基本とする。視点方向は各移動・スキル処理がPlayerMouseFacingのpublic APIへ明示的に方向を渡して指定する(ブリンク方向と視点方向が異なる例外スキルも、渡す方向を変えるだけで実装できる)。スキル間の連携(ゼルフE→Qのクールダウンリセットなど)もReflectionではなく、各コンポーネントが公開するpublicメソッド・プロパティの直接呼び出しで行う。
 - `CharacterStats` は移動速度に加えて、攻撃速度(毎秒の攻撃回数)と攻撃射程(Unity units)の基礎値を管理する。Current Attack Speed = Base Attack Speed × (1 + Bonus Attack Speed Percent / 100)、Attack Interval = 1 / Current Attack Speed。最大HP(Current Max Health = Base + Bonus、1未満にならない)と攻撃力(Current Attack Damage = Base + Bonus、0未満にならない)の基礎値も管理する。現在HPはHealthControllerが保持する。
 - `PlayerBasicAttackController` は選択中のターゲットへの通常攻撃を管理する。攻撃間隔ごとにCharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え(攻撃者としてPlayerのTransformを渡す通常ダメージ)、被弾フラッシュを発生させる。HealthControllerが返す実ダメージ量を使って、ダメージ表示(CombatTextManager)とゼルフPの与ダメージ回復(ZelfPassiveHeal)へ通知する。射程判定はTargetableのColliderの最も近い点との水平距離(XZ平面)で行い、射程外のターゲットを選択した場合はPlayerClickMovementのMoveToPosition()で射程内まで自動接近してから攻撃する。ターゲットが死亡した場合は攻撃を停止し、PlayerTargetSelectorが選択を解除する。将来的にミニオンなども扱うBasicAttackControllerへ発展させる。
-- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後に本体Rendererのみを非表示化する(GameObjectは無効化せず、復活イベントを受けて本体・Colliderを元へ戻す)。また、ターゲット分類(TargetClassification: Character / Minion / Tower / TrainingDummy)をInspectorで保持し、攻撃側(ゼルフPなど)が効果量の判定に使用する。InitializeRuntime(分類,ring,rR,bR)で実行時初期化。Classification / IsDeadプロパティ。
+- `Targetable` は選択リングの色で射程内(明るい緑)/射程外(オレンジ)を表示する。死亡時はHealthControllerの死亡イベントを受けて選択不可(Collider無効化)となり、短時間死亡状態を表示した後に本体Rendererのみを非表示化する(GameObjectは無効化せず、復活イベントを受けて本体・Colliderを元へ戻す)。また、ターゲット分類(TargetClassification: Character / Minion / Tower / TrainingDummy)をInspectorで保持し、攻撃側(ゼルフPなど)が効果量の判定に使用する。
 - `PlayerDeathHandler` はPlayerの死亡イベントを受け取り、PlayerClickMovement / PlayerMouseFacing / PlayerBasicAttackController / CharacterControllerと見た目(Renderer)を無効化する。復活イベントを受け取った場合は、無効化したコンポーネントと見た目を元へ戻し、移動を停止した状態で復活する(復活までの時間と復活位置はRespawnControllerが管理)。
 - `WorldHealthBar`(Scripts/UI)はHealthControllerのHP変化・死亡イベントを購読し、World Space Canvas上のUI ImageのFill AmountでHPバーを表示する。バーは毎フレームMain Cameraの向きに揃え、対象の死亡時はCanvasの無効化で非表示になり、復活時に再表示される。
 - `ZelfPassiveHeal`(Scripts/Characters)はゼルフP(与ダメージ回復)を管理する。通常攻撃から実ダメージ量とターゲット分類を受け取り、Character 5% / Minion 2.5% / Tower 0%(テスト用のTrainingDummy分類はCharacterと同じ5%。いずれもInspector設定)で自身のHealthControllerを回復する。死亡中は回復せず、最大HPを超えない。実際にHPが増えた場合のみ緑色の回復表示を要求する。
@@ -187,11 +185,6 @@ CrowdControlEffect
 - Q/W/E/R/P/D/Fを共通のスキルインターフェースで扱う。
 - キャラクター固有の挙動は個別SkillControllerまたはStrategyで実装する。
 - 初期段階では、過度な汎用化を避ける。
-
-### Map
-
-- MapBuilder(DefaultExecutionOrder -300): Inspector未割り当て時はTower/Nexusプリミティブを自動生成。地面のレイヤーをGroundLayerへ自動設定(fallback=6)。
-- Team/TeamMember: Coreネームスペース。GameManager: OnNexusDestroyed。
 
 ### Minions / Structures
 
@@ -310,3 +303,19 @@ balance: reduce Zelf E dash damage
 Unityの `Library`、`Temp`、`Logs`、`obj`、`Build` はGit管理しない。
 
 TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity EditorスクリプトによるMarkdownの自動編集(メニュー操作によるセットアップスクリプトを含む)は使用しない。
+
+## マップ・構造物の実行時生成(フェーズ5)
+
+GAME_DESIGN.md 3章のマップ仕様を1:100スケールで実行時生成する。シーンには空オブジェクトへMapBuilderとGameManagerをアタッチするだけでよい。
+
+| 要素 | 設計値 | 実装値(1:100) |
+| --- | --- | --- |
+| マップ | 8,400 x 2,400 | 地面Plane 84 x 24(原点中心、GroundLayer) |
+| 本拠地 | X=900 / 7,500、HP6,000、AR50 | X=±33、Cube(4,4,4)、タワー破壊まで無敵 |
+| 1本目のタワー | X=2,600 / 5,800、HP5,000、AR60、射程800、AD130、AS0.8 | X=±16、Cylinder(2.4,2,2.4)、射程8 |
+| ミニオン | 近接3体 + 遠距離2体、初回15秒・間隔20秒 | Capsule、本拠地前X=±30から出撃 |
+
+- 実行順: MapBuilder(-300) -> GameManager(-250) -> PlayerSpawner(-200)。
+- 構造物・ミニオンのGameObject構成: プリミティブ + HealthController + TeamMember + Targetable + 各種コントローラ(TargetableLayer)。
+- CharacterStatsを持たない対象のAR・特殊軽減はIIncomingDamageModifierで自前適用する。AddComponentの順序上、各コントローラのInitializeがHealthController.RefreshDamageModifiers()を呼ぶ必要がある。
+- チーム判定はTeamMemberコンポーネントで行う。ヒーローへはGameManagerが自動付与する(Blue)。

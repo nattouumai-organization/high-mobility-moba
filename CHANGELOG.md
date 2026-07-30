@@ -20,13 +20,23 @@
 - 削除した要素
 ```
 
-## 2026-07-30 phase5-fix4: Groundレイヤー・タワービジュアル修正
+## 2026-07-31
 
 ### Fixed
-- MapBuilder: 地面 Plane のレイヤーを GroundLayer へ自動設定。右クリック移動・全スキルの発動が正常化。
-- MapBuilder: Inspector 未割り当て時に Tower(Cylinder)・ Nexus(Cube) プリミティブを自動生成。
-- NexusController: _crystalRenderer 未設定時に GetComponentInChildren で代替。
-- fix1~fix3 の内容を継続。
+
+- マップ自動生成で1本目のタワーが存在しなかった問題を修正(フェーズ5 fix5)。前回の修正でタワーの生成位置が本拠地のすぐ隣になっており、レーン中間にあるべき1本目のタワーが消えていた。MapBuilderをGAME_DESIGN.md 3章の座標(1:100スケール)へ準拠させ、地面84 x 24ユニット、本拠地 = 中央からX±33(設計900/7,500)、1本目のタワー = 中央からX±16(設計2,600/5,800)として生成するよう変更。
+
+### Changed
+
+- MapBuilder: マップサイズ・構造物位置をInspectorで調整可能にし、生成ログを追加。既存オブジェクトをInspectorへ割り当てた場合は該当の自動生成をスキップ。
+- タワー(TowerController): 敵ミニオン優先の自動攻撃、同一ヒーロー連続攻撃ボーナス(+25%/最大+200%、2秒でリセット)、攻撃側ミニオン不在時の90%軽減・確定ダメージ無効、AR60(HP5,000 / 射程8 / AD130 / AS0.8)。
+- 本拠地(NexusController): タワー破壊までの完全無敵とAR50(HP6,000)、破壊時の勝敗通知。
+- ミニオン(MinionController) / GameManager: ウェーブ(近接3体 + 遠距離2体、初回15秒・間隔20秒)と成長式 WaveLv = floor((WaveNumber - 1) / 2) を設計値で実装。
+- GameManager: ヒーローへTeamMemberを自動付与(タワー・ミニオンの索敵対象化)。
+- TopDownCameraController: マップ境界によるカメラスクロール範囲のクランプを追加(MapBuilderがあるシーンのみ)。
+- PlayerSpawner: MapBuilderがあるシーンでは自チーム本拠地前へスポーンするよう変更。
+- HealthController: SetMaxHealth(実行時の最大HP設定)とRefreshDamageModifiers(後付けIIncomingDamageModifierの再取得)を追加。
+- Targetable: InitializeRuntime(実行時生成オブジェクト用の分類・Renderer設定)を追加。
 
 ## 2026-07-29
 

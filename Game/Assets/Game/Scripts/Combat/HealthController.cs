@@ -227,12 +227,6 @@ public class HealthController : MonoBehaviour
     /// HP変化を通知した後、復活イベントを発行し、死亡時に無効化した見た目・操作を各コンポーネントが復元する。
     /// 死亡していない場合は何もしない。
     /// </summary>
-    public void SetMaxHealth(float maxHealth)
-    {
-        _maxHealth = Mathf.Max(1f, maxHealth);
-        _currentHealth = Mathf.Min(_currentHealth, _maxHealth);
-    }
-
     public void Revive()
     {
         if (!_isDead)
@@ -265,6 +259,45 @@ public class HealthController : MonoBehaviour
         }
 
         return amount;
+    }
+
+    /// <summary>
+    /// CharacterStatsを持たない対象(タワー・本拠地・ミニオンなど)の最大HPを実行時に設定する。
+    /// MapBuilder / MinionControllerが生成直後に呼び出す。refillToFullがtrueなら現在HPも全快させる。
+    /// CharacterStatsを持つ対象では何もしない(最大HPはCharacterStatsが管理する)。
+    /// </summary>
+    public void SetMaxHealth(float maxHealth, bool refillToFull = true)
+    {
+        if (_characterStats == null)
+        {
+            _characterStats = GetComponent<CharacterStats>();
+        }
+
+        if (_characterStats != null)
+        {
+            return;
+        }
+
+        _maxHealth = Mathf.Max(1f, maxHealth);
+
+        if (refillToFull && !_isDead)
+        {
+            _currentHealth = MaxHealth;
+        }
+
+        _currentHealth = Mathf.Min(_currentHealth, MaxHealth);
+        _lastKnownMaxHealth = MaxHealth;
+        NotifyHealthChanged();
+    }
+
+    /// <summary>
+    /// 同じGameObject上のIIncomingDamageModifierを再取得する。
+    /// タワー・本拠地・ミニオンのように、実行時のAddComponentで軽減コンポーネントを後付けした場合に呼び出す
+    /// (AwakeのキャッシュはAddComponentより先に実行されているため)。
+    /// </summary>
+    public void RefreshDamageModifiers()
+    {
+        _damageModifiers = GetComponents<IIncomingDamageModifier>();
     }
 
     private void Die()
