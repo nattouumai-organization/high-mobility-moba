@@ -10,7 +10,7 @@ using UnityEngine;
 /// 追従対象は未設定なら自動検出する(PlayerClickMovement / PlayerInputHubを持つオブジェクト)。
 /// カメラの俰瞰角度・高さは、対象取得時のカメラ位置と対象の相対オフセットとして維持する(シーン設定のまま)。
 /// スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。
-/// マップ境界によるスクロール範囲のクランプは、マップ実装後に追加する。
+/// マップ境界によるスクロール範囲のクランプは、MapBuilderがあるシーンでのみ動作する。
 /// 入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用する。
 /// </summary>
 public class TopDownCameraController : MonoBehaviour
@@ -143,7 +143,7 @@ public class TopDownCameraController : MonoBehaviour
         // 俰瞰角度・高さを維持するため、最初に対象を取得した時点の相対位置をオフセットとして使う。
         if (!_hasOffset)
         {
-            _offset = transform.position - _target.position;
+            _offset = ComputeFollowOffset();
             _hasOffset = true;
         }
 
@@ -167,6 +167,26 @@ public class TopDownCameraController : MonoBehaviour
         }
         _scrollForward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
     }
+    // 追従オフセットを、カメラが現在見ている地面上の注視点から求める。
+    // プレイヤーがシーン上のカメラ位置から離れた場所(本拠地前)へ生成されても、
+    // 俯瞰角度・高さを維持したままプレイヤーが画面中央に入る。
+    private Vector3 ComputeFollowOffset()
+    {
+        Vector3 forward = transform.forward;
+        if (forward.y < -0.0001f)
+        {
+            float distance = (_target.position.y - transform.position.y) / forward.y;
+            if (distance > 0f)
+            {
+                Vector3 lookPoint = transform.position + forward * distance;
+                return transform.position - lookPoint;
+            }
+        }
+
+        // 水平・上向きなど注視点を求められない場合は従来どおり相対位置を使う。
+        return transform.position - _target.position;
+    }
+
     // マップ境界によるスクロール範囲のクランプ。MapBuilderがあるシーンでのみ動作する。
     private void ApplyMapClamp()
     {

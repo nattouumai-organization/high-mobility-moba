@@ -25,6 +25,7 @@
 ### Fixed
 
 - マップ自動生成で1本目のタワーが存在しなかった問題を修正(フェーズ5 fix5)。前回の修正でタワーの生成位置が本拠地のすぐ隣になっており、レーン中間にあるべき1本目のタワーが消えていた。MapBuilderをGAME_DESIGN.md 3章の座標(1:100スケール)へ準拠させ、地面84 x 24ユニット、本拠地 = 中央からX±33(設計900/7,500)、1本目のタワー = 中央からX±16(設計2,600/5,800)として生成するよう変更。
+- プレイヤーが画面に映らない問題を修正(フェーズ5 fix6)。カメラの追従オフセットが「検出時のカメラとプレイヤーの相対位置」だったため、プレイヤーを本拠地前(X=-30)へ生成するようになった結果、カメラが常にプレイヤーから約30ユニット離れた場所を映していた(右クリック移動でカメラが一方向へ動き続ける現象も同一原因)。オフセットを「カメラが見ている地面上の注視点」基準で算出するよう変更し、俯瞰角度・高さを維持したままプレイヤーを画面中央に映すようにした。
 
 ### Changed
 
@@ -33,7 +34,7 @@
 - 本拠地(NexusController): タワー破壊までの完全無敵とAR50(HP6,000)、破壊時の勝敗通知。
 - ミニオン(MinionController) / GameManager: ウェーブ(近接3体 + 遠距離2体、初回15秒・間隔20秒)と成長式 WaveLv = floor((WaveNumber - 1) / 2) を設計値で実装。
 - GameManager: ヒーローへTeamMemberを自動付与(タワー・ミニオンの索敵対象化)。
-- TopDownCameraController: マップ境界によるカメラスクロール範囲のクランプを追加(MapBuilderがあるシーンのみ)。
+- TopDownCameraController: マップ境界によるカメラスクロール範囲のクランプを追加(MapBuilderがあるシーンのみ)。追従オフセットは注視点基準で算出(fix6)。
 - PlayerSpawner: MapBuilderがあるシーンでは自チーム本拠地前へスポーンするよう変更。
 - HealthController: SetMaxHealth(実行時の最大HP設定)とRefreshDamageModifiers(後付けIIncomingDamageModifierの再取得)を追加。
 - Targetable: InitializeRuntime(実行時生成オブジェクト用の分類・Renderer設定)を追加。
