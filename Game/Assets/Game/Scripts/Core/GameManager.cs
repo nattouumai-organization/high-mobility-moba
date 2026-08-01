@@ -3,6 +3,7 @@ using UnityEngine;
 /// <summary>
 /// 試合進行の管理(SC_Prototypeの空オブジェクトへアタッチする)。
 /// - ミニオンウェーブの出撃(GAME_DESIGN.md 5章: 近接3体 + 遠距離2体、初回15秒後、間隔20秒)。
+///   出撃方向・横並びはMapBuilderのレーン方向(斜め配置対応)に従う。
 /// - ウェーブ成長(WaveLv = floor((WaveNumber - 1) / 2))をMinionControllerへ引き渡す。
 /// - ヒーローへTeamMemberを自動付与し、タワー・ミニオンの索敵対象にする。
 /// - タワー破壊・本拠地破壊の通知を受け取り、勝敗を判定する(勝敗UIはフェーズ5タスク7で実装予定)。
@@ -83,8 +84,8 @@ public class GameManager : MonoBehaviour
         {
             if (hero.GetComponent<TeamMember>() == null)
             {
-            	TeamMember member = hero.gameObject.AddComponent<TeamMember>();
-            	member.SetTeam(Team.Blue);
+                TeamMember member = hero.gameObject.AddComponent<TeamMember>();
+                member.SetTeam(Team.Blue);
             }
         }
     }
@@ -108,19 +109,21 @@ public class GameManager : MonoBehaviour
     private void SpawnTeamWave(Team team, MapBuilder map, int waveLevel)
     {
         Vector3 basePosition = map.GetMinionSpawnPosition(team);
-        Vector3 forward = team == Team.Blue ? Vector3.right : Vector3.left;
+        Vector3 forward = map.GetLaneForward(team);
+        // レーンに対して横方向(斜め配置でも横並びが崩れないようにレーン基準で算出)。
+        Vector3 lateral = Vector3.Cross(Vector3.up, forward).normalized;
 
         for (int i = 0; i < _meleePerWave; i++)
         {
-            float offsetZ = (i - (_meleePerWave - 1) * 0.5f) * 1.4f;
-            Vector3 position = basePosition + forward * 1.2f + new Vector3(0f, 0f, offsetZ);
+            float offset = (i - (_meleePerWave - 1) * 0.5f) * 1.4f;
+            Vector3 position = basePosition + forward * 1.2f + lateral * offset;
             MinionController.Spawn(team, MinionController.MinionType.Melee, position, waveLevel, map.TargetableLayer);
         }
 
         for (int i = 0; i < _rangedPerWave; i++)
         {
-            float offsetZ = (i - (_rangedPerWave - 1) * 0.5f) * 1.6f;
-            Vector3 position = basePosition - forward * 1.2f + new Vector3(0f, 0f, offsetZ);
+            float offset = (i - (_rangedPerWave - 1) * 0.5f) * 1.6f;
+            Vector3 position = basePosition - forward * 1.2f + lateral * offset;
             MinionController.Spawn(team, MinionController.MinionType.Ranged, position, waveLevel, map.TargetableLayer);
         }
     }

@@ -308,12 +308,14 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 GAME_DESIGN.md 3章のマップ仕様を1:100スケールで実行時生成する。シーンには空オブジェクトへMapBuilderとGameManagerをアタッチするだけでよい。
 
-| 要素 | 設計値 | 実装値(1:100) |
+レーンは原点中心の斜め配置(既定 -45度 = 左下(青)→右上(赤))。MapBuilder.LaneRotationがレーン座標(X=レーン方向/Z=幅方向)→ワールド座標の変換を提供し、構造物の配置・スポーン位置・ミニオンの進軍方向(GetLaneForward / GetLaneCenterPull)・カメラのスクロール範囲(回転後のマップ4隅から算出)がすべてレーン角度に追従する。
+
+| 要素 | 設計値 | 実装値(1:100、レーン座標) |
 | --- | --- | --- |
-| マップ | 8,400 x 2,400 | 地面Plane 84 x 24(原点中心、GroundLayer) |
+| マップ | 8,400 x 2,400 | 地面Plane 84 x 24(原点中心・LaneRotationで回転、GroundLayer) |
 | 本拠地 | X=900 / 7,500、HP6,000、AR50 | X=±33、Cube(4,4,4)、タワー破壊まで無敵 |
 | 1本目のタワー | X=2,600 / 5,800、HP5,000、AR60、射程800、AD130、AS0.8 | X=±16、Cylinder(2.4,2,2.4)、射程8 |
-| ミニオン | 近接3体 + 遠距離2体、初回15秒・間隔20秒 | Capsule、本拠地前X=±30から出撃 |
+| ミニオン | 近接3体 + 遠距離2体、初回15秒・間隔20秒 | Capsule、本拠地前レーン座標X=±30から出撃 |
 
 - 実行順: MapBuilder(-300) -> GameManager(-250) -> PlayerSpawner(-200)。
 - 構造物・ミニオンのGameObject構成: プリミティブ + HealthController + TeamMember + Targetable + 各種コントローラ(TargetableLayer)。

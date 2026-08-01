@@ -6,7 +6,8 @@ using UnityEngine;
 /// - 近接: HP420 / AD18 / AS0.85 / AR0 / 射程1.75(設計175)。成長: HP+20 / AD+1.5 / AR+1。
 /// - 遠距離: HP290 / AD22 / AS0.70 / AR0 / 射程5(設計500)。成長: HP+14 / AD+1.5 / AR+0.5。
 /// - MS3.3(設計330)。HPregなし。AS・MS・射程は成長しない。
-/// - 敵本拠地方向へ進軍し、索敵範囲内の敵(ミニオン・ヒーロー・タワー・本拠地)を攻撃する。
+/// - 敵本拠地方向へ進軍し(進軍方向はMapBuilderのレーン方向に従う。斜め配置対応)、
+///   索敵範囲内の敵(ミニオン・ヒーロー・タワー・本拠地)を攻撃する。
 ///   タワー破壊前の本拠地(無敵)は狙わない。
 /// - ARはCharacterStatsを持たないためIIncomingDamageModifierとして自前で適用する。
 /// </summary>
@@ -238,11 +239,22 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         }
     }
 
-    // 目標がいない間は敵本拠地方向へ進軍する(レーン中央Z=0へ緩やかに寄せる)。
+    // 目標がいない間は敵本拠地方向へ進軍する。進軍方向はMapBuilderのレーン方向に従い、
+    // レーン中心線へ緩やかに寄せる(斜め配置でもレーン上を進軍する)。
     private void MoveForward()
     {
-        Vector3 direction = _team == Team.Blue ? Vector3.right : Vector3.left;
-        direction += new Vector3(0f, 0f, -transform.position.z * 0.15f);
+        Vector3 direction;
+        MapBuilder map = MapBuilder.Instance;
+        if (map != null)
+        {
+            direction = map.GetLaneForward(_team) + map.GetLaneCenterPull(transform.position) * 0.15f;
+        }
+        else
+        {
+            direction = _team == Team.Blue ? Vector3.right : Vector3.left;
+            direction += new Vector3(0f, 0f, -transform.position.z * 0.15f);
+        }
+
         Move(direction);
     }
 

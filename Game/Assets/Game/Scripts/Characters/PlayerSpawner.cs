@@ -53,14 +53,15 @@ public sealed class PlayerSpawner : MonoBehaviour
             return;
         }
 
-        // MapBuilderがあるシーンでは、本拠地前のスポーン位置を使用する(高さはスポナーの値を維持)。1v1プロトタイプの操作ヒーローはBlue所属。
+        // MapBuilderがあるシーンでは、本拠地前のスポーン位置を使用し、レーンの進軍方向を向く(高さはスポナーの値を維持)。
+        // 1v1プロトタイプの操作ヒーローはBlue所属。
         Vector3 spawnPosition = transform.position;
         Quaternion spawnRotation = transform.rotation;
         if (MapBuilder.Instance != null)
         {
             Vector3 mapSpawn = MapBuilder.Instance.GetHeroSpawnPosition(Team.Blue);
             spawnPosition = new Vector3(mapSpawn.x, transform.position.y, mapSpawn.z);
-            spawnRotation = Quaternion.LookRotation(Vector3.right);
+            spawnRotation = Quaternion.LookRotation(MapBuilder.Instance.GetLaneForward(Team.Blue));
         }
 
         SpawnedPlayer = Instantiate(prefab, spawnPosition, spawnRotation);

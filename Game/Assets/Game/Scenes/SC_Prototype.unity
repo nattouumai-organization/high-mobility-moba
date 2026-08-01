@@ -130,6 +130,8 @@ GameObject:
   - component: {fileID: 304994532}
   - component: {fileID: 304994531}
   - component: {fileID: 304994533}
+  - component: {fileID: 304994535}
+  - component: {fileID: 304994534}
   m_Layer: 0
   m_Name: Map
   m_TagString: Untagged
@@ -149,21 +151,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd99dad6eface6440a6415669620d226, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MapBuilder
-  _halfLength: 35
-  _halfWidth: 10
-  _laneWallZ: 8.5
-  _laneWallHalfLength: 28
-  _openingCenters:
-  - -18
-  - 0
-  - 18
-  _openingWidth: 4
-  _wallHeight: 3
-  _wallThickness: 1
-  _spawnPointX: 31
-  _towerX: 16
-  _blueTeamColor: {r: 0.25, g: 0.5, b: 1, a: 1}
-  _redTeamColor: {r: 1, g: 0.35, b: 0.3, a: 1}
+  _mapLength: 84
+  _mapWidth: 24
+  _nexusOffsetX: 33
+  _towerOffsetX: 16
+  _groundLayerName: GroundLayer
+  _targetableLayerName: TargetableLayer
+  _existingGround: {fileID: 0}
+  _blueTower: {fileID: 0}
+  _redTower: {fileID: 0}
+  _blueNexus: {fileID: 0}
+  _redNexus: {fileID: 0}
 --- !u!4 &304994532
 Transform:
   m_ObjectHideFlags: 0
@@ -191,18 +189,52 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 12dd93e3fbd87d44e9e645e692cd7e9f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TowerController
-  _maxHealth: 5000
-  _armor: 60
-  _attackDamage: 130
-  _attackSpeed: 0.8
+  _team: 0
   _attackRange: 8
-  _bonusPerHitPercent: 25
-  _maxBonusPercent: 200
-  _resetSeconds: 2
-  _healthStageSize: 1000
-  _beamDuration: 0.15
-  _healthBarHeight: 5.4
-  _healthBarWidth: 2.4
+  _attackDamage: 130
+  _attacksPerSecond: 0.8
+  _armor: 60
+  _minionProtectRange: 8
+  _noMinionDamageCut: 0.9
+  _consecutiveBonusPerHit: 0.25
+  _consecutiveBonusMax: 2
+  _consecutiveResetSeconds: 2
+--- !u!114 &304994534
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304994530}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9e2b5c8a4f1473b82c6d0a9e3f75b14, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Targetable
+  _classification: 0
+  _selectionRing: {fileID: 0}
+  _selectionRingRenderer: {fileID: 0}
+  _bodyRenderer: {fileID: 0}
+  _selectedColor: {r: 1, g: 0.45, b: 0.35, a: 1}
+  _inRangeRingColor: {r: 0.35, g: 1, b: 0.35, a: 1}
+  _outOfRangeRingColor: {r: 1, g: 0.5, b: 0.1, a: 1}
+  _hitFlashColor: {r: 1, g: 1, b: 1, a: 1}
+  _hitFlashDuration: 0.15
+  _deathHideDelay: 0.6
+--- !u!114 &304994535
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304994530}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a7c2e5f8d1b3462f90a4c8e6b2d75f19, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthController
+  _maxHealth: 100
+  _currentHealth: 100
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -356,7 +388,6 @@ MonoBehaviour:
   _target: {fileID: 0}
   _edgeScrollSpeed: 8
   _edgeThicknessPixels: 12
-  _boundsMargin: 2
   _mode: 0
 --- !u!1 &410087039
 GameObject:
@@ -511,7 +542,7 @@ Transform:
   m_GameObject: {fileID: 448836973}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: 0}
+  m_LocalPosition: {x: 0, y: 2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -530,8 +561,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSpawner
   _fallbackCharacterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
-  _team: 0
-  _spawnHeightOffset: 1.1
 --- !u!1 &1246788901
 GameObject:
   m_ObjectHideFlags: 0
