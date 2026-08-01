@@ -8,6 +8,7 @@ using UnityEngine.UI;
 /// 毎フレームMain Cameraと同じ向きに揃えることで、常にカメラ方向を向き裏返らない。
 /// 対象が死亡した場合はHPバーを非表示にし、復活した場合は再表示する。HP数値のテキスト表示は今回実装しない。
 /// World Space Canvasの子(Background / Fill)と合わせて使用する。
+/// 実行時生成の場合はInitializeRuntimeでHP取得元とFill Imageを設定する(タワーのHPバーなど)。
 /// </summary>
 public class WorldHealthBar : MonoBehaviour
 {
@@ -53,6 +54,34 @@ public class WorldHealthBar : MonoBehaviour
         _healthController.HealthChanged -= HandleHealthChanged;
         _healthController.Died -= HandleDied;
         _healthController.Revived -= HandleRevived;
+    }
+
+    /// <summary>
+    /// 実行時生成用の初期化。HP取得元とFill Imageを設定し、イベント購読と表示を最新化する。
+    /// AddComponent直後(Awake/OnEnable実行後)に呼ぶことを想定している。
+    /// </summary>
+    /// <param name="healthController">HPの取得元。</param>
+    /// <param name="fillImage">残りHPを表すFilledタイプのUI Image。</param>
+    public void InitializeRuntime(HealthController healthController, Image fillImage)
+    {
+        // 既に別のHealthControllerを購読済みの場合は付け替える。
+        if (_healthController != null && isActiveAndEnabled)
+        {
+            _healthController.HealthChanged -= HandleHealthChanged;
+            _healthController.Died -= HandleDied;
+            _healthController.Revived -= HandleRevived;
+        }
+
+        _healthController = healthController;
+        _fillImage = fillImage;
+
+        if (_healthController != null && isActiveAndEnabled)
+        {
+            _healthController.HealthChanged += HandleHealthChanged;
+            _healthController.Died += HandleDied;
+            _healthController.Revived += HandleRevived;
+            HandleHealthChanged(_healthController.CurrentHealth, _healthController.MaxHealth);
+        }
     }
 
     private void Start()

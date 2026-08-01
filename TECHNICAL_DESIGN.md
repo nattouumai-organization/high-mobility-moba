@@ -325,11 +325,18 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - DamageContextにIsBasicAttackフラグを追加。通常攻撃(ヒーローAA・タワー・ミニオン)のみisBasicAttack: trueでTakeDamageを呼ぶ。
 - タワー: 同一チームからのダメージ0 / 通常攻撃以外は0 / 攻撃者周囲8以内に味方ミニオン不在なら確定無効・通常90%軽減 / AR60。
 - 本拠地: 自チームタワー破壊まで完全無敵 / 同一チームダメージ0 / 通常攻撃のみ / AR50。
-- ヒーローの通常攻撃は同一チームの対象をターゲットにしない(PlayerBasicAttackController.GetValidTarget)。
+- ヒーローの通常攻撃は同一チームの対象をターゲットにしない(PlayerBasicAttackController.GetValidTarget)。さらに右クリック選択段階でも同一チームの対象を除外する(PlayerTargetSelector.IsSameTeam)。
 - 構造物・ミニオンはCharacterStatsを持たないため、HealthController.SetMaxHealth(実行時HP設定)と各ControllerのIIncomingDamageModifierでARを自前適用する。AddComponent後はHealthController.RefreshDamageModifiers()を呼ぶ。
+
+### タワーのHPバー(WorldHealthBar再利用)
+
+- WorldHealthBarにInitializeRuntime(HealthController, Image)を追加し、実行時生成に対応。
+- TowerController.Initializeがタワー頭上(中心+3.2m)にWorld Space Canvas(240x28px、1px=0.01m)+Background/Fill Imageを生成する。Fillの色はチームカラー。
+- タワー本体は非一様スケールのためHPバーは子にせず、ワールド位置だけ合わせる(タワーは不動)。破壊時は非表示→タワーOnDestroyで破棄。
 
 ### ミニオン(MinionController)
 
 - 近接: HP420/AD18/AS0.85/射程1.75、遠隔: HP290/AD22/AS0.70/射程5。移動速度3.3。ウェーブレベル成長: 近接HP+20/AD+1.5/AR+1、遠隔HP+14/AD+1.5/AR+0.5。
 - 索敵範囲7以内の最近敵を狙い、敵不在の間はレーン進行方向へ進軍(中心線引き寄せ付き)。無敵状態の本拠地は狙わない。
+- 分離処理: 半径の合計+余白(0.1m)より近いミニオン同士を最大2m/秒で押し離し、重なりを防ぐ。完全に重なった場合はスポーン順の連番から決定的な方向へ離れる(Unity 6で廃止のGetInstanceIDは使用しない)。
 - 攻撃はisBasicAttack: trueの通常攻撃扱いで構造物にも有効。ActiveMinions(static)をタワーのミニオン同伴判定が参照する。

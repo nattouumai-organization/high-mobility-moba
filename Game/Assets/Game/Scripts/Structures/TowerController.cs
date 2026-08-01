@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// 1本目のタワー(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
@@ -11,6 +12,7 @@ using UnityEngine;
 ///   2. 通常攻撃(DamageContext.IsBasicAttack)以外のダメージは0(スキルでは攻撃できない)。
 ///   3. 攻撃者の周囲8以内に攻撃側チームのミニオンがいない場合、確定ダメージは無効・通常ダメージは90%軽減。
 ///   4. 最後にAR60で通常ダメージを軽減(CharacterStatsを持たないため自前で適用)。
+/// - 頭上にワールド空間のHPバーを実行時生成する(WorldHealthBarを再利用)。
 /// - 破壊されるとGameManagerへ通知し、自チームの本拠地が攻撃可能になる。
 /// </summary>
 public class TowerController : MonoBehaviour, IIncomingDamageModifier
@@ -26,10 +28,15 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private const float NoMinionDamageMultiplier = 0.1f;
     private const float RetargetCooldown = 0.25f;
 
+    // HPバー: タワー中心(y=2)からの高さオフセットとワールドスケール(1px=0.01m、240x28px=2.4x0.28m)。
+    private const float HealthBarHeightOffset = 3.2f;
+    private const float HealthBarWorldScale = 0.01f;
+
     private static readonly List<TowerController> Towers = new List<TowerController>();
 
     private Team _team = Team.Blue;
     private HealthController _health;
+    private GameObject _healthBarRoot;
     private float _attackCooldown;
     private Transform _lastHeroTarget;
     private int _consecutiveHits;
@@ -67,6 +74,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             // HealthController.AwakeのキャッシュはこのAddComponentより先に実行済みのため再取得させる。
             _health.RefreshDamageModifiers();
             _health.Died += HandleDied;
+            CreateHealthBar();
         }
     }
 
@@ -86,6 +94,57 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         {
             _health.Died -= HandleDied;
         }
+
+        // HPバーは親子付けしていないため、タワー破棄時に明示的に破棄する。
+        if (_healthBarRoot != null)
+        {
+            Destroy(_healthBarRoot);
+        }
+    }
+
+    // タワー頭上にワールド空間のHPバーを実行時生成する。
+    // タワー本体は非一様スケール(2.4, 2, 2.4)のため、子にするとカメラ向け回転時に歪む。
+    // タワーは移動しないので、親子付けせずワールド位置だけ合わせる。
+    private void CreateHealthBar()
+    {
+        if (_healthBarRoot != null)
+        {
+            return;
+        }
+
+        _healthBarRoot = new GameObject($"{_team} Tower Health Bar");
+        _healthBarRoot.transform.position = transform.position + Vector3.up * HealthBarHeightOffset;
+        _healthBarRoot.transform.localScale = Vector3.one * HealthBarWorldScale;
+
+        Canvas canvas = _healthBarRoot.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        RectTransform rootRect = _healthBarRoot.GetComponent<RectTransform>();
+        rootRect.sizeDelta = new Vector2(240f, 28f);
+
+        Image background = CreateBarImage("Background", rootRect, Vector2.zero, Vector2.zero);
+        background.color = new Color(0.08f, 0.08f, 0.08f, 0.85f);
+
+        Image fill = CreateBarImage("Fill", rootRect, new Vector2(3f, 3f), new Vector2(-3f, -3f));
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fill.color = Color.Lerp(_team.GetTeamColor(), Color.white, 0.2f);
+
+        // WorldHealthBarはCanvas追加後にAddComponentする(AwakeでCanvasをキャッシュするため)。
+        WorldHealthBar healthBar = _healthBarRoot.AddComponent<WorldHealthBar>();
+        healthBar.InitializeRuntime(_health, fill);
+    }
+
+    private static Image CreateBarImage(string imageName, RectTransform parent, Vector2 offsetMin, Vector2 offsetMax)
+    {
+        GameObject imageObject = new GameObject(imageName);
+        imageObject.transform.SetParent(parent, false);
+        RectTransform rect = imageObject.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = offsetMin;
+        rect.offsetMax = offsetMax;
+        return imageObject.AddComponent<Image>();
     }
 
     private void Update()

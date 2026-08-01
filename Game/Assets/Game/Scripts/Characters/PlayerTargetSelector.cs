@@ -11,6 +11,7 @@ using UnityEngine;
 /// 右クリック長押し中にGroundを指している間はターゲットを解除し続け、長押し移動へ切り替える。
 /// ターゲットが死亡・破棄・無効化された場合は、選択を安全に解除する。
 /// 自分(Player)が死亡している間は、選択中のターゲットを解除し、新しいターゲット選択も受け付けない。
+/// 同一チームの対象(味方のタワー・本拠地・ミニオン)は右クリックで選択できない(地面移動として扱われる)。
 /// </summary>
 public class PlayerTargetSelector : MonoBehaviour
 {
@@ -30,6 +31,9 @@ public class PlayerTargetSelector : MonoBehaviour
     private HealthController _selfHealth;
 
     private PlayerInputHub _inputHub;
+
+    // 自分のチーム。GameManagerが実行時に付与するため、参照時に遅延取得する。
+    private TeamMember _teamMember;
 
     // 現在選択中のターゲット。未選択時はnull。
     public Targetable CurrentTarget => _currentTarget;
@@ -114,7 +118,37 @@ public class PlayerTargetSelector : MonoBehaviour
         }
 
         targetable = hitInfo.collider.GetComponentInParent<Targetable>();
-        return targetable != null;
+        if (targetable == null)
+        {
+            return false;
+        }
+
+        // 同一チームの対象(味方のタワー・本拠地・ミニオン)は右クリックで選択できない。
+        // ここでfalseを返すとIsPointingAtTargetable()もfalseになり、右クリックは地面移動として扱われる。
+        if (IsSameTeam(targetable))
+        {
+            targetable = null;
+            return false;
+        }
+
+        return true;
+    }
+
+    // 対象が自分と同一チームかどうか。どちらかにTeamMemberが無い場合は別チーム扱い(選択可能)。
+    private bool IsSameTeam(Targetable targetable)
+    {
+        // TeamMemberはGameManagerが実行時に付与するため、未取得の間は毎回確認する。
+        if (_teamMember == null)
+        {
+            _teamMember = GetComponent<TeamMember>();
+            if (_teamMember == null)
+            {
+                return false;
+            }
+        }
+
+        TeamMember targetTeam = targetable.GetComponentInParent<TeamMember>();
+        return targetTeam != null && targetTeam.Team == _teamMember.Team;
     }
 
     private bool IsPointingAtGround()

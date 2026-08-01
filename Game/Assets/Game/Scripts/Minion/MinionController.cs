@@ -7,6 +7,7 @@ using UnityEngine;
 /// - ウェーブレベルで強化: 近接 HP+20/AD+1.5/AR+1、遠隔 HP+14/AD+1.5/AR+0.5。
 /// - 索敵範囲7以内の最も近い敵(TeamMemberを持つ対象)を狙う。無敵状態の本拠地は狙わない。
 /// - 敵がいない間はレーン進行方向へ進軍する(レーン中心線への引き寄せ付き)。
+/// - ミニオン同士が重ならないよう、毎フレームの最後に分離処理(近すぎるミニオンを押し離す)を行う。
 /// - 攻撃は通常攻撃扱い(isBasicAttack: true)。タワー・本拠地は通常攻撃のみダメージを受けるため、
 ///   ミニオンの攻撃は構造物にも有効。
 /// </summary>
@@ -23,7 +24,15 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
     private const float RetargetInterval = 0.25f;
     private const float CenterPullStrength = 0.15f;
 
+    // 分離処理: 半径の合計+余白より近づいたミニオン同士を、最大SeparationSpeed(m/秒)で押し離す。
+    private const float SeparationPadding = 0.1f;
+    private const float SeparationSpeed = 2f;
+
     private static readonly List<MinionController> Active = new List<MinionController>();
+
+    // スポーン順の連番。分離処理で完全に重なった場合の決定的な方向決めに使う。
+    // (Object.GetInstanceIDはUnity 6で廃止(CS0619)のため使用しない)
+    private static int _spawnCounter;
 
     /// <summary>生存中のミニオン一覧。タワーのミニオン同伴判定などが参照する。</summary>
     public static IReadOnlyList<MinionController> ActiveMinions => Active;
@@ -35,6 +44,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
     private float _attackInterval;
     private float _attackRange;
     private float _armor;
+    private float _radius;
+    private int _spawnIndex;
     private float _attackCooldown;
     private float _retargetTimer;
     private HealthController _currentTarget;
@@ -85,6 +96,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         _team = team;
         _type = type;
         _health = health;
+        _spawnIndex = _spawnCounter++;
 
         float maxHealth;
         if (type == MinionType.Melee)
@@ -94,6 +106,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             _attackInterval = 1f / 0.85f;
             _attackRange = 1.75f;
             _armor = 1f * waveLevel;
+            _radius = 0.65f * 0.5f;
         }
         else
         {
@@ -102,6 +115,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             _attackInterval = 1f / 0.70f;
             _attackRange = 5f;
             _armor = 0.5f * waveLevel;
+            _radius = 0.5f * 0.5f;
         }
 
         if (_health != null)
@@ -138,6 +152,12 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
+        UpdateCombatAndMovement();
+        ApplySeparation();
+    }
+
+    private void UpdateCombatAndMovement()
+    {
         _attackCooldown -= Time.deltaTime;
 
         // 一定間隔で索敵する(毎フレームの全走査を避ける)。
@@ -170,6 +190,54 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         }
 
         MoveForward();
+    }
+
+    // ミニオン同士が重ならないようにする分離処理。
+    // 半径の合計+余白より近いミニオンから離れる方向へ、最大SeparationSpeed(m/秒)で押し出される。
+    // 相互に押し合うため数フレームで自然に間隔が確保される。攻撃中・停止中も適用する。
+    private void ApplySeparation()
+    {
+        Vector3 push = Vector3.zero;
+        foreach (MinionController other in Active)
+        {
+            if (other == this || other == null || other.IsDead)
+            {
+                continue;
+            }
+
+            Vector3 delta = transform.position - other.transform.position;
+            delta.y = 0f;
+            float minDistance = _radius + other._radius + SeparationPadding;
+            float distance = delta.magnitude;
+            if (distance >= minDistance)
+            {
+                continue;
+            }
+
+            Vector3 direction;
+            if (distance > 0.001f)
+            {
+                direction = delta / distance;
+            }
+            else
+            {
+                // 完全に重なった場合はスポーン順の連番から決定的な方向を選ぶ(毎フレーム同じ方向へ離れられる)。
+                // 47は360と互いに素のため、連番が違えば方向もばらける。
+                float angle = (_spawnIndex * 47) % 360;
+                direction = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
+            }
+
+            push += direction * (minDistance - distance);
+        }
+
+        if (push == Vector3.zero)
+        {
+            return;
+        }
+
+        Vector3 step = Vector3.ClampMagnitude(push, SeparationSpeed * Time.deltaTime);
+        step.y = 0f;
+        transform.position += step;
     }
 
     /// <summary>受けるダメージの変更(IIncomingDamageModifier)。ARで通常ダメージを軽減する。</summary>
