@@ -1,11 +1,15 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
 /// 1本目のタワー(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
-/// - 射程8(設計800)内の敵(TeamMemberを持つ対象)を自動攻撃する。敵ミニオンを優先し、
-///   ミニオンがいない場合のみ敵ヒーローを狙う。構造物(タワー・本拠地)は狙わない。
+/// - 射程8(設計800)内の敵(TeamMemberを持つ対象)を自動攻撃する。構造物(タワー・本拠地)は狙わない。
+/// - 攻撃優先順位: アグロ中の敵ヒーロー(最優先) > 敵ミニオン > 敵ヒーロー(最も低い)。
+///   アグロ: 敵ヒーローがタワー下で味方ヒーローにダメージを与える(攻撃者または被弾者が射程内)と発動し、
+///   その敵ヒーローが死亡するか射程外に出るまで最優先で狙い続ける。
+///   味方ヒーローのHealthController.DamageTakenイベントを購読して検知する(ミニオン・構造物からの被弾では発動しない)。
 /// - 同一ヒーローへの連続攻撃で威力+25%/発(最大+200%)。攻撃が2秒間途切れるとリセット。
 /// - 受けるダメージ(IIncomingDamageModifier):
 ///   1. 同一チームからのダメージは0(味方のタワーは殴れない)。
@@ -28,6 +32,10 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private const float NoMinionDamageMultiplier = 0.1f;
     private const float RetargetCooldown = 0.25f;
 
+    // 味方ヒーローの被ダメージ監視(アグロ検知用)の購読先を見直す間隔。
+    // ヒーローへのTeamMember付与はGameManagerが実行時に行うため、定期的に走査する。
+    private const float AllyScanInterval = 1f;
+
     // HPバー: タワー中心(y=2)からの高さオフセットとワールドスケール(1px=0.01m、240x28px=2.4x0.28m)。
     private const float HealthBarHeightOffset = 3.2f;
     private const float HealthBarWorldScale = 0.01f;
@@ -42,6 +50,15 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private int _consecutiveHits;
     private float _consecutiveResetTimer;
     private bool _isDestroyed;
+
+    // アグロ中の敵ヒーロー(タワー下で味方ヒーローを攻撃したプレイヤー)。最優先で狙う。
+    private Transform _aggroHero;
+    private HealthController _aggroHeroHealth;
+
+    // 被ダメージ監視中の味方ヒーローと購読ハンドラ(解除用に保持)。
+    private readonly Dictionary<HealthController, Action<DamageContext, float>> _allySubscriptions =
+        new Dictionary<HealthController, Action<DamageContext, float>>();
+    private float _allyScanTimer;
 
     /// <summary>所属チーム。</summary>
     public Team Team => _team;
@@ -94,6 +111,17 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         {
             _health.Died -= HandleDied;
         }
+
+        // 味方ヒーローの被ダメージ監視をすべて解除する。
+        foreach (KeyValuePair<HealthController, Action<DamageContext, float>> subscription in _allySubscriptions)
+        {
+            if (subscription.Key != null)
+            {
+                subscription.Key.DamageTaken -= subscription.Value;
+            }
+        }
+
+        _allySubscriptions.Clear();
 
         // HPバーは親子付けしていないため、タワー破棄時に明示的に破棄する。
         if (_healthBarRoot != null)
@@ -154,6 +182,21 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
+        // 味方ヒーローの被ダメージ監視先を定期的に見直す(TeamMemberは実行時に付与されるため)。
+        _allyScanTimer -= Time.deltaTime;
+        if (_allyScanTimer <= 0f)
+        {
+            _allyScanTimer = AllyScanInterval;
+            RefreshAllyHeroSubscriptions();
+        }
+
+        // アグロ中の敵ヒーローが死亡・射程外になったらアグロを解除する。
+        if (_aggroHero != null
+            && (_aggroHeroHealth == null || _aggroHeroHealth.IsDead || !IsWithinAttackRange(_aggroHero)))
+        {
+            ClearAggro();
+        }
+
         // 連続攻撃ボーナスは攻撃が2秒間途切れるとリセットする。
         if (_consecutiveResetTimer > 0f)
         {
@@ -183,9 +226,16 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         _attackCooldown = 1f / AttacksPerSecond;
     }
 
-    // 射程内の敵を探す。敵ミニオンを優先し、いなければ敵ヒーロー。構造物は狙わない。
+    // 射程内の敵を探す。優先順位: アグロ中の敵ヒーロー > 敵ミニオン > 敵ヒーロー(最も低い)。構造物は狙わない。
     private HealthController AcquireTarget(out bool isHero)
     {
+        // アグロ中の敵ヒーローはミニオンより優先して狙う。
+        if (_aggroHero != null && _aggroHeroHealth != null && !_aggroHeroHealth.IsDead && IsWithinAttackRange(_aggroHero))
+        {
+            isHero = true;
+            return _aggroHeroHealth;
+        }
+
         HealthController bestMinion = null;
         float bestMinionDistance = float.MaxValue;
         HealthController bestHero = null;
@@ -244,8 +294,108 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             return bestMinion;
         }
 
+        // ヒーローは優先順位最低。ミニオンが射程内に1体もいない場合のみ狙う。
         isHero = bestHero != null;
         return bestHero;
+    }
+
+    // 味方ヒーロー(同一チームでミニオン・構造物以外)の被ダメージ監視を開始する。
+    private void RefreshAllyHeroSubscriptions()
+    {
+        foreach (TeamMember member in FindObjectsByType<TeamMember>(FindObjectsSortMode.None))
+        {
+            if (member.Team != _team)
+            {
+                continue;
+            }
+
+            if (member.GetComponent<MinionController>() != null
+                || member.GetComponent<TowerController>() != null
+                || member.GetComponent<NexusController>() != null)
+            {
+                continue;
+            }
+
+            HealthController allyHealth = member.GetComponent<HealthController>();
+            if (allyHealth == null || _allySubscriptions.ContainsKey(allyHealth))
+            {
+                continue;
+            }
+
+            Action<DamageContext, float> handler =
+                (context, actualDamage) => HandleAllyHeroDamaged(allyHealth, context, actualDamage);
+            allyHealth.DamageTaken += handler;
+            _allySubscriptions.Add(allyHealth, handler);
+        }
+    }
+
+    // 味方ヒーローがダメージを受けたときのアグロ判定。
+    // 攻撃者が敵ヒーローで、攻撃者または被弾者がタワー射程内にいる場合に発動する。
+    private void HandleAllyHeroDamaged(HealthController victim, DamageContext context, float actualDamage)
+    {
+        if (_isDestroyed || _health == null || _health.IsDead)
+        {
+            return;
+        }
+
+        if (actualDamage <= 0f || context.Attacker == null)
+        {
+            return;
+        }
+
+        // 攻撃者が敵チームのヒーローであること(ミニオン・構造物の攻撃ではアグロしない)。
+        TeamMember attackerTeam = context.Attacker.GetComponent<TeamMember>();
+        if (attackerTeam == null || attackerTeam.Team == _team)
+        {
+            return;
+        }
+
+        if (context.Attacker.GetComponent<MinionController>() != null
+            || context.Attacker.GetComponent<TowerController>() != null
+            || context.Attacker.GetComponent<NexusController>() != null)
+        {
+            return;
+        }
+
+        // 「タワー下での攻撃」判定: 攻撃者または被弾者がタワー射程内にいること。
+        bool attackerInRange = IsWithinAttackRange(context.Attacker);
+        bool victimInRange = victim != null && IsWithinAttackRange(victim.transform);
+        if (!attackerInRange && !victimInRange)
+        {
+            return;
+        }
+
+        HealthController attackerHealth = context.Attacker.GetComponent<HealthController>();
+        if (attackerHealth == null || attackerHealth.IsDead)
+        {
+            return;
+        }
+
+        _aggroHero = context.Attacker;
+        _aggroHeroHealth = attackerHealth;
+    }
+
+    private void ClearAggro()
+    {
+        _aggroHero = null;
+        _aggroHeroHealth = null;
+    }
+
+    // 対象がタワーの射程内にいるかどうか(コライダー最近点・水平距離)。
+    private bool IsWithinAttackRange(Transform target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        Collider targetCollider = target.GetComponent<Collider>();
+        Vector3 closest = targetCollider != null && targetCollider.enabled
+            ? targetCollider.ClosestPoint(transform.position)
+            : target.position;
+        Vector3 delta = closest - transform.position;
+        delta.y = 0f;
+        return delta.magnitude <= AttackRange;
     }
 
     private void Attack(HealthController target, bool isHero)

@@ -328,6 +328,14 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - ヒーローの通常攻撃は同一チームの対象をターゲットにしない(PlayerBasicAttackController.GetValidTarget)。さらに右クリック選択段階でも同一チームの対象を除外する(PlayerTargetSelector.IsSameTeam)。
 - 構造物・ミニオンはCharacterStatsを持たないため、HealthController.SetMaxHealth(実行時HP設定)と各ControllerのIIncomingDamageModifierでARを自前適用する。AddComponent後はHealthController.RefreshDamageModifiers()を呼ぶ。
 
+### タワーの攻撃優先順位とアグロ
+
+- 優先順位: アグロ中の敵ヒーロー(最優先) > 敵ミニオン > 敵ヒーロー(最も低い。ミニオンが射程内に1体もいない場合のみ)。
+- アグロ発動条件: 敵ヒーローが味方ヒーローに実ダメージを与え、かつ攻撃者または被弾者がタワー射程内にいること。ミニオン・構造物からの被弾では発動しない。
+- アグロ解除条件: アグロ対象の死亡、またはタワー射程外への離脱。解除後は通常の優先順位に戻る(再度攻撃すれば再発動)。
+- 検知方法: タワーが味方ヒーローのHealthController.DamageTakenイベントを購読(1秒間隔で購読先を見直し)し、DamageContext.Attackerから攻撃者を判定する。HealthControllerの変更は不要。
+- アグロ中も連続攻撃ボーナス(+25%/発・最大+200%)は通常通り適用される。
+
 ### タワーのHPバー(WorldHealthBar再利用)
 
 - WorldHealthBarにInitializeRuntime(HealthController, Image)を追加し、実行時生成に対応。
