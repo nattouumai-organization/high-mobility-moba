@@ -168,6 +168,14 @@ public class PlayerBasicAttackController : MonoBehaviour
             return null;
         }
 
+        // 同一チームの対象(味方のタワー・本拠地・ミニオン)は通常攻撃のターゲットにしない。
+        TeamMember myTeam = GetComponent<TeamMember>();
+        TeamMember targetTeam = target.GetComponent<TeamMember>();
+        if (myTeam != null && targetTeam != null && myTeam.Team == targetTeam.Team)
+        {
+            return null;
+        }
+
         return target;
     }
 
@@ -201,7 +209,8 @@ public class PlayerBasicAttackController : MonoBehaviour
         if (targetHealth != null)
         {
             // 攻撃者としてPlayerのTransformを渡す(通常ダメージ)。受けた側のダメージ軽減(ゼルフWなど)が前方判定に使用する。
-            float actualDamage = targetHealth.TakeDamage(_characterStats.CurrentAttackDamage, transform);
+            // isBasicAttack: trueで通常攻撃として扱う(タワー・本拠地は通常攻撃のみ被弾)。
+            float actualDamage = targetHealth.TakeDamage(_characterStats.CurrentAttackDamage, transform, DamageType.Normal, isBasicAttack: true);
 
             if (actualDamage > 0f)
             {

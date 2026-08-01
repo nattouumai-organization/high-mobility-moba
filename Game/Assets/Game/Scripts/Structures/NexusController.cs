@@ -1,28 +1,27 @@
 using UnityEngine;
 
 /// <summary>
-/// 本拠地(GAME_DESIGN.md 4章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
-/// - HP6,000 / AR50 / HPregなし。
-/// - 同チームの1本目のタワーが破壊されるまで全ダメージ無効(IIncomingDamageModifierで0にする)。
-/// - AR(50)はCharacterStatsを持たないためIIncomingDamageModifierとして自前で適用する。
+/// 本拠地(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
+/// - 自チームの1本目のタワーが破壊されるまで完全無敵(すべてのダメージを0にする)。
+/// - 受けるダメージはタワーと同じく通常攻撃のみ有効。同一チームからのダメージは0。
+/// - 通常ダメージはAR50で軽減(CharacterStatsを持たないため自前で適用)。
 /// - 破壊されるとGameManagerへ通知し、相手チームの勝利となる。
 /// </summary>
 public class NexusController : MonoBehaviour, IIncomingDamageModifier
 {
-    [Header("戦闘(GAME_DESIGN.md 4章)")]
-    [SerializeField] private Team _team = Team.Blue;
-    [SerializeField, Min(0f)] private float _armor = 50f;
+    private const float Armor = 50f;
 
+    private Team _team = Team.Blue;
     private HealthController _health;
     private bool _isDestroyed;
 
     /// <summary>所属チーム。</summary>
     public Team Team => _team;
 
-    /// <summary>同チームのタワーが残っている間は無敵。</summary>
+    /// <summary>自チームの1本目のタワーが破壊されるまでは無敵。</summary>
     public bool IsInvulnerable => !TowerController.IsTowerDestroyed(_team);
 
-    /// <summary>MapBuilderが生成直後に呼び出す初期化。</summary>
+    /// <summary>生成直後の初期化(MapBuilderから呼び出す)。</summary>
     public void Initialize(Team team)
     {
         _team = team;
@@ -43,20 +42,35 @@ public class NexusController : MonoBehaviour, IIncomingDamageModifier
         }
     }
 
-    /// <summary>
-    /// 受けるダメージの軽減(IIncomingDamageModifier)。
-    /// タワーが破壊されるまで本拠地は攻撃できない(全ダメージ0)。その後はAR(50)で通常ダメージを軽減する。
-    /// </summary>
+    /// <summary>受けるダメージの変更(IIncomingDamageModifier)。クラスコメントのルールを適用する。</summary>
     public float ModifyIncomingDamage(DamageContext context, float currentAmount)
     {
+        // 自チームのタワー破壊前は完全無敵。
         if (IsInvulnerable)
         {
             return 0f;
         }
 
-        if (context.Type == DamageType.Normal && _armor > 0f)
+        // 同一チームからのダメージは受けない。
+        if (context.Attacker != null)
         {
-            currentAmount = currentAmount * 100f / (100f + _armor);
+            TeamMember attackerTeam = context.Attacker.GetComponent<TeamMember>();
+            if (attackerTeam != null && attackerTeam.Team == _team)
+            {
+                return 0f;
+            }
+        }
+
+        // 本拠地も通常攻撃でのみダメージを受ける(スキル・反射は無効)。
+        if (!context.IsBasicAttack)
+        {
+            return 0f;
+        }
+
+        // ARによる通常ダメージの軽減。
+        if (context.Type == DamageType.Normal)
+        {
+            currentAmount = currentAmount * 100f / (100f + Armor);
         }
 
         return currentAmount;
@@ -70,14 +84,9 @@ public class NexusController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _isDestroyed = true;
-
         if (GameManager.Instance != null)
         {
             GameManager.Instance.NotifyNexusDestroyed(_team);
-        }
-        else
-        {
-            Debug.Log($"NexusController: {_team}チームの本拠地が破壊されました({_team.Opponent()}チームの勝利)。", this);
         }
     }
 }

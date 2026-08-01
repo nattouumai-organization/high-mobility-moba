@@ -1,84 +1,83 @@
 using UnityEngine;
 
 /// <summary>
-/// 試合マップを実行時に生成するビルダー(SC_Prototypeの空オブジェクトへアタッチする)。
-/// GAME_DESIGN.md 3章のマップ仕様(横8,400 x 縦2,400)を1:100スケール(84 x 24ユニット)で再現する。
-/// レーンは原点中心の斜め配置(既定-45度 = 左下(青本拠地)から右上(赤本拠地))。
-/// - レーン座標(X=レーン方向/Z=幅方向)をLaneRotationでワールド座標へ変換し、
-///   地面・本拠地(レーン座標X=±33)・1本目のタワー(レーン座標X=±16)・スポーン位置を配置する。
-/// - 地面Plane(GroundLayer)を生成し、右クリック移動・スキルの地面Raycastが機能するようにする。
-/// - Inspectorへ既存のオブジェクトを割り当てた場合、該当の自動生成はスキップする。
-/// - カメラのスクロール範囲(回転後のマップ境界から算出)と、PlayerSpawner / GameManagerが使う
-///   スポーン位置・レーン方向を提供する。
-/// DefaultExecutionOrder(-300)により、GameManager(-250)・PlayerSpawner(-200)より先に生成する。
+/// 1レーンマップを実行時に生成する(GAME_DESIGN.md 3章)。シーンに置いた空のGameObjectにアタッチするだけでよい。
+/// - レイアウト(ローカルX軸基準): 地面84x24、1本目のタワーX=±16、本拠地X=±33、ヒーロー初期位置(±30, -2.5)、
+///   ミニオン出撃位置X=±30。_laneYawDegrees(既定-45度)で全体を回転し、ブルー左下→レッド右上の斜めレーンにする。
+/// - 生成物はInspectorのスロットがnullの場合のみCreatePrimitiveで自動生成する(差し替え可能)。
+/// - 生成した構造物にはHealthController/TeamMember/Targetable/各Controllerを付与する。
+/// - Targetableレイヤーはレイヤー名から実行時に解決する(PlayerTargetSelectorのLayerMaskと合わせる)。
+/// - StartでGameManagerの存在を確認し、無ければ自動生成する(ミニオン不出撃の自己修復)。
+/// - カメラ用にマップ外周の移動限界(CameraMinXなど)を公開する。
 /// </summary>
 [DefaultExecutionOrder(-300)]
 public class MapBuilder : MonoBehaviour
 {
-    /// <summary>シーン上のMapBuilder。カメラ・スポナーが参照する。無い場合はnull。</summary>
+    private const float GroundLength = 84f;
+    private const float GroundWidth = 24f;
+    private const float TowerLocalX = 16f;
+    private const float NexusLocalX = 33f;
+    private const float HeroSpawnLocalX = 30f;
+    private const float HeroSpawnLocalZ = -2.5f;
+    private const float MinionSpawnLocalX = 30f;
+    private const float TowerMaxHealth = 5000f;
+    private const float NexusMaxHealth = 6000f;
+    private const float CameraMarginX = 3f;
+    private const float CameraMarginZMin = 15f;
+    private const float CameraMarginZMax = 5f;
+
+    /// <summary>シーン上のMapBuilder。カメラ・ミニオン・PlayerSpawnerが参照する。</summary>
     public static MapBuilder Instance { get; private set; }
 
-    [Header("マップサイズ(1:100スケール)")]
-    [SerializeField, Min(10f)] private float _mapLength = 84f;
-    [SerializeField, Min(4f)] private float _mapWidth = 24f;
+    // レーン全体の回転角(Y軸)。-45度でブルー左下→レッド右上の斜め配置になる。
+    [SerializeField] [Range(-90f, 90f)] private float _laneYawDegrees = -45f;
 
-    [Header("レーンの向き(Y軸回転、度)。0=X軸方向、-45=左下(青)から右上(赤)への斜め")]
-    [SerializeField, Range(-90f, 90f)] private float _laneYawDegrees = -45f;
+    // Targetable/Groundレイヤーの名前。PlayerTargetSelectorのLayerMask(Inspector設定)と一致させること。
+    [SerializeField] private string _targetableLayerName = "Targetable";
+    [SerializeField] private string _groundLayerName = "Ground";
 
-    [Header("構造物の位置(中央からのレーン座標X距離)")]
-    [SerializeField, Min(1f)] private float _nexusOffsetX = 33f;
-    [SerializeField, Min(1f)] private float _towerOffsetX = 16f;
-
-    [Header("レイヤー")]
-    [SerializeField] private string _groundLayerName = "GroundLayer";
-    [SerializeField] private string _targetableLayerName = "TargetableLayer";
-
-    [Header("既存オブジェクト(未設定なら自動生成)")]
-    [SerializeField] private GameObject _existingGround;
+    // nullの場合はCreatePrimitiveで自動生成する。モデル差し替え用のスロット。
+    [SerializeField] private GameObject _ground;
     [SerializeField] private GameObject _blueTower;
     [SerializeField] private GameObject _redTower;
     [SerializeField] private GameObject _blueNexus;
     [SerializeField] private GameObject _redNexus;
 
-    private int _groundLayer = 6;
-    private int _targetableLayer = 7;
-    private Quaternion _laneRotation = Quaternion.identity;
-    private Vector3 _cameraBoundsMin;
-    private Vector3 _cameraBoundsMax;
+    private int _targetableLayer = -1;
+    private int _groundLayer = -1;
 
-    /// <summary>地面のレイヤー番号。</summary>
-    public int GroundLayer => _groundLayer;
+    /// <summary>レーン全体の回転。ローカル座標→ワールド座標の変換に使う。</summary>
+    public Quaternion LaneRotation => Quaternion.Euler(0f, _laneYawDegrees, 0f);
 
-    /// <summary>タワー・ミニオンなど攻撃対象のレイヤー番号。</summary>
+    /// <summary>Targetableレイヤー番号。未定義の場合は-1。</summary>
     public int TargetableLayer => _targetableLayer;
 
-    /// <summary>レーン座標→ワールド座標の回転。</summary>
-    public Quaternion LaneRotation => _laneRotation;
-
-    /// <summary>カメラのスクロール範囲(TopDownCameraControllerが参照)。回転後のマップ境界から算出する。</summary>
-    public float CameraMinX => _cameraBoundsMin.x;
-    public float CameraMaxX => _cameraBoundsMax.x;
-    public float CameraMinZ => _cameraBoundsMin.z;
-    public float CameraMaxZ => _cameraBoundsMax.z;
+    /// <summary>カメラの移動限界(ワールド座標)。</summary>
+    public float CameraMinX { get; private set; }
+    public float CameraMaxX { get; private set; }
+    public float CameraMinZ { get; private set; }
+    public float CameraMaxZ { get; private set; }
 
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Debug.LogWarning("MapBuilder: 複数のMapBuilderが存在するため、後から起動したものは無効化します。", this);
+            Debug.LogWarning("MapBuilder: 既に別のMapBuilderが存在するため、このコンポーネントは無効化します。", this);
             enabled = false;
             return;
         }
 
         Instance = this;
-
-        _groundLayer = ResolveLayer(_groundLayerName, 6);
-        _targetableLayer = ResolveLayer(_targetableLayerName, 7);
-        _laneRotation = Quaternion.Euler(0f, _laneYawDegrees, 0f);
+        transform.rotation = LaneRotation;
+        _targetableLayer = ResolveLayer(_targetableLayerName);
+        _groundLayer = ResolveLayer(_groundLayerName);
+        BuildMap();
         RecalculateCameraBounds();
+    }
 
-        BuildGround();
-        BuildStructures();
+    private void Start()
+    {
+        EnsureGameManager();
     }
 
     private void OnDestroy()
@@ -89,160 +88,240 @@ public class MapBuilder : MonoBehaviour
         }
     }
 
-    /// <summary>ヒーローのスポーン位置(本拠地の少し前・レーンやや下)。高さ(Y)は呼び出し側が維持する。</summary>
-    public Vector3 GetHeroSpawnPosition(Team team)
+    // GameManagerがシーンに無い/無効の場合に自動生成・有効化する。
+    // ミニオンウェーブとヒーローのチーム設定はGameManagerが担当するため、
+    // この自己修復が無いと「ミニオンが出撃しない」「タワーがヒーローを攻撃しない」不具合になる。
+    private void EnsureGameManager()
     {
-        float sign = team == Team.Blue ? -1f : 1f;
-        return _laneRotation * new Vector3(sign * (_nexusOffsetX - 3f), 0f, -2.5f);
-    }
-
-    /// <summary>ミニオンウェーブのスポーン位置(本拠地の少し前)。</summary>
-    public Vector3 GetMinionSpawnPosition(Team team)
-    {
-        float sign = team == Team.Blue ? -1f : 1f;
-        return _laneRotation * new Vector3(sign * (_nexusOffsetX - 3f), 0f, 0f);
-    }
-
-    /// <summary>指定チームの進軍方向(敵本拠地へ向かうワールド方向)。</summary>
-    public Vector3 GetLaneForward(Team team)
-    {
-        return _laneRotation * (team == Team.Blue ? Vector3.right : Vector3.left);
-    }
-
-    /// <summary>レーン中心線へ戻る方向ベクトル(ミニオンの進軍補正用。中心線上ならゼロ)。</summary>
-    public Vector3 GetLaneCenterPull(Vector3 worldPosition)
-    {
-        Vector3 laneDirection = _laneRotation * Vector3.right;
-        Vector3 flat = new Vector3(worldPosition.x, 0f, worldPosition.z);
-        Vector3 lateral = flat - laneDirection * Vector3.Dot(flat, laneDirection);
-        return -lateral;
-    }
-
-    private static int ResolveLayer(string layerName, int fallbackLayerNumber)
-    {
-        int layer = LayerMask.NameToLayer(layerName);
-        return layer >= 0 ? layer : fallbackLayerNumber;
-    }
-
-    // 回転後のマップ4隅からカメラのスクロール範囲を求める(俯瞰カメラの引き分としてZに余裕を持たせる)。
-    private void RecalculateCameraBounds()
-    {
-        Vector3 min = Vector3.zero;
-        Vector3 max = Vector3.zero;
-        for (int i = 0; i < 4; i++)
+        if (GameManager.Instance != null)
         {
-            float signX = (i & 1) == 0 ? -1f : 1f;
-            float signZ = (i & 2) == 0 ? -1f : 1f;
-            Vector3 corner = _laneRotation * new Vector3(signX * _mapLength * 0.5f, 0f, signZ * _mapWidth * 0.5f);
-            min = Vector3.Min(min, corner);
-            max = Vector3.Max(max, corner);
-        }
+            if (!GameManager.Instance.isActiveAndEnabled)
+            {
+                GameManager.Instance.gameObject.SetActive(true);
+                GameManager.Instance.enabled = true;
+                Debug.LogWarning("MapBuilder: 無効化されていたGameManagerを有効化しました。", GameManager.Instance);
+            }
 
-        _cameraBoundsMin = new Vector3(min.x - 3f, 0f, min.z - 15f);
-        _cameraBoundsMax = new Vector3(max.x + 3f, 0f, max.z + 5f);
-    }
-
-    private void BuildGround()
-    {
-        if (_existingGround != null)
-        {
-            _existingGround.layer = _groundLayer;
-            Debug.Log("MapBuilder: 既存の地面のレイヤーを設定しました。", this);
             return;
         }
 
-        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
-        ground.name = "Ground (MapBuilder)";
-        ground.transform.position = Vector3.zero;
-        ground.transform.rotation = _laneRotation;
-        ground.transform.localScale = new Vector3(_mapLength / 10f, 1f, _mapWidth / 10f);
-        ground.layer = _groundLayer;
-        SetColor(ground, new Color(0.33f, 0.42f, 0.33f, 1f));
-        Debug.Log($"MapBuilder: 地面({_mapLength} x {_mapWidth}、レーン角度{_laneYawDegrees}度)をレイヤー{_groundLayer}({LayerMask.LayerToName(_groundLayer)})で生成しました。", this);
-    }
-
-    private void BuildStructures()
-    {
-        _blueTower = EnsureTower(_blueTower, Team.Blue);
-        _redTower = EnsureTower(_redTower, Team.Red);
-        _blueNexus = EnsureNexus(_blueNexus, Team.Blue);
-        _redNexus = EnsureNexus(_redNexus, Team.Red);
-    }
-
-    private GameObject EnsureTower(GameObject existing, Team team)
-    {
+        GameManager existing = FindFirstObjectByType<GameManager>(FindObjectsInactive.Include);
         if (existing != null)
         {
-            return existing;
+            existing.gameObject.SetActive(true);
+            existing.enabled = true;
+            Debug.LogWarning("MapBuilder: 非アクティブなGameManagerを有効化しました。", existing);
+            return;
         }
 
+        GameObject managerObject = new GameObject("GameManager (Auto)");
+        managerObject.AddComponent<GameManager>();
+        Debug.LogWarning("MapBuilder: シーンにGameManagerが無かったため自動生成しました。ミニオンウェーブとヒーローのチーム設定が有効になります。", managerObject);
+    }
+
+    private int ResolveLayer(string layerName)
+    {
+        if (string.IsNullOrEmpty(layerName))
+        {
+            return -1;
+        }
+
+        int layer = LayerMask.NameToLayer(layerName);
+        if (layer < 0)
+        {
+            Debug.LogWarning($"MapBuilder: レイヤー'{layerName}'がプロジェクトに定義されていません。レイヤー設定をスキップします(Project Settings > Tags and Layersで追加できます)。", this);
+            return -1;
+        }
+
+        return layer;
+    }
+
+    /// <summary>ヒーローの初期位置(ワールド座標)。PlayerSpawnerが参照する。</summary>
+    public Vector3 GetHeroSpawnPosition(Team team)
+    {
         float sign = team == Team.Blue ? -1f : 1f;
-        Vector3 position = _laneRotation * new Vector3(sign * _towerOffsetX, 2f, 0f);
+        return LocalToWorld(new Vector3(sign * HeroSpawnLocalX, 0f, HeroSpawnLocalZ));
+    }
 
-        GameObject tower = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        tower.name = $"{team} Tower (1st)";
-        tower.transform.position = position;
-        tower.transform.rotation = _laneRotation;
-        tower.transform.localScale = new Vector3(2.4f, 2f, 2.4f);
-        tower.layer = _targetableLayer;
-        SetColor(tower, team.GetTeamColor());
+    /// <summary>ミニオンの出撃位置(ワールド座標)。</summary>
+    public Vector3 GetMinionSpawnPosition(Team team)
+    {
+        float sign = team == Team.Blue ? -1f : 1f;
+        return LocalToWorld(new Vector3(sign * MinionSpawnLocalX, 0f, 0f));
+    }
 
-        HealthController health = tower.AddComponent<HealthController>();
-        health.SetMaxHealth(5000f);
+    /// <summary>レーンの進行方向(ワールド座標・水平)。ブルーは敵陣地へ向かう+X方向。</summary>
+    public Vector3 GetLaneForward(Team team)
+    {
+        Vector3 forward = LaneRotation * (team == Team.Blue ? Vector3.right : Vector3.left);
+        forward.y = 0f;
+        return forward.normalized;
+    }
 
-        TeamMember member = tower.AddComponent<TeamMember>();
-        member.SetTeam(team);
+    /// <summary>レーン中心線への引き寄せベクトル(ワールド座標)。ミニオンの進軍が使う。</summary>
+    public Vector3 GetLaneCenterPull(Vector3 worldPosition)
+    {
+        Vector3 local = Quaternion.Inverse(LaneRotation) * worldPosition;
+        float pull = Mathf.Clamp(-local.z, -1f, 1f);
+        Vector3 world = LaneRotation * new Vector3(0f, 0f, pull);
+        world.y = 0f;
+        return world;
+    }
 
-        Targetable targetable = tower.AddComponent<Targetable>();
-        targetable.InitializeRuntime(TargetClassification.Tower, tower.GetComponent<Renderer>());
+    private Vector3 LocalToWorld(Vector3 local)
+    {
+        return LaneRotation * local;
+    }
 
-        TowerController controller = tower.AddComponent<TowerController>();
+    private void BuildMap()
+    {
+        EnsureGround();
+        _blueTower = EnsureTower(_blueTower, Team.Blue, new Vector3(-TowerLocalX, 0f, 0f));
+        _redTower = EnsureTower(_redTower, Team.Red, new Vector3(TowerLocalX, 0f, 0f));
+        _blueNexus = EnsureNexus(_blueNexus, Team.Blue, new Vector3(-NexusLocalX, 0f, 0f));
+        _redNexus = EnsureNexus(_redNexus, Team.Red, new Vector3(NexusLocalX, 0f, 0f));
+    }
+
+    private void EnsureGround()
+    {
+        if (_ground == null)
+        {
+            _ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            _ground.name = "Lane Ground";
+            // Planeは10x10のためスケールで 84x24 に合わせる。
+            _ground.transform.localScale = new Vector3(GroundLength / 10f, 1f, GroundWidth / 10f);
+            Renderer groundRenderer = _ground.GetComponent<Renderer>();
+            if (groundRenderer != null)
+            {
+                groundRenderer.material.color = new Color(0.32f, 0.55f, 0.32f);
+            }
+        }
+
+        _ground.transform.position = Vector3.zero;
+        _ground.transform.rotation = LaneRotation;
+        if (_groundLayer >= 0 && _groundLayer <= 31)
+        {
+            _ground.layer = _groundLayer;
+        }
+    }
+
+    private GameObject EnsureTower(GameObject tower, Team team, Vector3 localPosition)
+    {
+        if (tower == null)
+        {
+            tower = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            tower.name = $"{team} Tower";
+            tower.transform.localScale = new Vector3(2.4f, 2f, 2.4f);
+        }
+
+        Vector3 world = LocalToWorld(localPosition);
+        tower.transform.position = new Vector3(world.x, 2f, world.z);
+        ApplyTeamVisual(tower, team);
+        SetupStructure(tower, team, TowerMaxHealth, TargetClassification.Tower);
+
+        TowerController controller = tower.GetComponent<TowerController>();
+        if (controller == null)
+        {
+            controller = tower.AddComponent<TowerController>();
+        }
+
         controller.Initialize(team);
-
-        Debug.Log($"MapBuilder: {team}チームの1本目のタワーを({position.x:F1}, {position.z:F1})へ生成しました。", this);
         return tower;
     }
 
-    private GameObject EnsureNexus(GameObject existing, Team team)
+    private GameObject EnsureNexus(GameObject nexus, Team team, Vector3 localPosition)
     {
-        if (existing != null)
+        if (nexus == null)
         {
-            return existing;
+            nexus = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            nexus.name = $"{team} Nexus";
+            nexus.transform.localScale = new Vector3(4f, 4f, 4f);
         }
 
-        float sign = team == Team.Blue ? -1f : 1f;
-        Vector3 position = _laneRotation * new Vector3(sign * _nexusOffsetX, 2f, 0f);
+        Vector3 world = LocalToWorld(localPosition);
+        nexus.transform.position = new Vector3(world.x, 2f, world.z);
+        nexus.transform.rotation = LaneRotation;
+        ApplyTeamVisual(nexus, team);
+        SetupStructure(nexus, team, NexusMaxHealth, TargetClassification.Tower);
 
-        GameObject nexus = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        nexus.name = $"{team} Nexus";
-        nexus.transform.position = position;
-        nexus.transform.rotation = _laneRotation;
-        nexus.transform.localScale = new Vector3(4f, 4f, 4f);
-        nexus.layer = _targetableLayer;
-        SetColor(nexus, Color.Lerp(team.GetTeamColor(), Color.black, 0.35f));
+        NexusController controller = nexus.GetComponent<NexusController>();
+        if (controller == null)
+        {
+            controller = nexus.AddComponent<NexusController>();
+        }
 
-        HealthController health = nexus.AddComponent<HealthController>();
-        health.SetMaxHealth(6000f);
-
-        TeamMember member = nexus.AddComponent<TeamMember>();
-        member.SetTeam(team);
-
-        Targetable targetable = nexus.AddComponent<Targetable>();
-        targetable.InitializeRuntime(TargetClassification.Tower, nexus.GetComponent<Renderer>());
-
-        NexusController controller = nexus.AddComponent<NexusController>();
         controller.Initialize(team);
-
-        Debug.Log($"MapBuilder: {team}チームの本拠地を({position.x:F1}, {position.z:F1})へ生成しました。", this);
         return nexus;
     }
 
-    private static void SetColor(GameObject target, Color color)
+    private void ApplyTeamVisual(GameObject structure, Team team)
     {
-        Renderer renderer = target.GetComponent<Renderer>();
-        if (renderer != null)
+        Renderer structureRenderer = structure.GetComponent<Renderer>();
+        if (structureRenderer != null)
         {
-            renderer.material.color = color;
+            structureRenderer.material.color = team.GetTeamColor();
         }
+    }
+
+    // 構造物へHealthController/TeamMember/Targetableを付与する(既に付いていれば再利用)。
+    private void SetupStructure(GameObject structure, Team team, float maxHealth, TargetClassification classification)
+    {
+        if (_targetableLayer >= 0 && _targetableLayer <= 31)
+        {
+            structure.layer = _targetableLayer;
+        }
+
+        HealthController health = structure.GetComponent<HealthController>();
+        if (health == null)
+        {
+            health = structure.AddComponent<HealthController>();
+        }
+
+        health.SetMaxHealth(maxHealth);
+
+        TeamMember member = structure.GetComponent<TeamMember>();
+        if (member == null)
+        {
+            member = structure.AddComponent<TeamMember>();
+        }
+
+        member.SetTeam(team);
+
+        Targetable targetable = structure.GetComponent<Targetable>();
+        if (targetable == null)
+        {
+            targetable = structure.AddComponent<Targetable>();
+            targetable.InitializeRuntime(classification, structure.GetComponent<Renderer>());
+        }
+    }
+
+    private void RecalculateCameraBounds()
+    {
+        // 回転後の地面の4隅をワールド座標へ変換し、外接矩形にマージンを加えてカメラ限界とする。
+        Vector3[] corners =
+        {
+            new Vector3(-GroundLength / 2f, 0f, -GroundWidth / 2f),
+            new Vector3(-GroundLength / 2f, 0f, GroundWidth / 2f),
+            new Vector3(GroundLength / 2f, 0f, -GroundWidth / 2f),
+            new Vector3(GroundLength / 2f, 0f, GroundWidth / 2f),
+        };
+
+        float minX = float.MaxValue;
+        float maxX = float.MinValue;
+        float minZ = float.MaxValue;
+        float maxZ = float.MinValue;
+        foreach (Vector3 corner in corners)
+        {
+            Vector3 world = LocalToWorld(corner);
+            minX = Mathf.Min(minX, world.x);
+            maxX = Mathf.Max(maxX, world.x);
+            minZ = Mathf.Min(minZ, world.z);
+            maxZ = Mathf.Max(maxZ, world.z);
+        }
+
+        CameraMinX = minX - CameraMarginX;
+        CameraMaxX = maxX + CameraMarginX;
+        CameraMinZ = minZ - CameraMarginZMin;
+        CameraMaxZ = maxZ + CameraMarginZMax;
     }
 }

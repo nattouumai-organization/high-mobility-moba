@@ -304,20 +304,32 @@ Unityの `Library`、`Temp`、`Logs`、`obj`、`Build` はGit管理しない。
 
 TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity EditorスクリプトによるMarkdownの自動編集(メニュー操作によるセットアップスクリプトを含む)は使用しない。
 
-## マップ・構造物の実行時生成(フェーズ5)
+## フェーズ5: マップ生成・構造物・ミニオン(実行時生成)
 
-GAME_DESIGN.md 3章のマップ仕様を1:100スケールで実行時生成する。シーンには空オブジェクトへMapBuilderとGameManagerをアタッチするだけでよい。
+### MapBuilder(実行順序-300)
 
-レーンは原点中心の斜め配置(既定 -45度 = 左下(青)→右上(赤))。MapBuilder.LaneRotationがレーン座標(X=レーン方向/Z=幅方向)→ワールド座標の変換を提供し、構造物の配置・スポーン位置・ミニオンの進軍方向(GetLaneForward / GetLaneCenterPull)・カメラのスクロール範囲(回転後のマップ4隅から算出)がすべてレーン角度に追従する。
+- シーンの空オブジェクトにアタッチするだけで1レーンマップ(地面84x24・タワー±16・本拠地±33)を実行時生成する。
+- `_laneYawDegrees`(既定-45度)で全体を回転し、ブルー左下→レッド右上の斜めレーンにする。
+- Targetable/Groundレイヤーはレイヤー名(既定"Targetable"/"Ground")から実行時に解決し、PlayerTargetSelectorのLayerMask設定と整合させる。
+- StartでGameManagerの存在を確認し、シーンに無い/無効なら自動生成・有効化する(ミニオン不出撃の自己修復)。
+- カメラ用に回転後マップの外接矩形+マージンの移動限界(CameraMinXなど)を公開する。
 
-| 要素 | 設計値 | 実装値(1:100、レーン座標) |
-| --- | --- | --- |
-| マップ | 8,400 x 2,400 | 地面Plane 84 x 24(原点中心・LaneRotationで回転、GroundLayer) |
-| 本拠地 | X=900 / 7,500、HP6,000、AR50 | X=±33、Cube(4,4,4)、タワー破壊まで無敵 |
-| 1本目のタワー | X=2,600 / 5,800、HP5,000、AR60、射程800、AD130、AS0.8 | X=±16、Cylinder(2.4,2,2.4)、射程8 |
-| ミニオン | 近接3体 + 遠距離2体、初回15秒・間隔20秒 | Capsule、本拠地前レーン座標X=±30から出撃 |
+### GameManager(実行順序-250)
 
-- 実行順: MapBuilder(-300) -> GameManager(-250) -> PlayerSpawner(-200)。
-- 構造物・ミニオンのGameObject構成: プリミティブ + HealthController + TeamMember + Targetable + 各種コントローラ(TargetableLayer)。
-- CharacterStatsを持たない対象のAR・特殊軽減はIIncomingDamageModifierで自前適用する。AddComponentの順序上、各コントローラのInitializeがHealthController.RefreshDamageModifiers()を呼ぶ必要がある。
-- チーム判定はTeamMemberコンポーネントで行う。ヒーローへはGameManagerが自動付与する(Blue)。
+- ウェーブ管理: 開始15秒後に初回、以陀20秒間隔で両チームに近接3体+遠隔2体を出撃。ウェーブレベル=floor((n-1)/2)。
+- ヒーロー(PlayerClickMovement)へのTeamMember(ブルー)付与を担当(開始直後+5秒間隔)。タワーの索敵はTeamMember前提。
+- 本拠地破壊通知でマッチ終了フラグを立てる(勝敗UI・リスタートはタスク7)。
+
+### 構造物のダメージルール(DamageContext.IsBasicAttack)
+
+- DamageContextにIsBasicAttackフラグを追加。通常攻撃(ヒーローAA・タワー・ミニオン)のみisBasicAttack: trueでTakeDamageを呼ぶ。
+- タワー: 同一チームからのダメージ0 / 通常攻撃以外は0 / 攻撃者周囲8以内に味方ミニオン不在なら確定無効・通常90%軽減 / AR60。
+- 本拠地: 自チームタワー破壊まで完全無敵 / 同一チームダメージ0 / 通常攻撃のみ / AR50。
+- ヒーローの通常攻撃は同一チームの対象をターゲットにしない(PlayerBasicAttackController.GetValidTarget)。
+- 構造物・ミニオンはCharacterStatsを持たないため、HealthController.SetMaxHealth(実行時HP設定)と各ControllerのIIncomingDamageModifierでARを自前適用する。AddComponent後はHealthController.RefreshDamageModifiers()を呼ぶ。
+
+### ミニオン(MinionController)
+
+- 近接: HP420/AD18/AS0.85/射程1.75、遠隔: HP290/AD22/AS0.70/射程5。移動速度3.3。ウェーブレベル成長: 近接HP+20/AD+1.5/AR+1、遠隔HP+14/AD+1.5/AR+0.5。
+- 索敵範囲7以内の最近敵を狙い、敵不在の間はレーン進行方向へ進軍(中心線引き寄せ付き)。無敵状態の本拠地は狙わない。
+- 攻撃はisBasicAttack: trueの通常攻撃扱いで構造物にも有効。ActiveMinions(static)をタワーのミニオン同伴判定が参照する。

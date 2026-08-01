@@ -2,39 +2,38 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 1本目のタワー(GAME_DESIGN.md 4章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
-/// - HP5,000 / AR60 / 射程8(設計800) / AD130 / AS0.80。
-/// - 射程内の敵を自動攻撃する。敵ミニオンを優先し、いなければ敵ヒーローを攻撃する(構造物は攻撃しない)。
-/// - 同じ敵ヒーローを連続攻撃するたびダメージが25%増加(最大+200%)。2秒間ヒーローを攻撃しなければリセット。
-/// - 攻撃側チームのミニオンが近くにいない場合、通常ダメージを90%軽減し確定ダメージを無効化。
-/// - AR(60)はCharacterStatsを持たないためIIncomingDamageModifierとして自前で適用する。
-/// - 破壊されると同チームの本拠地が攻撃可能になる(NexusControllerがIsTowerDestroyedを参照)。
+/// 1本目のタワー(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
+/// - 射程8(設計800)内の敵(TeamMemberを持つ対象)を自動攻撃する。敵ミニオンを優先し、
+///   ミニオンがいない場合のみ敵ヒーローを狙う。構造物(タワー・本拠地)は狙わない。
+/// - 同一ヒーローへの連続攻撃で威力+25%/発(最大+200%)。攻撃が2秒間途切れるとリセット。
+/// - 受けるダメージ(IIncomingDamageModifier):
+///   1. 同一チームからのダメージは0(味方のタワーは殴れない)。
+///   2. 通常攻撃(DamageContext.IsBasicAttack)以外のダメージは0(スキルでは攻撃できない)。
+///   3. 攻撃者の周囲8以内に攻撃側チームのミニオンがいない場合、確定ダメージは無効・通常ダメージは90%軽減。
+///   4. 最後にAR60で通常ダメージを軽減(CharacterStatsを持たないため自前で適用)。
+/// - 破壊されるとGameManagerへ通知し、自チームの本拠地が攻撃可能になる。
 /// </summary>
 public class TowerController : MonoBehaviour, IIncomingDamageModifier
 {
+    private const float AttackRange = 8f;
+    private const float AttackDamage = 130f;
+    private const float AttacksPerSecond = 0.8f;
+    private const float Armor = 60f;
+    private const float ConsecutiveBonusPerHit = 0.25f;
+    private const float ConsecutiveBonusMax = 2f;
+    private const float ConsecutiveResetSeconds = 2f;
+    private const float MinionEscortRange = 8f;
+    private const float NoMinionDamageMultiplier = 0.1f;
+    private const float RetargetCooldown = 0.25f;
+
     private static readonly List<TowerController> Towers = new List<TowerController>();
 
-    [Header("戦闘(GAME_DESIGN.md 4章)")]
-    [SerializeField] private Team _team = Team.Blue;
-    [SerializeField, Min(0.5f)] private float _attackRange = 8f;
-    [SerializeField, Min(1f)] private float _attackDamage = 130f;
-    [SerializeField, Min(0.05f)] private float _attacksPerSecond = 0.8f;
-    [SerializeField, Min(0f)] private float _armor = 60f;
-
-    [Header("ミニオン不在時の保護")]
-    [SerializeField, Min(0.5f)] private float _minionProtectRange = 8f;
-    [SerializeField, Range(0f, 1f)] private float _noMinionDamageCut = 0.9f;
-
-    [Header("連続攻撃ボーナス")]
-    [SerializeField, Min(0f)] private float _consecutiveBonusPerHit = 0.25f;
-    [SerializeField, Min(0f)] private float _consecutiveBonusMax = 2f;
-    [SerializeField, Min(0.1f)] private float _consecutiveResetSeconds = 2f;
-
+    private Team _team = Team.Blue;
     private HealthController _health;
     private float _attackCooldown;
     private Transform _lastHeroTarget;
     private int _consecutiveHits;
-    private float _lastHeroAttackTime = float.NegativeInfinity;
+    private float _consecutiveResetTimer;
     private bool _isDestroyed;
 
     /// <summary>所属チーム。</summary>
@@ -43,26 +42,22 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     /// <summary>破壊済みかどうか。</summary>
     public bool IsDestroyed => _isDestroyed;
 
-    /// <summary>指定チームのタワーが1本も残っていないかどうか。本拠地の無敵解除判定に使用する。</summary>
+    /// <summary>指定チームの1本目のタワーが破壊済みかどうか。本拠地の無敵判定が参照する。</summary>
     public static bool IsTowerDestroyed(Team team)
     {
         foreach (TowerController tower in Towers)
         {
-            if (tower == null || tower.Team != team)
+            if (tower != null && tower._team == team)
             {
-                continue;
-            }
-
-            if (!tower.IsDestroyed)
-            {
-                return false;
+                return tower._isDestroyed || (tower._health != null && tower._health.IsDead);
             }
         }
 
+        // タワーが存在しない場合は破壊済み扱い(本拠地を攻撃可能にする)。
         return true;
     }
 
-    /// <summary>MapBuilderが生成直後に呼び出す初期化。</summary>
+    /// <summary>生成直後の初期化(MapBuilderから呼び出す)。</summary>
     public void Initialize(Team team)
     {
         _team = team;
@@ -100,10 +95,15 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
-        if (_consecutiveHits > 0 && Time.time - _lastHeroAttackTime > _consecutiveResetSeconds)
+        // 連続攻撃ボーナスは攻撃が2秒間途切れるとリセットする。
+        if (_consecutiveResetTimer > 0f)
         {
-            _consecutiveHits = 0;
-            _lastHeroTarget = null;
+            _consecutiveResetTimer -= Time.deltaTime;
+            if (_consecutiveResetTimer <= 0f)
+            {
+                _consecutiveHits = 0;
+                _lastHeroTarget = null;
+            }
         }
 
         _attackCooldown -= Time.deltaTime;
@@ -115,20 +115,21 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         HealthController target = AcquireTarget(out bool isHero);
         if (target == null)
         {
-            _attackCooldown = 0.25f;
+            // ターゲットがいない間は短い間隔で再索敵する。
+            _attackCooldown = RetargetCooldown;
             return;
         }
 
         Attack(target, isHero);
-        _attackCooldown = 1f / Mathf.Max(0.05f, _attacksPerSecond);
+        _attackCooldown = 1f / AttacksPerSecond;
     }
 
-    // 射程内の敵を探す。敵ミニオンを優先し、いなければ敵ヒーロー(構造物以外)を返す。
+    // 射程内の敵を探す。敵ミニオンを優先し、いなければ敵ヒーロー。構造物は狙わない。
     private HealthController AcquireTarget(out bool isHero)
     {
         HealthController bestMinion = null;
-        HealthController bestHero = null;
         float bestMinionDistance = float.MaxValue;
+        HealthController bestHero = null;
         float bestHeroDistance = float.MaxValue;
 
         foreach (TeamMember member in FindObjectsByType<TeamMember>(FindObjectsSortMode.None))
@@ -138,6 +139,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
                 continue;
             }
 
+            // 構造物(タワー・本拠地)は狙わない。
             if (member.GetComponent<TowerController>() != null || member.GetComponent<NexusController>() != null)
             {
                 continue;
@@ -149,14 +151,20 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
                 continue;
             }
 
-            Vector3 closest = GetClosestPoint(member, transform.position);
-            float distance = Vector3.Distance(transform.position, closest);
-            if (distance > _attackRange)
+            Collider memberCollider = member.GetComponent<Collider>();
+            Vector3 closest = memberCollider != null && memberCollider.enabled
+                ? memberCollider.ClosestPoint(transform.position)
+                : member.transform.position;
+            Vector3 delta = closest - transform.position;
+            delta.y = 0f;
+            float distance = delta.magnitude;
+            if (distance > AttackRange)
             {
                 continue;
             }
 
-            if (member.GetComponent<MinionController>() != null)
+            bool isMinion = member.GetComponent<MinionController>() != null;
+            if (isMinion)
             {
                 if (distance < bestMinionDistance)
                 {
@@ -171,24 +179,44 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             }
         }
 
-        isHero = bestMinion == null && bestHero != null;
-        return bestMinion != null ? bestMinion : bestHero;
+        if (bestMinion != null)
+        {
+            isHero = false;
+            return bestMinion;
+        }
+
+        isHero = bestHero != null;
+        return bestHero;
     }
 
     private void Attack(HealthController target, bool isHero)
     {
-        float damage = _attackDamage;
+        float damage = AttackDamage;
 
         if (isHero)
         {
-            _consecutiveHits = _lastHeroTarget == target.transform ? _consecutiveHits + 1 : 0;
-            float bonus = Mathf.Min(_consecutiveHits * _consecutiveBonusPerHit, _consecutiveBonusMax);
-            damage *= 1f + bonus;
-            _lastHeroTarget = target.transform;
-            _lastHeroAttackTime = Time.time;
+            // 同一ヒーローへの連続攻撃で威力+25%/発(最大+200%)。
+            if (_lastHeroTarget == target.transform)
+            {
+                _consecutiveHits++;
+            }
+            else
+            {
+                _lastHeroTarget = target.transform;
+                _consecutiveHits = 0;
+            }
+
+            damage *= 1f + Mathf.Min(ConsecutiveBonusMax, _consecutiveHits * ConsecutiveBonusPerHit);
+            _consecutiveResetTimer = ConsecutiveResetSeconds;
+        }
+        else
+        {
+            _lastHeroTarget = null;
+            _consecutiveHits = 0;
         }
 
-        float dealt = target.TakeDamage(damage, transform, DamageType.Normal);
+        // タワーの攻撃は通常攻撃扱い(将来ミニオン以外へのルール拡張に備えてフラグを明示)。
+        float dealt = target.TakeDamage(damage, transform, DamageType.Normal, isBasicAttack: true);
         if (dealt > 0f)
         {
             Targetable targetable = target.GetComponent<Targetable>();
@@ -199,70 +227,75 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         }
     }
 
-    /// <summary>
-    /// 受けるダメージの軽減(IIncomingDamageModifier)。
-    /// 攻撃側チームのミニオンが近くにいない場合: 通常ダメージ90%軽減・確定ダメージ無効。
-    /// その後、通常ダメージへAR(60)による軽減を適用する。
-    /// </summary>
+    /// <summary>受けるダメージの変更(IIncomingDamageModifier)。クラスコメントのルールを適用する。</summary>
     public float ModifyIncomingDamage(DamageContext context, float currentAmount)
     {
-        if (!IsAttackerMinionNearby(context.Attacker))
+        // 同一チームからのダメージは受けない(味方のタワーは殴れない)。
+        if (context.Attacker != null)
+        {
+            TeamMember attackerTeam = context.Attacker.GetComponent<TeamMember>();
+            if (attackerTeam != null && attackerTeam.Team == _team)
+            {
+                return 0f;
+            }
+        }
+
+        // タワーは通常攻撃でのみダメージを受ける(ゼルフW/Eなどのスキル・反射は無効)。
+        if (!context.IsBasicAttack)
+        {
+            return 0f;
+        }
+
+        // 攻撃者の周囲に攻撃側チームのミニオンがいない場合: 確定ダメージ無効・通常ダメージ90%軽減。
+        if (!HasEscortMinions(context.Attacker))
         {
             if (context.Type == DamageType.True)
             {
                 return 0f;
             }
 
-            currentAmount *= 1f - _noMinionDamageCut;
+            currentAmount *= NoMinionDamageMultiplier;
         }
 
-        if (context.Type == DamageType.Normal && _armor > 0f)
+        // ARによる通常ダメージの軽減(CharacterStatsを持たないため自前で適用)。
+        if (context.Type == DamageType.Normal)
         {
-            currentAmount = currentAmount * 100f / (100f + _armor);
+            currentAmount = currentAmount * 100f / (100f + Armor);
         }
 
         return currentAmount;
     }
 
-    // 攻撃側チームのミニオンがタワー近くにいるかどうか。攻撃者が不明な場合は相手チームとして扱う。
-    private bool IsAttackerMinionNearby(Transform attacker)
+    // 攻撃者の周囲MinionEscortRange以内に、攻撃側チームの生存ミニオンがいるかどうか。
+    private static bool HasEscortMinions(Transform attacker)
     {
-        Team attackerTeam = _team.Opponent();
-        if (attacker != null)
+        if (attacker == null)
         {
-            TeamMember member = attacker.GetComponentInParent<TeamMember>();
-            if (member != null)
-            {
-                attackerTeam = member.Team;
-            }
+            return false;
         }
 
-        if (attackerTeam == _team)
+        TeamMember attackerTeam = attacker.GetComponent<TeamMember>();
+        if (attackerTeam == null)
         {
-            return true;
+            return false;
         }
 
-        float sqrRange = _minionProtectRange * _minionProtectRange;
         foreach (MinionController minion in MinionController.ActiveMinions)
         {
-            if (minion == null || minion.IsDead || minion.Team != attackerTeam)
+            if (minion == null || minion.IsDead || minion.Team != attackerTeam.Team)
             {
                 continue;
             }
 
-            if ((minion.transform.position - transform.position).sqrMagnitude <= sqrRange)
+            Vector3 delta = minion.transform.position - attacker.position;
+            delta.y = 0f;
+            if (delta.magnitude <= MinionEscortRange)
             {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private static Vector3 GetClosestPoint(Component target, Vector3 from)
-    {
-        Collider collider = target.GetComponent<Collider>();
-        return collider != null && collider.enabled ? collider.ClosestPoint(from) : target.transform.position;
     }
 
     private void HandleDied()
@@ -273,14 +306,12 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _isDestroyed = true;
-
         if (GameManager.Instance != null)
         {
             GameManager.Instance.NotifyTowerDestroyed(_team);
         }
-        else
-        {
-            Debug.Log($"TowerController: {_team}チームの1本目のタワーが破壊されました。", this);
-        }
+
+        // 少し遅らせてオブジェクトを破棄する。
+        Destroy(gameObject, 2f);
     }
 }

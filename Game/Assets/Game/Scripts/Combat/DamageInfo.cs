@@ -32,12 +32,16 @@ public readonly struct DamageContext
     /// <summary>反射によるダメージかどうか(ヴォルブラークRの反射など)。反射フラグ付きのダメージは再反射されない。</summary>
     public readonly bool IsReflected;
 
-    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false)
+    /// <summary>通常攻撃によるダメージかどうか。タワー・本拠地は通常攻撃のみダメージを受ける(フェーズ5)。</summary>
+    public readonly bool IsBasicAttack;
+
+    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false, bool isBasicAttack = false)
     {
         Attacker = attacker;
         Type = type;
         BaseAmount = baseAmount;
         IsReflected = isReflected;
+        IsBasicAttack = isBasicAttack;
     }
 }
 

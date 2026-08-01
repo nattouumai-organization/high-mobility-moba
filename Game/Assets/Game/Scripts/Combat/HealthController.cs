@@ -146,11 +146,12 @@ public class HealthController : MonoBehaviour
     /// <param name="attacker">攻撃者のTransform。取得できない場合はnull(前方判定による軽減は行われない)。</param>
     /// <param name="damageType">ダメージ種別。既定は通常ダメージ(Normal)。確定ダメージ(True)はARでは軽減されない。</param>
     /// <param name="isReflected">反射によるダメージかどうか。DamageContext.IsReflectedへ引き継がれ、反射ダメージの再反射防止(ヴォルブラークR)に使用する。既定はfalse。</param>
+    /// <param name="isBasicAttack">通常攻撃によるダメージかどうか。DamageContext.IsBasicAttackへ引き継がれ、タワー・本拠地の「通常攻撃のみ被弾」判定に使用する。既定はfalse。</param>
     /// <returns>
     /// 実際に減少したHP量(実ダメージ)。軽減後のダメージが基準で、残りHPを超えた過剰ダメージ分は含まない。
     /// 死亡済み・無効な値の場合は0を返す。
     /// </returns>
-    public float TakeDamage(float damage, Transform attacker, DamageType damageType = DamageType.Normal, bool isReflected = false)
+    public float TakeDamage(float damage, Transform attacker, DamageType damageType = DamageType.Normal, bool isReflected = false, bool isBasicAttack = false)
     {
         if (_isDead || damage <= 0f)
         {
@@ -158,7 +159,7 @@ public class HealthController : MonoBehaviour
         }
 
         // 受けたダメージごとに、HPへ適用する直前の軽減判定(ゼルフWなど)を行う。
-        float modifiedDamage = ApplyIncomingDamageModifiers(new DamageContext(attacker, damageType, damage, isReflected), damage);
+        float modifiedDamage = ApplyIncomingDamageModifiers(new DamageContext(attacker, damageType, damage, isReflected, isBasicAttack), damage);
         if (modifiedDamage <= 0f)
         {
             return 0f;
@@ -184,7 +185,7 @@ public class HealthController : MonoBehaviour
         // 死亡処理より前に通知するため、死亡の瞬間の致死ダメージも通知対象になる。
         if (actualDamage > 0f)
         {
-            DamageTaken?.Invoke(new DamageContext(attacker, damageType, damage, isReflected), actualDamage);
+            DamageTaken?.Invoke(new DamageContext(attacker, damageType, damage, isReflected, isBasicAttack), actualDamage);
         }
 
         if (_currentHealth <= 0f)
@@ -262,38 +263,35 @@ public class HealthController : MonoBehaviour
     }
 
     /// <summary>
-    /// CharacterStatsを持たない対象(タワー・本拠地・ミニオンなど)の最大HPを実行時に設定する。
-    /// MapBuilder / MinionControllerが生成直後に呼び出す。refillToFullがtrueなら現在HPも全快させる。
-    /// CharacterStatsを持つ対象では何もしない(最大HPはCharacterStatsが管理する)。
+    /// CharacterStatsを持たないオブジェクト(タワー・本拠地・ミニオンなど)の最大HPを実行時に設定する。
+    /// CharacterStatsがある場合はそちらを優先するため何もしない。
     /// </summary>
+    /// <param name="maxHealth">新しい最大HP(1未満は1に切り上げ)。</param>
+    /// <param name="refillToFull">trueの場合は現在HPを最大HPまで回復させる。falseの場合は現在HPを新しい最大HP以下に切り詰める。</param>
     public void SetMaxHealth(float maxHealth, bool refillToFull = true)
     {
-        if (_characterStats == null)
-        {
-            _characterStats = GetComponent<CharacterStats>();
-        }
-
         if (_characterStats != null)
         {
             return;
         }
 
         _maxHealth = Mathf.Max(1f, maxHealth);
-
-        if (refillToFull && !_isDead)
+        if (refillToFull)
         {
             _currentHealth = MaxHealth;
         }
+        else
+        {
+            _currentHealth = Mathf.Min(_currentHealth, MaxHealth);
+        }
 
-        _currentHealth = Mathf.Min(_currentHealth, MaxHealth);
         _lastKnownMaxHealth = MaxHealth;
         NotifyHealthChanged();
     }
 
     /// <summary>
-    /// 同じGameObject上のIIncomingDamageModifierを再取得する。
-    /// タワー・本拠地・ミニオンのように、実行時のAddComponentで軽減コンポーネントを後付けした場合に呼び出す
-    /// (AwakeのキャッシュはAddComponentより先に実行されているため)。
+    /// IIncomingDamageModifierのキャッシュを再取得する。
+    /// Awake後にAddComponentでモディファイア(TowerControllerなど)を付与した場合に呼ぶこと。
     /// </summary>
     public void RefreshDamageModifiers()
     {

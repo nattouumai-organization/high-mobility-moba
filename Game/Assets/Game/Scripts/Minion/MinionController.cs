@@ -2,123 +2,108 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// レーンミニオン(GAME_DESIGN.md 5章)。GameManagerがウェーブごとにSpawnで生成する。
-/// - 近接: HP420 / AD18 / AS0.85 / AR0 / 射程1.75(設計175)。成長: HP+20 / AD+1.5 / AR+1。
-/// - 遠距離: HP290 / AD22 / AS0.70 / AR0 / 射程5(設計500)。成長: HP+14 / AD+1.5 / AR+0.5。
-/// - MS3.3(設計330)。HPregなし。AS・MS・射程は成長しない。
-/// - 敵本拠地方向へ進軍し(進軍方向はMapBuilderのレーン方向に従う。斜め配置対応)、
-///   索敵範囲内の敵(ミニオン・ヒーロー・タワー・本拠地)を攻撃する。
-///   タワー破壊前の本拠地(無敵)は狙わない。
-/// - ARはCharacterStatsを持たないためIIncomingDamageModifierとして自前で適用する。
+/// レーンを進軍するミニオン(GAME_DESIGN.md 3章)。GameManagerがウェーブごとにSpawnで生成する。
+/// - 近接: HP420/AD18/AS0.85/射程1.75、遠隔: HP290/AD22/AS0.70/射程5。移動速度3.3。
+/// - ウェーブレベルで強化: 近接 HP+20/AD+1.5/AR+1、遠隔 HP+14/AD+1.5/AR+0.5。
+/// - 索敵範囲7以内の最も近い敵(TeamMemberを持つ対象)を狙う。無敵状態の本拠地は狙わない。
+/// - 敵がいない間はレーン進行方向へ進軍する(レーン中心線への引き寄せ付き)。
+/// - 攻撃は通常攻撃扱い(isBasicAttack: true)。タワー・本拠地は通常攻撃のみダメージを受けるため、
+///   ミニオンの攻撃は構造物にも有効。
 /// </summary>
 public class MinionController : MonoBehaviour, IIncomingDamageModifier
 {
-    /// <summary>ミニオンの種類。</summary>
     public enum MinionType
     {
         Melee,
         Ranged,
     }
 
-    private static readonly List<MinionController> Active = new List<MinionController>();
-
-    /// <summary>生存中の全ミニオン。タワーのミニオン保護判定などが参照する。</summary>
-    public static IReadOnlyList<MinionController> ActiveMinions => Active;
-
-    // GAME_DESIGN.md 5章の基礎値(距離は1:100スケール)。
-    private const float MeleeBaseHealth = 420f;
-    private const float MeleeBaseDamage = 18f;
-    private const float MeleeAttacksPerSecond = 0.85f;
-    private const float MeleeBaseArmor = 0f;
-    private const float MeleeAttackRange = 1.75f;
-    private const float MeleeHealthUp = 20f;
-    private const float MeleeDamageUp = 1.5f;
-    private const float MeleeArmorUp = 1f;
-
-    private const float RangedBaseHealth = 290f;
-    private const float RangedBaseDamage = 22f;
-    private const float RangedAttacksPerSecond = 0.70f;
-    private const float RangedBaseArmor = 0f;
-    private const float RangedAttackRange = 5f;
-    private const float RangedHealthUp = 14f;
-    private const float RangedDamageUp = 1.5f;
-    private const float RangedArmorUp = 0.5f;
-
     private const float MoveSpeed = 3.3f;
     private const float AggroRange = 7f;
     private const float RetargetInterval = 0.25f;
+    private const float CenterPullStrength = 0.15f;
+
+    private static readonly List<MinionController> Active = new List<MinionController>();
+
+    /// <summary>生存中のミニオン一覧。タワーのミニオン同伴判定などが参照する。</summary>
+    public static IReadOnlyList<MinionController> ActiveMinions => Active;
 
     private Team _team = Team.Blue;
     private MinionType _type = MinionType.Melee;
-    private float _attackDamage;
-    private float _attacksPerSecond = 1f;
-    private float _armor;
-    private float _attackRange = 1.75f;
-
     private HealthController _health;
-    private HealthController _currentTarget;
+    private float _attackDamage;
+    private float _attackInterval;
+    private float _attackRange;
+    private float _armor;
     private float _attackCooldown;
     private float _retargetTimer;
-    private bool _isDead;
+    private HealthController _currentTarget;
+    private Targetable _currentTargetable;
 
     /// <summary>所属チーム。</summary>
     public Team Team => _team;
 
-    /// <summary>ミニオンの種類。</summary>
-    public MinionType Type => _type;
-
     /// <summary>死亡済みかどうか。</summary>
-    public bool IsDead => _isDead;
+    public bool IsDead => _health == null || _health.IsDead;
 
-    /// <summary>ミニオンを生成する(GameManagerのウェーブ出撃から呼び出す)。</summary>
+    /// <summary>
+    /// ミニオンを生成する。カプセルのプリミティブに必要なコンポーネントを付与して初期化する。
+    /// AddComponentの順序はHealthController→TeamMember→Targetable→MinionController(タワーと同じ方式)。
+    /// </summary>
     public static MinionController Spawn(Team team, MinionType type, Vector3 position, int waveLevel, int targetableLayer)
     {
-        GameObject minion = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        minion.name = $"{team} {type} Minion";
+        GameObject minionObject = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        minionObject.name = $"{team} {type} Minion";
 
         float scale = type == MinionType.Melee ? 0.65f : 0.5f;
-        minion.transform.localScale = new Vector3(scale, scale, scale);
-        minion.transform.position = new Vector3(position.x, scale, position.z);
-        minion.layer = targetableLayer;
-
-        Renderer renderer = minion.GetComponent<Renderer>();
-        if (renderer != null)
+        minionObject.transform.localScale = new Vector3(scale, scale, scale);
+        minionObject.transform.position = new Vector3(position.x, scale, position.z);
+        if (targetableLayer >= 0 && targetableLayer <= 31)
         {
-            Color color = team.GetTeamColor();
-            if (type == MinionType.Ranged)
-            {
-                color = Color.Lerp(color, Color.white, 0.35f);
-            }
-
-            renderer.material.color = color;
+            minionObject.layer = targetableLayer;
         }
 
-        HealthController health = minion.AddComponent<HealthController>();
-        TeamMember member = minion.AddComponent<TeamMember>();
+        Renderer minionRenderer = minionObject.GetComponent<Renderer>();
+        if (minionRenderer != null)
+        {
+            // チームカラーを少し白へ寄せて、タワー・本拠地と見分けやすくする。
+            minionRenderer.material.color = Color.Lerp(team.GetTeamColor(), Color.white, 0.35f);
+        }
+
+        HealthController health = minionObject.AddComponent<HealthController>();
+        TeamMember member = minionObject.AddComponent<TeamMember>();
         member.SetTeam(team);
-
-        Targetable targetable = minion.AddComponent<Targetable>();
-        targetable.InitializeRuntime(TargetClassification.Minion, renderer);
-
-        MinionController controller = minion.AddComponent<MinionController>();
-        controller.Initialize(team, type, waveLevel);
-        return controller;
+        Targetable targetable = minionObject.AddComponent<Targetable>();
+        targetable.InitializeRuntime(TargetClassification.Minion, minionRenderer);
+        MinionController minion = minionObject.AddComponent<MinionController>();
+        minion.Initialize(team, type, waveLevel, health);
+        return minion;
     }
 
-    /// <summary>生成直後の初期化。ウェーブ成長(WaveLv)を適用した戦闘値を設定する。</summary>
-    public void Initialize(Team team, MinionType type, int waveLevel)
+    private void Initialize(Team team, MinionType type, int waveLevel, HealthController health)
     {
         _team = team;
         _type = type;
+        _health = health;
 
-        bool isMelee = type == MinionType.Melee;
-        float maxHealth = (isMelee ? MeleeBaseHealth : RangedBaseHealth) + (isMelee ? MeleeHealthUp : RangedHealthUp) * waveLevel;
-        _attackDamage = (isMelee ? MeleeBaseDamage : RangedBaseDamage) + (isMelee ? MeleeDamageUp : RangedDamageUp) * waveLevel;
-        _armor = (isMelee ? MeleeBaseArmor : RangedBaseArmor) + (isMelee ? MeleeArmorUp : RangedArmorUp) * waveLevel;
-        _attacksPerSecond = isMelee ? MeleeAttacksPerSecond : RangedAttacksPerSecond;
-        _attackRange = isMelee ? MeleeAttackRange : RangedAttackRange;
+        float maxHealth;
+        if (type == MinionType.Melee)
+        {
+            maxHealth = 420f + 20f * waveLevel;
+            _attackDamage = 18f + 1.5f * waveLevel;
+            _attackInterval = 1f / 0.85f;
+            _attackRange = 1.75f;
+            _armor = 1f * waveLevel;
+        }
+        else
+        {
+            maxHealth = 290f + 14f * waveLevel;
+            _attackDamage = 22f + 1.5f * waveLevel;
+            _attackInterval = 1f / 0.70f;
+            _attackRange = 5f;
+            _armor = 0.5f * waveLevel;
+        }
 
-        _health = GetComponent<HealthController>();
         if (_health != null)
         {
             _health.SetMaxHealth(maxHealth);
@@ -148,128 +133,46 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
 
     private void Update()
     {
-        if (_isDead || _health == null || _health.IsDead)
+        if (_health == null || _health.IsDead)
         {
             return;
         }
 
         _attackCooldown -= Time.deltaTime;
 
+        // 一定間隔で索敵する(毎フレームの全走査を避ける)。
         _retargetTimer -= Time.deltaTime;
         if (_retargetTimer <= 0f)
         {
             _retargetTimer = RetargetInterval;
-            _currentTarget = AcquireTarget();
+            AcquireTarget();
         }
 
-        if (_currentTarget == null || _currentTarget.IsDead)
+        if (_currentTarget != null && !_currentTarget.IsDead)
         {
-            _currentTarget = null;
-            MoveForward();
+            Vector3 closest = GetTargetClosestPoint();
+            Vector3 toTarget = closest - transform.position;
+            toTarget.y = 0f;
+
+            if (toTarget.magnitude <= _attackRange)
+            {
+                FaceDirection(toTarget);
+                if (_attackCooldown <= 0f)
+                {
+                    AttackCurrentTarget();
+                    _attackCooldown = _attackInterval;
+                }
+                return;
+            }
+
+            MoveInDirection(toTarget.normalized);
             return;
         }
 
-        Vector3 closest = GetClosestPoint(_currentTarget, transform.position);
-        Vector3 toTarget = closest - transform.position;
-        toTarget.y = 0f;
-
-        if (toTarget.magnitude > _attackRange)
-        {
-            Move(toTarget);
-            return;
-        }
-
-        if (_attackCooldown <= 0f)
-        {
-            AttackCurrentTarget();
-            _attackCooldown = 1f / Mathf.Max(0.05f, _attacksPerSecond);
-        }
+        MoveForward();
     }
 
-    // 索敵範囲内で最も近い敵(ミニオン・ヒーロー・タワー・攻撃可能な本拠地)を探す。
-    private HealthController AcquireTarget()
-    {
-        HealthController best = null;
-        float bestDistance = float.MaxValue;
-
-        foreach (TeamMember member in FindObjectsByType<TeamMember>(FindObjectsSortMode.None))
-        {
-            if (member.Team == _team)
-            {
-                continue;
-            }
-
-            HealthController health = member.GetComponent<HealthController>();
-            if (health == null || health.IsDead)
-            {
-                continue;
-            }
-
-            // タワー破壊前の本拠地(無敵)は狙わない。
-            NexusController nexus = member.GetComponent<NexusController>();
-            if (nexus != null && nexus.IsInvulnerable)
-            {
-                continue;
-            }
-
-            Vector3 closest = GetClosestPoint(health, transform.position);
-            float distance = Vector3.Distance(transform.position, closest);
-            if (distance > AggroRange || distance >= bestDistance)
-            {
-                continue;
-            }
-
-            bestDistance = distance;
-            best = health;
-        }
-
-        return best;
-    }
-
-    private void AttackCurrentTarget()
-    {
-        float dealt = _currentTarget.TakeDamage(_attackDamage, transform, DamageType.Normal);
-        if (dealt > 0f)
-        {
-            Targetable targetable = _currentTarget.GetComponent<Targetable>();
-            if (targetable != null)
-            {
-                targetable.PlayHitFlash();
-            }
-        }
-    }
-
-    // 目標がいない間は敵本拠地方向へ進軍する。進軍方向はMapBuilderのレーン方向に従い、
-    // レーン中心線へ緩やかに寄せる(斜め配置でもレーン上を進軍する)。
-    private void MoveForward()
-    {
-        Vector3 direction;
-        MapBuilder map = MapBuilder.Instance;
-        if (map != null)
-        {
-            direction = map.GetLaneForward(_team) + map.GetLaneCenterPull(transform.position) * 0.15f;
-        }
-        else
-        {
-            direction = _team == Team.Blue ? Vector3.right : Vector3.left;
-            direction += new Vector3(0f, 0f, -transform.position.z * 0.15f);
-        }
-
-        Move(direction);
-    }
-
-    private void Move(Vector3 direction)
-    {
-        direction.y = 0f;
-        if (direction.sqrMagnitude < 0.0001f)
-        {
-            return;
-        }
-
-        transform.position += direction.normalized * (MoveSpeed * Time.deltaTime);
-    }
-
-    /// <summary>受けるダメージの軽減(IIncomingDamageModifier)。ウェーブ成長したARで通常ダメージを軽減する。</summary>
+    /// <summary>受けるダメージの変更(IIncomingDamageModifier)。ARで通常ダメージを軽減する。</summary>
     public float ModifyIncomingDamage(DamageContext context, float currentAmount)
     {
         if (context.Type == DamageType.Normal && _armor > 0f)
@@ -280,21 +183,130 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         return currentAmount;
     }
 
-    private static Vector3 GetClosestPoint(Component target, Vector3 from)
+    // 索敵範囲内の最も近い敵を狙う。無敵状態の本拠地は狙わない。
+    private void AcquireTarget()
     {
-        Collider collider = target.GetComponent<Collider>();
-        return collider != null && collider.enabled ? collider.ClosestPoint(from) : target.transform.position;
+        _currentTarget = null;
+        _currentTargetable = null;
+        float bestDistance = float.MaxValue;
+
+        foreach (TeamMember member in FindObjectsByType<TeamMember>(FindObjectsSortMode.None))
+        {
+            if (member.Team == _team)
+            {
+                continue;
+            }
+
+            NexusController nexus = member.GetComponent<NexusController>();
+            if (nexus != null && nexus.IsInvulnerable)
+            {
+                continue;
+            }
+
+            HealthController health = member.GetComponent<HealthController>();
+            if (health == null || health.IsDead)
+            {
+                continue;
+            }
+
+            Collider memberCollider = member.GetComponent<Collider>();
+            Vector3 closest = memberCollider != null && memberCollider.enabled
+                ? memberCollider.ClosestPoint(transform.position)
+                : member.transform.position;
+            Vector3 delta = closest - transform.position;
+            delta.y = 0f;
+            float distance = delta.magnitude;
+            if (distance > AggroRange || distance >= bestDistance)
+            {
+                continue;
+            }
+
+            bestDistance = distance;
+            _currentTarget = health;
+            _currentTargetable = member.GetComponent<Targetable>();
+        }
     }
 
-    private void HandleDied()
+    private Vector3 GetTargetClosestPoint()
     {
-        if (_isDead)
+        if (_currentTarget == null)
+        {
+            return transform.position;
+        }
+
+        Collider targetCollider = _currentTarget.GetComponent<Collider>();
+        return targetCollider != null && targetCollider.enabled
+            ? targetCollider.ClosestPoint(transform.position)
+            : _currentTarget.transform.position;
+    }
+
+    // 通常攻撃(即時・弾丸なし)。isBasicAttack: trueを渡すことでタワー・本拠地にもダメージが通る。
+    private void AttackCurrentTarget()
+    {
+        if (_currentTarget == null)
         {
             return;
         }
 
-        _isDead = true;
-        // 見た目の非表示はTargetableが行う。少し遅らせてオブジェクトを破棄する。
+        float dealt = _currentTarget.TakeDamage(_attackDamage, transform, DamageType.Normal, isBasicAttack: true);
+        if (dealt > 0f && _currentTargetable != null)
+        {
+            _currentTargetable.PlayHitFlash();
+        }
+    }
+
+    // 敵がいない間はレーン進行方向へ進軍する(レーン中心線への引き寄せ付き)。
+    private void MoveForward()
+    {
+        Vector3 direction;
+        MapBuilder map = MapBuilder.Instance;
+        if (map != null)
+        {
+            direction = map.GetLaneForward(_team) + map.GetLaneCenterPull(transform.position) * CenterPullStrength;
+            direction.y = 0f;
+            direction.Normalize();
+        }
+        else
+        {
+            direction = _team == Team.Blue ? Vector3.right : Vector3.left;
+        }
+
+        MoveInDirection(direction);
+    }
+
+    private void MoveInDirection(Vector3 direction)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        direction.Normalize();
+        transform.position += direction * (MoveSpeed * Time.deltaTime);
+        FaceDirection(direction);
+    }
+
+    private void FaceDirection(Vector3 direction)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+    }
+
+    private void HandleDied()
+    {
+        // 死体がターゲット選択・索敵に引っかからないようにコライダーを無効化し、少し遅らせて破棄する。
+        Collider bodyCollider = GetComponent<Collider>();
+        if (bodyCollider != null)
+        {
+            bodyCollider.enabled = false;
+        }
+
         Destroy(gameObject, 2f);
     }
 }
