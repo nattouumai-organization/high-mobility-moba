@@ -11,6 +11,7 @@ using UnityEngine;
 /// 射程外のターゲットを選択した場合は、PlayerBasicAttackControllerがMoveToPosition()で射程内まで自動接近させる。
 /// スタン・スネア中(CrowdControlControllerのIsMovementBlocked)は移動しない。
 /// 移動先の予約(右クリック)は受け付け、CC終了後に移動を再開する。
+/// 経路上に障害物(タワー・本拠地)がある場合は、ObstacleAvoidanceで最短側の接線方向へ迂回し、ぶつからずに移動する。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -128,6 +129,12 @@ public class PlayerClickMovement : MonoBehaviour
         _hasDestination = true;
     }
 
+    // 障害物回避に使う自身の半径(CharacterControllerの半径×最大の水平スケール)。
+    private float AgentRadius =>
+        _characterController != null
+            ? _characterController.radius * Mathf.Max(transform.localScale.x, transform.localScale.z)
+            : 0.5f;
+
     private void MoveTowardsDestination()
     {
         if (!_hasDestination)
@@ -135,7 +142,10 @@ public class PlayerClickMovement : MonoBehaviour
             return;
         }
 
-        Vector3 toDestination = _destination - transform.position;
+        // 目的地が障害物(タワー・本拠地)と重なっている場合は、到達できる障害物の縁まで目的地をずらす。
+        Vector3 destination = ObstacleAvoidance.ClampDestination(transform.position, _destination, AgentRadius, null);
+
+        Vector3 toDestination = destination - transform.position;
         toDestination.y = 0f;
 
         float remainingDistance = toDestination.magnitude;
@@ -148,8 +158,11 @@ public class PlayerClickMovement : MonoBehaviour
         // 移動速度はCharacterStatsから毎フレーム取得するため、Inspector値の変更が即座に反映される。
         // 移動先を通り過ぎないよう、残り距離でクランプする。
         float moveDistance = Mathf.Min(_characterStats.CurrentMoveSpeed * Time.deltaTime, remainingDistance);
-        Vector3 motion = toDestination.normalized * moveDistance;
-        _characterController.Move(motion);
+
+        // 経路上に障害物がある場合は、最短側の接線方向へ迂回する(ObstacleAvoidance)。
+        Vector3 direction = ObstacleAvoidance.SteerDirection(
+            transform.position, toDestination / remainingDistance, AgentRadius, remainingDistance, null);
+        _characterController.Move(direction * moveDistance);
     }
 
     /// <summary>

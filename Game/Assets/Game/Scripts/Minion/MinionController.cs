@@ -8,6 +8,7 @@ using UnityEngine;
 /// - 索敵範囲7以内の最も近い敵(TeamMemberを持つ対象)を狙う。無敵状態の本拠地は狙わない。
 /// - 敵がいない間はレーン進行方向へ進軍する(レーン中心線への引き寄せ付き)。
 /// - ミニオン同士が重ならないよう、毎フレームの最後に分離処理(近すぎるミニオンを押し離す)を行う。
+/// - 経路上の障害物(タワー・本拠地)はObstacleAvoidanceで最短側へ迂回し、ぶつからずに移動する(攻撃対象の構造物は除く)。
 /// - 攻撃は通常攻撃扱い(isBasicAttack: true)。タワー・本拠地は通常攻撃のみダメージを受けるため、
 ///   ミニオンの攻撃は構造物にも有効。
 /// </summary>
@@ -23,6 +24,9 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
     private const float AggroRange = 7f;
     private const float RetargetInterval = 0.25f;
     private const float CenterPullStrength = 0.15f;
+
+    // 障害物回避: 進行方向この距離以内の障害物(タワー・本拠地)を迂回する。
+    private const float AvoidanceLookAhead = 3f;
 
     // 分離処理: 半径の合計+余白より近づいたミニオン同士を、最大SeparationSpeed(m/秒)で押し離す。
     private const float SeparationPadding = 0.1f;
@@ -185,7 +189,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
                 return;
             }
 
-            MoveInDirection(toTarget.normalized);
+            // 攻撃対象そのものは障害物として扱わない(構造物が対象の場合に接近できなくなるため)。
+            MoveInDirection(toTarget.normalized, _currentTarget.transform);
             return;
         }
 
@@ -339,10 +344,11 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             direction = _team == Team.Blue ? Vector3.right : Vector3.left;
         }
 
-        MoveInDirection(direction);
+        MoveInDirection(direction, null);
     }
 
-    private void MoveInDirection(Vector3 direction)
+    // ignoreObstacleには攻撃対象など障害物扱いしないTransformを渡す(不要ならnull)。
+    private void MoveInDirection(Vector3 direction, Transform ignoreObstacle)
     {
         direction.y = 0f;
         if (direction.sqrMagnitude < 0.0001f)
@@ -351,6 +357,11 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         }
 
         direction.Normalize();
+
+        // 経路上に障害物(タワー・本拠地)がある場合は、最短側の接線方向へ迂回する。
+        direction = ObstacleAvoidance.SteerDirection(
+            transform.position, direction, _radius, AvoidanceLookAhead, ignoreObstacle);
+
         transform.position += direction * (MoveSpeed * Time.deltaTime);
         FaceDirection(direction);
     }

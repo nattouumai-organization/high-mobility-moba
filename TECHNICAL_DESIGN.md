@@ -348,3 +348,11 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - 索敵範囲7以内の最近敵を狙い、敵不在の間はレーン進行方向へ進軍(中心線引き寄せ付き)。無敵状態の本拠地は狙わない。
 - 分離処理: 半径の合計+余白(0.1m)より近いミニオン同士を最大2m/秒で押し離し、重なりを防ぐ。完全に重なった場合はスポーン順の連番から決定的な方向へ離れる(Unity 6で廃止のGetInstanceIDは使用しない)。
 - 攻撃はisBasicAttack: trueの通常攻撃扱いで構造物にも有効。ActiveMinions(static)をタワーのミニオン同伴判定が参照する。
+
+### 移動と障害物回避(ObstacleAvoidance)
+
+- 静的ユーティリティObstacleAvoidanceが障害物(タワー・本拠地)をXZ平面上の円として扱う。半径はコライダー形状(タワー=CapsuleColliderの水平半径、本拠地=BoxColliderの水平対角半径)から算出し、移動体半径+余白0.15mを加える。
+- SteerDirection: 直進経路が円と交差する場合、目的地への向きから外れる角度が小さい側(=最短側)の接線角+余裕4度へ進行方向を回転する。接触中は接線+外向き成分で縁を回り込む。この距離より先の障害物は無視する上限(残り移動距離・先読み距離)を持つ。
+- ClampDestination: 目的地が円の内側の場合、円の外周(中心ちょうどを指した場合は現在位置側の縁)へ目的地を押し出す。
+- 障害物一覧はTowerController/NexusControllerから1秒間隔で自動収集する(タワー破壊・生成などのシーン変化に追従)。
+- 使用箇所: PlayerClickMovement(CharacterController.Moveの方向補正+目的地補正。半径はCharacterControllerから取得)、MinionController(進軍・追跡の方向補正。先読み3m)。攻撃対象の構造物はignore指定で障害物から除外し、接近攻撃を妨げない。ダッシュ系スキル(ゼルフE・フラッシュなど)は直進のまま。
