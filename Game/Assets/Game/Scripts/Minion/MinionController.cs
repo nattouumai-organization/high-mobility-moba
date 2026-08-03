@@ -8,6 +8,8 @@ using UnityEngine;
 /// - 索敵範囲7以内の最も近い敵(TeamMemberを持つ対象)を狙う。無敵状態の本拠地は狙わない。
 /// - 敵がいない間はレーン進行方向へ進軍する(レーン中心線への引き寄せ付き)。
 /// - ミニオン同士が重ならないよう、毎フレームの最後に分離処理(近すぎるミニオンを押し離す)を行う。
+/// - 進路上の他ミニオンは接線方向の横移動で回り込む。それでも動けない状態が続く場合は一定時間の横移動で
+///   スタックを解消し、「前進する」か「標的を攻撃する」のどちらかを常に行う(何もしない時間を作らない)。
 /// - 経路上の障害物(タワー・本拠地)はObstacleAvoidanceで最短側へ迂回し、ぶつからずに移動する(攻撃対象の構造物は除く)。
 /// - 攻撃は通常攻撃扱い(isBasicAttack: true)。タワー・本拠地は通常攻撃のみダメージを受けるため、
 ///   ミニオンの攻撃は構造物にも有効。
@@ -27,6 +29,21 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
 
     // 障害物回避: 進行方向この距離以内の障害物(タワー・本拠地)を迂回する。
     private const float AvoidanceLookAhead = 3f;
+
+    // ミニオン回避: 進行方向この距離以内の他ミニオンを接線方向へ避けて回り込む。
+    private const float MinionAvoidLookAhead = 1.6f;
+
+    // 接線方向へ曲げる際に追加する角度(度)。ちょうど接線だと縁を擦るため少し外側へ向ける。
+    private const float MinionAvoidExtraTurnDegrees = 6f;
+
+    // スタック判定: 期待移動量に対する実移動量がこの割合未満のフレームを「動けていない」とみなす。
+    private const float StuckMovementRatio = 0.35f;
+
+    // 動けない状態がこの時間(秒)続いたら、横移動によるスタック解消を開始する。
+    private const float StuckTimeThreshold = 0.4f;
+
+    // スタック解消の横移動を続ける時間(秒)。
+    private const float SidestepDuration = 0.5f;
 
     // 分離処理: 半径の合計+余白より近づいたミニオン同士を、最大SeparationSpeed(m/秒)で押し離す。
     private const float SeparationPadding = 0.1f;
@@ -54,6 +71,15 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
     private float _retargetTimer;
     private HealthController _currentTarget;
     private Targetable _currentTargetable;
+
+    // スタック検出用: 前フレームの位置・動けていない累計時間・横移動の残り時間と左右。
+    private Vector3 _lastPosition;
+    private float _stuckTime;
+    private float _sidestepTimer;
+    private float _sidestepSide = 1f;
+
+    // このフレームで移動を試みたか(攻撃中はスタック判定の対象外にする)。
+    private bool _triedToMoveThisFrame;
 
     /// <summary>所属チーム。</summary>
     public Team Team => _team;
@@ -101,6 +127,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         _type = type;
         _health = health;
         _spawnIndex = _spawnCounter++;
+        _lastPosition = transform.position;
 
         float maxHealth;
         if (type == MinionType.Melee)
@@ -156,8 +183,10 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
+        _triedToMoveThisFrame = false;
         UpdateCombatAndMovement();
         ApplySeparation();
+        UpdateStuckState();
     }
 
     private void UpdateCombatAndMovement()
@@ -190,7 +219,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             }
 
             // 攻撃対象そのものは障害物として扱わない(構造物が対象の場合に接近できなくなるため)。
-            MoveInDirection(toTarget.normalized, _currentTarget.transform);
+            // 他ミニオンの回り込みは停止予定地点(攻撃射程に入る位置)までを対象にする。
+            MoveInDirection(toTarget.normalized, _currentTarget.transform, toTarget.magnitude - _attackRange);
             return;
         }
 
@@ -344,11 +374,12 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             direction = _team == Team.Blue ? Vector3.right : Vector3.left;
         }
 
-        MoveInDirection(direction, null);
+        MoveInDirection(direction, null, MinionAvoidLookAhead);
     }
 
     // ignoreObstacleには攻撃対象など障害物扱いしないTransformを渡す(不要ならnull)。
-    private void MoveInDirection(Vector3 direction, Transform ignoreObstacle)
+    // minionAvoidDistanceは他ミニオンの回り込みを行う先読み距離(停止予定地点より先のミニオンは避けない)。
+    private void MoveInDirection(Vector3 direction, Transform ignoreObstacle, float minionAvoidDistance)
     {
         direction.y = 0f;
         if (direction.sqrMagnitude < 0.0001f)
@@ -357,6 +388,19 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         }
 
         direction.Normalize();
+        _triedToMoveThisFrame = true;
+
+        if (_sidestepTimer > 0f)
+        {
+            // スタック解消中: 進行方向に対して真横へ移動し、詰まりから抜け出す。
+            _sidestepTimer -= Time.deltaTime;
+            direction = (Quaternion.Euler(0f, _sidestepSide * 90f, 0f) * direction).normalized;
+        }
+        else
+        {
+            // 進路上の他ミニオンは接線方向へ避けて回り込む。
+            direction = AvoidOtherMinions(direction, ignoreObstacle, minionAvoidDistance);
+        }
 
         // 経路上に障害物(タワー・本拠地)がある場合は、最短側の接線方向へ迂回する。
         direction = ObstacleAvoidance.SteerDirection(
@@ -364,6 +408,112 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
 
         transform.position += direction * (MoveSpeed * Time.deltaTime);
         FaceDirection(direction);
+    }
+
+    // 進路上(minionAvoidDistance以内)を塞ぐ最も近い他ミニオンを円として扱い、その接線方向へ進行方向を曲げる。
+    // ignoreTransformには攻撃対象を渡す(標的自身は避けずに接近する)。接触済みの相手は分離処理が押し離すため対象外。
+    private Vector3 AvoidOtherMinions(Vector3 direction, Transform ignoreTransform, float minionAvoidDistance)
+    {
+        float lookAhead = Mathf.Min(MinionAvoidLookAhead, minionAvoidDistance);
+        if (lookAhead <= 0f)
+        {
+            return direction;
+        }
+
+        bool found = false;
+        Vector3 bestTo = Vector3.zero;
+        float bestBlockRadius = 0f;
+        float bestProj = float.MaxValue;
+
+        foreach (MinionController other in Active)
+        {
+            if (other == this || other == null || other.IsDead || other.transform == ignoreTransform)
+            {
+                continue;
+            }
+
+            Vector3 to = other.transform.position - transform.position;
+            to.y = 0f;
+            float distance = to.magnitude;
+            float blockRadius = _radius + other._radius + SeparationPadding;
+            if (distance <= blockRadius)
+            {
+                continue;
+            }
+
+            float proj = Vector3.Dot(to, direction);
+            if (proj <= 0f || proj - blockRadius > lookAhead)
+            {
+                continue;
+            }
+
+            float perpSq = distance * distance - proj * proj;
+            if (perpSq >= blockRadius * blockRadius)
+            {
+                continue;
+            }
+
+            if (proj < bestProj)
+            {
+                bestProj = proj;
+                bestTo = to;
+                bestBlockRadius = blockRadius;
+                found = true;
+            }
+        }
+
+        if (!found)
+        {
+            return direction;
+        }
+
+        float dist = bestTo.magnitude;
+        Vector3 toDir = bestTo / dist;
+
+        // 迂回する側: 基本は外れる角度が小さい側(最短側)。正面ちょうどの場合はスポーン順で左右をばらけさせる。
+        float crossY = Vector3.Cross(bestTo, direction).y;
+        float side;
+        if (Mathf.Abs(crossY) < 0.01f)
+        {
+            side = _spawnIndex % 2 == 0 ? 1f : -1f;
+        }
+        else
+        {
+            side = crossY >= 0f ? 1f : -1f;
+        }
+
+        float tangentAngle = Mathf.Asin(Mathf.Clamp01(bestBlockRadius / dist)) * Mathf.Rad2Deg + MinionAvoidExtraTurnDegrees;
+        return (Quaternion.Euler(0f, side * tangentAngle, 0f) * toDir).normalized;
+    }
+
+    // 実際の移動量を監視し、移動を試みているのに動けない状態が続いたら横移動でスタックを解消する。
+    // 攻撃中(射程内で足を止めている間)はスタック判定の対象外。
+    private void UpdateStuckState()
+    {
+        Vector3 moved = transform.position - _lastPosition;
+        moved.y = 0f;
+        _lastPosition = transform.position;
+
+        if (!_triedToMoveThisFrame)
+        {
+            _stuckTime = 0f;
+            return;
+        }
+
+        if (moved.magnitude >= MoveSpeed * Time.deltaTime * StuckMovementRatio)
+        {
+            _stuckTime = 0f;
+            return;
+        }
+
+        _stuckTime += Time.deltaTime;
+        if (_stuckTime >= StuckTimeThreshold && _sidestepTimer <= 0f)
+        {
+            _stuckTime = 0f;
+            _sidestepTimer = SidestepDuration;
+            // 横移動の左右はスポーン順の偶奇でばらけさせる(全員が同じ側へ動いて詰まり直すのを防ぐ)。
+            _sidestepSide = _spawnIndex % 2 == 0 ? 1f : -1f;
+        }
     }
 
     private void FaceDirection(Vector3 direction)
