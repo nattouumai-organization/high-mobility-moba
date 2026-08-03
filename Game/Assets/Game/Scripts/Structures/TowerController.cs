@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 1本目のタワー(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
+/// タワー(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームと何本目か(tier)を設定する。
 /// - 射程8(設計800)内の敵(TeamMemberを持つ対象)を自動攻撃する。構造物(タワー・本拠地)は狙わない。
 /// - 攻撃優先順位: アグロ中の敵ヒーロー(最優先) > 敵ミニオン > 敵ヒーロー(最も低い)。
 ///   アグロ: 敵ヒーローがタワー下で味方ヒーローにダメージを与える(攻撃者または被弾者が射程内)と発動し、
@@ -17,7 +17,8 @@ using UnityEngine.UI;
 ///   3. 攻撃者の周囲8以内に攻撃側チームのミニオンがいない場合、確定ダメージは無効・通常ダメージは90%軽減。
 ///   4. 最後にAR60で通常ダメージを軽減(CharacterStatsを持たないため自前で適用)。
 /// - 頭上にワールド空間のHPバーを実行時生成する(WorldHealthBarを再利用)。
-/// - 破壊されるとGameManagerへ通知し、自チームの本拠地が攻撃可能になる。
+/// - 2本目のタワー(tier=2)は自チームの1本目が破壊されるまで無敵(すべてのダメージを0にする)。
+/// - 破壊されるとGameManagerへ通知する。1本目の破壊で2本目が攻撃可能になり、2本目の破壊でそのチームの負けとなる。
 /// - タワー段階報酬(フェーズ6): HPを1,000削られる毎に攻撃側チームに12pt・防衛側チームに5pt、破壊時は攻撃側に追加20ptを付与する。
 /// </summary>
 public class TowerController : MonoBehaviour, IIncomingDamageModifier
@@ -50,6 +51,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private static readonly List<TowerController> Towers = new List<TowerController>();
 
     private Team _team = Team.Blue;
+    private int _tier = 1;
     private HealthController _health;
     private GameObject _healthBarRoot;
     private float _attackCooldown;
@@ -76,25 +78,32 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     /// <summary>破壊済みかどうか。</summary>
     public bool IsDestroyed => _isDestroyed;
 
-    /// <summary>指定チームの1本目のタワーが破壊済みかどうか。本拠地の無敵判定が参照する。</summary>
-    public static bool IsTowerDestroyed(Team team)
+    /// <summary>何本目のタワーか(1=前衛、2=本拠地側)。</summary>
+    public int Tier => _tier;
+
+    /// <summary>2本目のタワーは自チームの1本目が破壊されるまで無敵。ミニオンの索敵除外にも使う。</summary>
+    public bool IsInvulnerable => _tier >= 2 && !IsTowerDestroyed(_team, _tier - 1);
+
+    /// <summary>指定チームの指定tierのタワーが破壊済みかどうか。2本目のタワーの無敵判定などが参照する。</summary>
+    public static bool IsTowerDestroyed(Team team, int tier = 1)
     {
         foreach (TowerController tower in Towers)
         {
-            if (tower != null && tower._team == team)
+            if (tower != null && tower._team == team && tower._tier == tier)
             {
                 return tower._isDestroyed || (tower._health != null && tower._health.IsDead);
             }
         }
 
-        // タワーが存在しない場合は破壊済み扱い(本拠地を攻撃可能にする)。
+        // タワーが存在しない場合は破壊済み扱い(後続の構造物を攻撃可能にする)。
         return true;
     }
 
     /// <summary>生成直後の初期化(MapBuilderから呼び出す)。</summary>
-    public void Initialize(Team team)
+    public void Initialize(Team team, int tier = 1)
     {
         _team = team;
+        _tier = Mathf.Max(1, tier);
         _health = GetComponent<HealthController>();
         if (_health != null)
         {
@@ -152,7 +161,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
-        _healthBarRoot = new GameObject($"{_team} Tower Health Bar");
+        _healthBarRoot = new GameObject($"{_team} Tower {_tier} Health Bar");
         _healthBarRoot.transform.position = transform.position + Vector3.up * HealthBarHeightOffset;
         _healthBarRoot.transform.localScale = Vector3.one * HealthBarWorldScale;
 
@@ -170,9 +179,36 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         fill.fillOrigin = (int)Image.OriginHorizontal.Left;
         fill.color = Color.Lerp(_team.GetTeamColor(), Color.white, 0.2f);
 
+        // 段階報酬(1,000ダメージ毎)の境界が分かるよう、バーの上に区切り線を重ねる(フェーズ6)。
+        if (_health != null && _health.MaxHealth > StageDamageStep)
+        {
+            int boundaryCount = Mathf.CeilToInt(_health.MaxHealth / StageDamageStep) - 1;
+            for (int i = 1; i <= boundaryCount; i++)
+            {
+                CreateStageMarker(rootRect, i, i * StageDamageStep / _health.MaxHealth);
+            }
+        }
+
         // WorldHealthBarはCanvas追加後にAddComponentする(AwakeでCanvasをキャッシュするため)。
         WorldHealthBar healthBar = _healthBarRoot.AddComponent<WorldHealthBar>();
         healthBar.InitializeRuntime(_health, fill);
+    }
+
+    // 段階報酬の境界線。フィル領域(左右3px内側)の指定割合の位置へ縦線を描く。
+    // スプライト未設定のImageは単純な全面描画のため、区切り線にはそのまま使える。
+    private static void CreateStageMarker(RectTransform parent, int index, float fraction)
+    {
+        GameObject markerObject = new GameObject($"Stage Marker {index}");
+        markerObject.transform.SetParent(parent, false);
+        RectTransform rect = markerObject.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(2f, -6f);
+        rect.anchoredPosition = new Vector2(3f + (parent.sizeDelta.x - 6f) * fraction, 0f);
+        Image image = markerObject.AddComponent<Image>();
+        image.color = new Color(0f, 0f, 0f, 0.6f);
+        image.raycastTarget = false;
     }
 
     private static Image CreateBarImage(string imageName, RectTransform parent, Vector2 offsetMin, Vector2 offsetMax)
@@ -451,6 +487,12 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     /// <summary>受けるダメージの変更(IIncomingDamageModifier)。クラスコメントのルールを適用する。</summary>
     public float ModifyIncomingDamage(DamageContext context, float currentAmount)
     {
+        // 2本目のタワーは自チームの1本目が破壊されるまで無敵。
+        if (IsInvulnerable)
+        {
+            return 0f;
+        }
+
         // 同一チームからのダメージは受けない(味方のタワーは殴れない)。
         if (context.Attacker != null)
         {
@@ -547,7 +589,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         PointsManager.AddPoints(_team.Opponent(), DestroyAttackerPoints, "tower destroyed");
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.NotifyTowerDestroyed(_team);
+            GameManager.Instance.NotifyTowerDestroyed(_team, _tier);
         }
 
         // 少し遅らせてオブジェクトを破棄する。

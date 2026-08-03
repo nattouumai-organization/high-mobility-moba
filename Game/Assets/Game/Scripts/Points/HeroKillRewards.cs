@@ -136,6 +136,13 @@ public class HeroKillRewards : MonoBehaviour
                 killerState.KillStreak++;
             }
         }
+        else
+        {
+            // 調査用ログ: 最後の攻撃者が敵チームのヒーローでない(ミニオン・タワー・同一チーム・不明)場合はキル不成立。
+            string victimName = victim.Hero != null ? victim.Hero.name : "(不明)";
+            string attackerName = victim.LastAttacker != null ? victim.LastAttacker.name : "(不明)";
+            Debug.Log($"HeroKillRewards: {victimName}が死亡しましたがキル不成立のためポイントなし(最後の攻撃者: {attackerName})。");
+        }
 
         // 死亡した側の連続キルは誰に倒されてもリセットする。
         victim.KillStreak = 0;

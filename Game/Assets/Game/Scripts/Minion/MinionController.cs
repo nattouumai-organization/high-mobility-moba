@@ -299,7 +299,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         return currentAmount;
     }
 
-    // 索敵範囲内の最も近い敵を狙う。無敵状態の本拠地は狙わない。
+    // 索敵範囲内の最も近い敵を狙う。無敵状態の本拠地・タワー(2本目)は狙わない。
     private void AcquireTarget()
     {
         _currentTarget = null;
@@ -315,6 +315,13 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
 
             NexusController nexus = member.GetComponent<NexusController>();
             if (nexus != null && nexus.IsInvulnerable)
+            {
+                continue;
+            }
+
+            // 無敵状態の2本目のタワーも狙わない(1本目の破壊まで)。
+            TowerController invulnerableTower = member.GetComponent<TowerController>();
+            if (invulnerableTower != null && invulnerableTower.IsInvulnerable)
             {
                 continue;
             }

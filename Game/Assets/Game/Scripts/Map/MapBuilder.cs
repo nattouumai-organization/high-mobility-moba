@@ -2,10 +2,11 @@ using UnityEngine;
 
 /// <summary>
 /// 1レーンマップを実行時に生成する(GAME_DESIGN.md 3章)。シーンに置いた空のGameObjectにアタッチするだけでよい。
-/// - レイアウト(ローカルX軸基準): 地面84x24、1本目のタワーX=±16、本拠地X=±33、ヒーロー初期位置(±30, -2.5)、
+/// - レイアウト(ローカルX軸基準): 地面84x24、1本目のタワーX=±16、2本目のタワーX=±33(旧本拠地位置)、ヒーロー初期位置(±30, -2.5)、
 ///   ミニオン出撃位置X=±30。_laneYawDegrees(既定-45度)で全体を回転し、ブルー左下→レッド右上の斜めレーンにする。
 /// - 生成物はInspectorのスロットがnullの場合のみCreatePrimitiveで自動生成する(差し替え可能)。
 /// - 生成した構造物にはHealthController/TeamMember/Targetable/各Controllerを付与する。
+/// - 本拠地は生成しない。2本目のタワーが本拠地の役割を持ち、破壊されたチームの負けとなる(フェーズ6)。
 /// - Targetableレイヤーはレイヤー名から実行時に解決する(PlayerTargetSelectorのLayerMaskと合わせる)。
 /// - StartでGameManagerの存在を確認し、無ければ自動生成する(ミニオン不出撃の自己修復)。
 /// - カメラ用にマップ外周の移動限界(CameraMinXなど)を公開する。
@@ -16,12 +17,11 @@ public class MapBuilder : MonoBehaviour
     private const float GroundLength = 84f;
     private const float GroundWidth = 24f;
     private const float TowerLocalX = 16f;
-    private const float NexusLocalX = 33f;
+    private const float BaseTowerLocalX = 33f;
     private const float HeroSpawnLocalX = 30f;
     private const float HeroSpawnLocalZ = -2.5f;
     private const float MinionSpawnLocalX = 30f;
     private const float TowerMaxHealth = 5000f;
-    private const float NexusMaxHealth = 6000f;
     private const float CameraMarginX = 3f;
     private const float CameraMarginZMin = 15f;
     private const float CameraMarginZMax = 5f;
@@ -40,8 +40,8 @@ public class MapBuilder : MonoBehaviour
     [SerializeField] private GameObject _ground;
     [SerializeField] private GameObject _blueTower;
     [SerializeField] private GameObject _redTower;
-    [SerializeField] private GameObject _blueNexus;
-    [SerializeField] private GameObject _redNexus;
+    [SerializeField] private GameObject _blueBaseTower;
+    [SerializeField] private GameObject _redBaseTower;
 
     private int _targetableLayer = -1;
     private int _groundLayer = -1;
@@ -176,10 +176,10 @@ public class MapBuilder : MonoBehaviour
     private void BuildMap()
     {
         EnsureGround();
-        _blueTower = EnsureTower(_blueTower, Team.Blue, new Vector3(-TowerLocalX, 0f, 0f));
-        _redTower = EnsureTower(_redTower, Team.Red, new Vector3(TowerLocalX, 0f, 0f));
-        _blueNexus = EnsureNexus(_blueNexus, Team.Blue, new Vector3(-NexusLocalX, 0f, 0f));
-        _redNexus = EnsureNexus(_redNexus, Team.Red, new Vector3(NexusLocalX, 0f, 0f));
+        _blueTower = EnsureTower(_blueTower, Team.Blue, new Vector3(-TowerLocalX, 0f, 0f), 1);
+        _redTower = EnsureTower(_redTower, Team.Red, new Vector3(TowerLocalX, 0f, 0f), 1);
+        _blueBaseTower = EnsureTower(_blueBaseTower, Team.Blue, new Vector3(-BaseTowerLocalX, 0f, 0f), 2);
+        _redBaseTower = EnsureTower(_redBaseTower, Team.Red, new Vector3(BaseTowerLocalX, 0f, 0f), 2);
     }
 
     private void EnsureGround()
@@ -205,12 +205,12 @@ public class MapBuilder : MonoBehaviour
         }
     }
 
-    private GameObject EnsureTower(GameObject tower, Team team, Vector3 localPosition)
+    private GameObject EnsureTower(GameObject tower, Team team, Vector3 localPosition, int tier)
     {
         if (tower == null)
         {
             tower = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            tower.name = $"{team} Tower";
+            tower.name = $"{team} Tower {tier}";
             tower.transform.localScale = new Vector3(2.4f, 2f, 2.4f);
         }
 
@@ -225,33 +225,8 @@ public class MapBuilder : MonoBehaviour
             controller = tower.AddComponent<TowerController>();
         }
 
-        controller.Initialize(team);
+        controller.Initialize(team, tier);
         return tower;
-    }
-
-    private GameObject EnsureNexus(GameObject nexus, Team team, Vector3 localPosition)
-    {
-        if (nexus == null)
-        {
-            nexus = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            nexus.name = $"{team} Nexus";
-            nexus.transform.localScale = new Vector3(4f, 4f, 4f);
-        }
-
-        Vector3 world = LocalToWorld(localPosition);
-        nexus.transform.position = new Vector3(world.x, 2f, world.z);
-        nexus.transform.rotation = LaneRotation;
-        ApplyTeamVisual(nexus, team);
-        SetupStructure(nexus, team, NexusMaxHealth, TargetClassification.Tower);
-
-        NexusController controller = nexus.GetComponent<NexusController>();
-        if (controller == null)
-        {
-            controller = nexus.AddComponent<NexusController>();
-        }
-
-        controller.Initialize(team);
-        return nexus;
     }
 
     private void ApplyTeamVisual(GameObject structure, Team team)
