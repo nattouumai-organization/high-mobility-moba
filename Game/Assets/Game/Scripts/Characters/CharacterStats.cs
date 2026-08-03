@@ -8,7 +8,7 @@ using UnityEngine;
 /// CharacterDataの数値はステータス単位(MS360・射程200など)であり、
 /// Unity単位への換算は本クラスの定数で一元管理する(AR・HPregはステータス値をそのまま使用する)。
 /// 未設定の場合は従来どおりInspectorの基礎値を使用する(後方互換)。
-/// 将来的にレベル成長などを追加する想定。
+/// レベル成長はフェーズ7で実装: HeroLevelGrowthがCharacterDataの成長値をボーナスAPI経由で加算する。
 /// </summary>
 public class CharacterStats : MonoBehaviour
 {
@@ -48,7 +48,7 @@ public class CharacterStats : MonoBehaviour
     [SerializeField] private float _bonusMaxHealth = 0f;
     [SerializeField] private float _baseAttackDamage = 20f;
     [SerializeField] private float _bonusAttackDamage = 0f;
-    // 防御力(AR)。通常ダメージの軽減式 FinalDamage = RawDamage × 100 / (100 + AR) に使用する(HealthControllerが参照)。
+    // 防御力(AR)。通常ダメージの軽減式 FinalDamage = RawDamage × 100 / (100 + AR) に使用する(HealthControllerが参照する)。
     [SerializeField] private float _baseArmor = 0f;
     [SerializeField] private float _bonusArmor = 0f;
     // HPreg(毎秒のHP自動回復量)。HealthControllerが毎フレーム参照して回復する。
@@ -60,6 +60,12 @@ public class CharacterStats : MonoBehaviour
     /// CrowdControlControllerのスロウ・ZelfRControllerのMS上昇計算の基準値として参照する。
     /// </summary>
     public float BaseMoveSpeed => _baseMoveSpeed;
+
+    /// <summary>
+    /// 現在適用されているCharacterData(未設定の場合はnull)。
+    /// レベル成長(HeroLevelGrowth)が成長値の参照に使用する(フェーズ7)。
+    /// </summary>
+    public CharacterData Data => _characterData;
 
     /// <summary>
     /// 現在の移動速度(毎秒Unity units)。スロウを受けても下限(MinMoveSpeedStat)未満にはならない。
@@ -145,7 +151,7 @@ public class CharacterStats : MonoBehaviour
     }
 
     /// <summary>
-    /// 最大HPボーナスを加算する。将来のアイテム・バフ・レベル成長から使用する。
+    /// 最大HPボーナスを加算する。レベル成長(HeroLevelGrowth)・将来のアイテム・バフから使用する。
     /// 変化はHealthControllerが検知し、増加分は現在HPへも加算される。
     /// </summary>
     public void AddMaxHealthBonus(float amount)
@@ -159,7 +165,7 @@ public class CharacterStats : MonoBehaviour
         _bonusMaxHealth -= amount;
     }
 
-    /// <summary>防御力(AR)ボーナスを加算する。将来のバフ・レベル成長から使用する。</summary>
+    /// <summary>防御力(AR)ボーナスを加算する。レベル成長(HeroLevelGrowth)・将来のバフから使用する。</summary>
     public void AddArmorBonus(float amount)
     {
         _bonusArmor += amount;
@@ -169,5 +175,44 @@ public class CharacterStats : MonoBehaviour
     public void RemoveArmorBonus(float amount)
     {
         _bonusArmor -= amount;
+    }
+
+    /// <summary>攻撃力(AD)ボーナスを加算する。レベル成長(HeroLevelGrowth)・将来のバフから使用する(フェーズ7)。</summary>
+    public void AddAttackDamageBonus(float amount)
+    {
+        _bonusAttackDamage += amount;
+    }
+
+    /// <summary>AddAttackDamageBonusで加算した攻撃力ボーナスを解除する。</summary>
+    public void RemoveAttackDamageBonus(float amount)
+    {
+        _bonusAttackDamage -= amount;
+    }
+
+    /// <summary>
+    /// 攻撃速度ボーナス(%)を加算する。CurrentAttackSpeedは基礎値×(1+合計%/100)で計算される。
+    /// レベル成長(HeroLevelGrowth)・将来のバフから使用する(フェーズ7)。
+    /// </summary>
+    public void AddAttackSpeedPercentBonus(float percent)
+    {
+        _bonusAttackSpeedPercent += percent;
+    }
+
+    /// <summary>AddAttackSpeedPercentBonusで加算した攻撃速度ボーナスを解除する。</summary>
+    public void RemoveAttackSpeedPercentBonus(float percent)
+    {
+        _bonusAttackSpeedPercent -= percent;
+    }
+
+    /// <summary>HPreg(毎秒回復)ボーナスを加算する。レベル成長(HeroLevelGrowth)・将来のバフから使用する(フェーズ7)。</summary>
+    public void AddHealthRegenBonus(float amount)
+    {
+        _bonusHealthRegen += amount;
+    }
+
+    /// <summary>AddHealthRegenBonusで加算したHPregボーナスを解除する。</summary>
+    public void RemoveHealthRegenBonus(float amount)
+    {
+        _bonusHealthRegen -= amount;
     }
 }

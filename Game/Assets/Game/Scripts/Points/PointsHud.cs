@@ -4,6 +4,7 @@ using UnityEngine.UI;
 /// <summary>
 /// 画面左上に両チームの合計ポイントを表示するHUD(フェーズ6)。
 /// GameManagerが実行時にAddComponentで生成する。
+/// フェーズ7: 各チームの現在レベル(LevelSystem)も併記する。
 /// 内蔵フォント(LegacyRuntime.ttf)に日本語グリフが無いため表記は英語。
 /// </summary>
 public class PointsHud : MonoBehaviour
@@ -38,7 +39,9 @@ public class PointsHud : MonoBehaviour
             return;
         }
 
-        _label.text = $"Points  Blue: {PointsManager.GetPoints(Team.Blue)}   Red: {PointsManager.GetPoints(Team.Red)}";
+        _label.text =
+            $"Points  Blue: {PointsManager.GetPoints(Team.Blue)} (Lv{LevelSystem.GetLevelForTeam(Team.Blue)})   " +
+            $"Red: {PointsManager.GetPoints(Team.Red)} (Lv{LevelSystem.GetLevelForTeam(Team.Red)})";
     }
 
     private void CreateUi()

@@ -12,6 +12,7 @@ using UnityEngine;
 ///   (勝敗UI・リスタートはフェーズ5タスク7で実装予定)。
 /// - ポイントHUD(PointsHud)を実行時に生成する(フェーズ6)。
 /// - キル・シャットダウン報酬を扱うHeroKillRewardsを実行時に生成する(フェーズ6)。
+/// - レベル成長を扱うHeroLevelGrowthとスキル強化HUDのSkillUpgradeHudを実行時に生成する(フェーズ7)。
 /// </summary>
 [DefaultExecutionOrder(-250)]
 public class GameManager : MonoBehaviour
@@ -57,6 +58,16 @@ public class GameManager : MonoBehaviour
         if (GetComponent<HeroKillRewards>() == null)
         {
             gameObject.AddComponent<HeroKillRewards>();
+        }
+
+        if (GetComponent<HeroLevelGrowth>() == null)
+        {
+            gameObject.AddComponent<HeroLevelGrowth>();
+        }
+
+        if (GetComponent<SkillUpgradeHud>() == null)
+        {
+            gameObject.AddComponent<SkillUpgradeHud>();
         }
     }
 

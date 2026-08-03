@@ -6,6 +6,10 @@ using UnityEngine.InputSystem;
 /// カメラ操作(Space: プレイヤー中心 / Y: カメラモード切替)・右クリック・マウス座標を公開する。
 /// 各コントローラーのAwakeからget-or-addで自動追加されるため、Inspector設定は不要。
 /// 将来のキーコンフィグ・ゲームパッド対応は、このクラスのバインディング変更のみで行う。
+/// フェーズ7: スキル強化用の修飾キー(左右Ctrl)を追加。Ctrl押下中はQ/W/E/Rの通常スキル入力を
+/// 抑制し(Pressed/PressedThisFrameがfalseになる)、Ctrl+スキルキーはUpgrade*PressedThisFrameとして
+/// HeroSkillUpgradesが強化操作に使用する(ReleasedThisFrameは抑制しないため、押下済みの
+/// ホールド系スキルは通常どおり解放できる)。
 /// </summary>
 public sealed class PlayerInputHub : MonoBehaviour
 {
@@ -20,27 +24,35 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _cameraLockToggleAction;
     private InputAction _rightClickAction;
     private InputAction _mousePositionAction;
+    private InputAction _upgradeModifierAction;
 
     private bool _initialized;
 
+    // --- スキル強化修飾キー(Ctrl)とCtrl+スキルキー(フェーズ7) ---
+    public bool UpgradeModifierPressed => _upgradeModifierAction != null && _upgradeModifierAction.IsPressed();
+    public bool UpgradeQPressedThisFrame => UpgradeModifierPressed && _qAction != null && _qAction.WasPressedThisFrame();
+    public bool UpgradeWPressedThisFrame => UpgradeModifierPressed && _wAction != null && _wAction.WasPressedThisFrame();
+    public bool UpgradeEPressedThisFrame => UpgradeModifierPressed && _eAction != null && _eAction.WasPressedThisFrame();
+    public bool UpgradeRPressedThisFrame => UpgradeModifierPressed && _rAction != null && _rAction.WasPressedThisFrame();
+
     // --- Q ---
-    public bool QPressedThisFrame => _qAction != null && _qAction.WasPressedThisFrame();
-    public bool QPressed => _qAction != null && _qAction.IsPressed();
+    public bool QPressedThisFrame => !UpgradeModifierPressed && _qAction != null && _qAction.WasPressedThisFrame();
+    public bool QPressed => !UpgradeModifierPressed && _qAction != null && _qAction.IsPressed();
     public bool QReleasedThisFrame => _qAction != null && _qAction.WasReleasedThisFrame();
 
     // --- W ---
-    public bool WPressedThisFrame => _wAction != null && _wAction.WasPressedThisFrame();
-    public bool WPressed => _wAction != null && _wAction.IsPressed();
+    public bool WPressedThisFrame => !UpgradeModifierPressed && _wAction != null && _wAction.WasPressedThisFrame();
+    public bool WPressed => !UpgradeModifierPressed && _wAction != null && _wAction.IsPressed();
     public bool WReleasedThisFrame => _wAction != null && _wAction.WasReleasedThisFrame();
 
     // --- E ---
-    public bool EPressedThisFrame => _eAction != null && _eAction.WasPressedThisFrame();
-    public bool EPressed => _eAction != null && _eAction.IsPressed();
+    public bool EPressedThisFrame => !UpgradeModifierPressed && _eAction != null && _eAction.WasPressedThisFrame();
+    public bool EPressed => !UpgradeModifierPressed && _eAction != null && _eAction.IsPressed();
     public bool EReleasedThisFrame => _eAction != null && _eAction.WasReleasedThisFrame();
 
     // --- R ---
-    public bool RPressedThisFrame => _rAction != null && _rAction.WasPressedThisFrame();
-    public bool RPressed => _rAction != null && _rAction.IsPressed();
+    public bool RPressedThisFrame => !UpgradeModifierPressed && _rAction != null && _rAction.WasPressedThisFrame();
+    public bool RPressed => !UpgradeModifierPressed && _rAction != null && _rAction.IsPressed();
     public bool RReleasedThisFrame => _rAction != null && _rAction.WasReleasedThisFrame();
 
     // --- 停止コマンド(S) ---
@@ -83,6 +95,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _cameraLockToggleAction.Enable();
         _rightClickAction.Enable();
         _mousePositionAction.Enable();
+        _upgradeModifierAction.Enable();
     }
 
     private void OnDisable()
@@ -98,6 +111,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _cameraLockToggleAction?.Disable();
         _rightClickAction?.Disable();
         _mousePositionAction?.Disable();
+        _upgradeModifierAction?.Disable();
     }
 
     private void OnDestroy()
@@ -113,6 +127,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _cameraLockToggleAction?.Dispose();
         _rightClickAction?.Dispose();
         _mousePositionAction?.Dispose();
+        _upgradeModifierAction?.Dispose();
     }
 
     // アクション生成は冪等。どのコンポーネントから先に呼ばれても安全。
@@ -132,5 +147,7 @@ public sealed class PlayerInputHub : MonoBehaviour
         _cameraLockToggleAction = new InputAction("CameraLockToggle", InputActionType.Button, "<Keyboard>/y");
         _rightClickAction = new InputAction("RightClick", InputActionType.Button, "<Mouse>/rightButton");
         _mousePositionAction = new InputAction("MousePosition", InputActionType.Value, "<Mouse>/position");
+        _upgradeModifierAction = new InputAction("UpgradeModifier", InputActionType.Button, "<Keyboard>/leftCtrl");
+        _upgradeModifierAction.AddBinding("<Keyboard>/rightCtrl");
     }
 }

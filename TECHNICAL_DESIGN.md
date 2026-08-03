@@ -383,3 +383,12 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - 本拠地(NexusController)は生成せず、各チームのタワーを2本生成する(1本目X=±16・2本目X=±33、いずれもHP5,000で段階報酬対象)。TowerControllerはtier(何本目か)を持ち、2本目は1本目が破壊されるまで無敵でミニオンの索敵からも除外される。2本目の破壊でGameManagerがマッチ終了(そのチームの負け)として扱う。NexusController.csは未使用としてプロジェクトに残る。
 - タワーのHPバーには段階報酬(1,000ダメージ毎)の境界を縦の区切り線で表示する。
 - テストプレイ用: HeroKillRewardsはRespawnControllerを持つ非ヒーロー(トレーニングダミー・攻撃ダミー)もキル対象として追跡する。ヒーローがとどめを刺すとキル25ptを付与し(ダミーがTeamMemberを持たない場合はキル者のチームへ付与)、ダミーは倒されるたびに連続キル数が1増える扱いにして2回目以降の撃破でシャットダウン報酬(+10/+20/+30pt)を順に確認できる。ミニオン・タワーはRespawnControllerを持たないため対象外で、実際のヒーロー同士のキル判定にも影響しない。
+
+### フェーズ7-1〜7-4: レベルとスキル強化
+
+- `LevelSystem`(静的クラス): チームポイントからLv1〜Lv6を算出する。閾値は0/40/90/150/225/310。状態を持たず毎回PointsManagerから算出する。
+- `HeroLevelGrowth`: GameManagerが実行時に生成。ヒーロー(PlayerClickMovement+CharacterStats+TeamMember)を定期スキャンし、チームレベル上昇時にCharacterDataの成長値を1レベル分ずつボーナスAPIで加算する。HeroSkillUpgradesの自動追加も担当。
+- `CharacterStats`: `Data`アクセサとAddAttackDamageBonus / AddAttackSpeedPercentBonus / AddHealthRegenBonus(及び解除API)を追加。最大HP増加分は従来どおりHealthControllerが現在HPへも加算する。
+- `HeroSkillUpgrades`: Q/W/E/Rのランク(最大2)とLv6追加強化の使用状況を保持。GAME_DESIGN 6章の順序(Lv2〜4でQ/W/E各1回、Lv5でR、Lv6で任意スキルの追加強化)に従う。ランクによるスキル性能変化は今後のタスクで実装(GetRank参照想定)。
+- `PlayerInputHub`: 強化用修飾キー(左右Ctrl)を追加。Ctrl押下中はQ/W/E/RのPressed/PressedThisFrameを抑制し(ReleasedThisFrameは抑制しない)、Upgrade*PressedThisFrameを公開する。
+- `SkillUpgradeHud`: GameManagerが実行時に生成。画面下部中央にQ/W/E/Rスロット(仮アイコン)とランクピップを表示し、強化可能時に上向き矢印(通常=緑、Lv6追加強化=金色)を表示する。本格的なスキルアイコンはフェーズ8で差し替え想定。
