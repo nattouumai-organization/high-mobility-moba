@@ -3,28 +3,28 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// 画面下部中央にQ/W/E/Rのスキルアイコン(仮)を表示し、強化できるスキルの上に
-/// 上向き矢印を表示するHUD(フェーズ7)。GameManagerが実行時にAddComponentで生成する。
-/// - 矢印の色: 通常強化=緑 / Lv6追加強化=金色(見た目で区別できるようにする)。
-/// - アイコン下部の黄色いピップは現在の強化ランク(最大2)を表す。
-/// - 操作はCtrl+Q/W/E/R(HeroSkillUpgrades側で処理)。アイコンの右に操作ヒントを表示する。
-/// - 本格的なスキルアイコンはフェーズ8「全キャラクターのUIアイコンを仮実装する」で差し替える想定。
-/// - 内蔵フォント(LegacyRuntime.ttf)に日本語グリフが無いため表記は英語。
+/// 既存のプレイヤーHUD(SkillCooldownHud)のQ/W/E/Rスロットへ、スキル強化表示を重ねるHUD(フェーズ7)。
+/// GameManagerが実行時にAddComponentで生成する。
+/// - 独自のスキルスロットは作らず、SkillCooldownHudが生成する「Player Status HUD Canvas」内の
+///   「Status Panel/Skill Bar/Skill Slot Q〜R」を定期スキャンで探し、各スロットの子として
+///   強化表示を追加する(生成タイミングに依存しない。SkillCooldownHud本体は変更しない)。
+/// - 強化可能なスキルのスロット真上に上向き矢印を表示する(通常強化=緑 / Lv6追加強化=金色)。
+/// - スロット下部のピップは現在の強化ランク(最大2)を表す。
+/// - 強化操作はCtrl+Q/W/E/R(HeroSkillUpgrades側で処理)。強化可能なスキルがあるときだけ
+///   スキルバー上部へ操作ヒントを表示する。
+/// - 内蔵フォント(LegacyRuntime.ttf)に日本語グリフが無いためヒント表記は英語。
+/// - SkillCooldownHud側でCanvas・スロットの名前を変更する場合は、本クラスの検索名も更新すること。
 /// </summary>
 public class SkillUpgradeHud : MonoBehaviour
 {
     private const float ScanInterval = 1f;
-    private const float SlotSize = 64f;
-    private const float SlotSpacing = 12f;
-    private const float BottomMargin = 24f;
 
-    private static readonly Color SlotBackgroundColor = new Color(0.1f, 0.1f, 0.12f, 0.85f);
     private static readonly Color NormalArrowColor = new Color(0.25f, 1f, 0.4f, 1f);
     private static readonly Color FinalArrowColor = new Color(1f, 0.78f, 0.1f, 1f);
     private static readonly Color RankPipOnColor = new Color(1f, 0.9f, 0.2f, 1f);
     private static readonly Color RankPipOffColor = new Color(1f, 1f, 1f, 0.15f);
 
-    private class SkillSlot
+    private class SlotOverlay
     {
         public HeroSkillSlot Skill;
         public GameObject ArrowRoot;
@@ -32,15 +32,11 @@ public class SkillUpgradeHud : MonoBehaviour
         public Image[] RankPips;
     }
 
-    private readonly List<SkillSlot> _slots = new List<SkillSlot>();
+    private readonly List<SlotOverlay> _overlays = new List<SlotOverlay>();
     private HeroSkillUpgrades _target;
-    private float _scanTimer;
     private Text _hintLabel;
-
-    private void Start()
-    {
-        CreateUi();
-    }
+    private bool _attached;
+    private float _scanTimer;
 
     private void Update()
     {
@@ -48,13 +44,18 @@ public class SkillUpgradeHud : MonoBehaviour
         if (_scanTimer <= 0f)
         {
             _scanTimer = ScanInterval;
+            if (!_attached)
+            {
+                TryAttachToExistingHud();
+            }
+
             if (_target == null)
             {
                 _target = FindLocalHero();
             }
         }
 
-        RefreshSlots();
+        RefreshOverlays();
     }
 
     // 入力(PlayerInputHub)を持つローカル操作のヒーローを探す。
@@ -72,98 +73,95 @@ public class SkillUpgradeHud : MonoBehaviour
         return null;
     }
 
-    private void RefreshSlots()
+    // SkillCooldownHudが生成した既存スロットを探し、強化表示を子として追加する。
+    // SkillCooldownHudの生成タイミングに依存しないよう、見つかるまで定期リトライする。
+    private void TryAttachToExistingHud()
     {
-        foreach (SkillSlot slot in _slots)
+        GameObject canvasObject = GameObject.Find("Player Status HUD Canvas");
+        if (canvasObject == null)
         {
-            bool canUpgrade = _target != null && _target.CanUpgrade(slot.Skill);
-            if (slot.ArrowRoot.activeSelf != canUpgrade)
+            return;
+        }
+
+        Transform skillBar = canvasObject.transform.Find("Status Panel/Skill Bar");
+        if (skillBar == null)
+        {
+            return;
+        }
+
+        HeroSkillSlot[] skills = { HeroSkillSlot.Q, HeroSkillSlot.W, HeroSkillSlot.E, HeroSkillSlot.R };
+        foreach (HeroSkillSlot skill in skills)
+        {
+            Transform slot = skillBar.Find($"Skill Slot {skill}");
+            if (slot == null)
             {
-                slot.ArrowRoot.SetActive(canUpgrade);
+                // コントローラー未検出などでスロット自体が無い場合は、そのスキルの強化表示を追加しない。
+                Debug.LogWarning($"[SkillUpgradeHud] 既存HUDにSkill Slot {skill}が見つからないため、強化表示を追加しません。", this);
+                continue;
+            }
+
+            _overlays.Add(CreateOverlay(slot, skill));
+        }
+
+        // 操作ヒント。強化可能なスキルがあるときだけ表示する(RefreshOverlaysで制御)。
+        _hintLabel = CreateText(skillBar, "UpgradeHint", "Ctrl+Q/W/E/R: upgrade skill", 16, FontStyle.Normal);
+        _hintLabel.alignment = TextAnchor.MiddleCenter;
+        _hintLabel.color = new Color(1f, 1f, 1f, 0.7f);
+        var hintRect = _hintLabel.rectTransform;
+        hintRect.anchorMin = new Vector2(0.5f, 1f);
+        hintRect.anchorMax = new Vector2(0.5f, 1f);
+        hintRect.pivot = new Vector2(0.5f, 0f);
+        hintRect.anchoredPosition = new Vector2(0f, 38f);
+        hintRect.sizeDelta = new Vector2(360f, 24f);
+        _hintLabel.enabled = false;
+
+        _attached = true;
+        Debug.Log($"[SkillUpgradeHud] 既存HUDへ強化表示を追加しました(スロット数{_overlays.Count})。", this);
+    }
+
+    private void RefreshOverlays()
+    {
+        bool anyUpgrade = false;
+        foreach (SlotOverlay overlay in _overlays)
+        {
+            bool canUpgrade = _target != null && _target.CanUpgrade(overlay.Skill);
+            anyUpgrade |= canUpgrade;
+            if (overlay.ArrowRoot.activeSelf != canUpgrade)
+            {
+                overlay.ArrowRoot.SetActive(canUpgrade);
             }
 
             if (canUpgrade)
             {
-                Color color = _target.IsFinalUpgradeCandidate(slot.Skill) ? FinalArrowColor : NormalArrowColor;
-                foreach (Image part in slot.ArrowParts)
+                Color color = _target.IsFinalUpgradeCandidate(overlay.Skill) ? FinalArrowColor : NormalArrowColor;
+                foreach (Image part in overlay.ArrowParts)
                 {
                     part.color = color;
                 }
             }
 
-            int rank = _target != null ? _target.GetRank(slot.Skill) : 0;
-            for (int i = 0; i < slot.RankPips.Length; i++)
+            int rank = _target != null ? _target.GetRank(overlay.Skill) : 0;
+            for (int i = 0; i < overlay.RankPips.Length; i++)
             {
-                slot.RankPips[i].color = i < rank ? RankPipOnColor : RankPipOffColor;
+                overlay.RankPips[i].color = i < rank ? RankPipOnColor : RankPipOffColor;
             }
         }
 
-        if (_hintLabel != null && _hintLabel.enabled != (_target != null))
+        if (_hintLabel != null && _hintLabel.enabled != anyUpgrade)
         {
-            _hintLabel.enabled = _target != null;
+            _hintLabel.enabled = anyUpgrade;
         }
     }
 
-    private void CreateUi()
+    // 既存スロットの子として、上向き矢印(スロット真上)とランクピップ(スロット下部)を生成する。
+    private SlotOverlay CreateOverlay(Transform slot, HeroSkillSlot skill)
     {
-        var canvasObject = new GameObject("SkillUpgradeHudCanvas");
-        canvasObject.transform.SetParent(transform, false);
-        var canvas = canvasObject.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 41;
-        var scaler = canvasObject.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-
-        HeroSkillSlot[] skills = { HeroSkillSlot.Q, HeroSkillSlot.W, HeroSkillSlot.E, HeroSkillSlot.R };
-        float totalWidth = skills.Length * SlotSize + (skills.Length - 1) * SlotSpacing;
-        for (int i = 0; i < skills.Length; i++)
-        {
-            float x = -totalWidth / 2f + SlotSize / 2f + i * (SlotSize + SlotSpacing);
-            _slots.Add(CreateSlot(canvasObject.transform, skills[i], x));
-        }
-
-        _hintLabel = CreateText(canvasObject.transform, "UpgradeHint", "Ctrl+Q/W/E/R: upgrade skill", 16, FontStyle.Normal);
-        _hintLabel.alignment = TextAnchor.MiddleLeft;
-        _hintLabel.color = new Color(1f, 1f, 1f, 0.7f);
-        var hintRect = _hintLabel.rectTransform;
-        hintRect.anchorMin = new Vector2(0.5f, 0f);
-        hintRect.anchorMax = new Vector2(0.5f, 0f);
-        hintRect.pivot = new Vector2(0f, 0.5f);
-        hintRect.anchoredPosition = new Vector2(totalWidth / 2f + 16f, BottomMargin + SlotSize / 2f);
-        hintRect.sizeDelta = new Vector2(320f, 24f);
-        _hintLabel.enabled = false;
-    }
-
-    private SkillSlot CreateSlot(Transform parent, HeroSkillSlot skill, float offsetX)
-    {
-        var slotObject = new GameObject($"SkillSlot{skill}");
-        slotObject.transform.SetParent(parent, false);
-        var rect = slotObject.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.5f, 0f);
-        rect.anchorMax = new Vector2(0.5f, 0f);
-        rect.pivot = new Vector2(0.5f, 0f);
-        rect.anchoredPosition = new Vector2(offsetX, BottomMargin);
-        rect.sizeDelta = new Vector2(SlotSize, SlotSize);
-
-        var background = slotObject.AddComponent<Image>();
-        background.color = SlotBackgroundColor;
-
-        // スキルキーのラベル(仮アイコン)。
-        Text label = CreateText(slotObject.transform, "KeyLabel", skill.ToString(), 30, FontStyle.Bold);
-        label.alignment = TextAnchor.MiddleCenter;
-        var labelRect = label.rectTransform;
-        labelRect.anchorMin = Vector2.zero;
-        labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = Vector2.zero;
-        labelRect.offsetMax = Vector2.zero;
-
-        // ランク表示ピップ(最大2)。
+        // ランク表示ピップ(最大2)。後から追加する子は既存のオーバーレイより手前に描画される。
         var pips = new Image[HeroSkillUpgrades.MaxRank];
         for (int i = 0; i < pips.Length; i++)
         {
-            var pipObject = new GameObject($"RankPip{i + 1}");
-            pipObject.transform.SetParent(slotObject.transform, false);
+            var pipObject = new GameObject($"UpgradeRankPip{i + 1}");
+            pipObject.transform.SetParent(slot, false);
             var pipRect = pipObject.AddComponent<RectTransform>();
             pipRect.anchorMin = new Vector2(0.5f, 0f);
             pipRect.anchorMax = new Vector2(0.5f, 0f);
@@ -172,11 +170,12 @@ public class SkillUpgradeHud : MonoBehaviour
             pipRect.sizeDelta = new Vector2(10f, 6f);
             pips[i] = pipObject.AddComponent<Image>();
             pips[i].color = RankPipOffColor;
+            pips[i].raycastTarget = false;
         }
 
-        // 強化可能時に表示する上向き矢印(斜めバー2本+縦棒)。スロットの真上に置く。
+        // 強化可能時に表示する上向き矢印(斜めバー2本+縦棒)。スロットの真上(パネル外側)に置く。
         var arrowRoot = new GameObject("UpgradeArrow");
-        arrowRoot.transform.SetParent(slotObject.transform, false);
+        arrowRoot.transform.SetParent(slot, false);
         var arrowRect = arrowRoot.AddComponent<RectTransform>();
         arrowRect.anchorMin = new Vector2(0.5f, 1f);
         arrowRect.anchorMax = new Vector2(0.5f, 1f);
@@ -190,7 +189,7 @@ public class SkillUpgradeHud : MonoBehaviour
         arrowParts[2] = CreateArrowStem(arrowRect);
         arrowRoot.SetActive(false);
 
-        return new SkillSlot { Skill = skill, ArrowRoot = arrowRoot, ArrowParts = arrowParts, RankPips = pips };
+        return new SlotOverlay { Skill = skill, ArrowRoot = arrowRoot, ArrowParts = arrowParts, RankPips = pips };
     }
 
     // 矢印の山形(斜めバー)部分。sprite未設定のImageは全面描画されるため矩形バーとして使える。
@@ -207,6 +206,7 @@ public class SkillUpgradeHud : MonoBehaviour
         partRect.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
         var image = partObject.AddComponent<Image>();
         image.color = NormalArrowColor;
+        image.raycastTarget = false;
         return image;
     }
 
@@ -223,6 +223,7 @@ public class SkillUpgradeHud : MonoBehaviour
         stemRect.sizeDelta = new Vector2(5f, 14f);
         var image = stemObject.AddComponent<Image>();
         image.color = NormalArrowColor;
+        image.raycastTarget = false;
         return image;
     }
 
@@ -237,6 +238,7 @@ public class SkillUpgradeHud : MonoBehaviour
         text.fontStyle = style;
         text.color = Color.white;
         text.text = content;
+        text.raycastTarget = false;
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
         var outline = textObject.AddComponent<Outline>();

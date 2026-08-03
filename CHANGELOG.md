@@ -412,3 +412,9 @@
 - 基礎ステータスのレベル成長を実装(HeroLevelGrowth)。レベルアップ時にCharacterData(ゼルフ/ヴォルブラーク)の成長値(HP/HPreg/AD/AS%/AR)をCharacterStatsのボーナスへ加算する。
 - Q/W/E/Rのスキル強化UIを実装(SkillUpgradeHud/HeroSkillUpgrades)。強化可能なスキルの上に緑の上向き矢印を表示し、Ctrl+Q/W/E/Rの同時押しで強化する(Ctrl押下中は通常のスキル発動を抑制)。
 - Lv6の追加強化選択を実装。Lv6到達後は好きなスキル1つを追加強化でき(1回のみ)、対象の矢印は金色で表示して通常強化と区別する。
+
+## フェーズ7-fix1: スキル強化UIを既存HUDへ統合
+
+- SkillUpgradeHudが独自のQ/W/E/Rスロット列を画面下部へ重複表示していた問題を修正。スキルUIはフェーズ3実装のプレイヤーHUD(SkillCooldownHud)のQ/W/E/Rスロットのみに統一した。
+- SkillUpgradeHudは独自のCanvas・スロットを生成せず、既存HUDの各スロットの子として上向き矢印(通常強化=緑 / Lv6追加強化=金色)とランクピップ(スロット下部・最大2)を重ねて表示する。スキル強化の機能・操作(Ctrl+Q/W/E/R)は変更なし。
+- 操作ヒント(Ctrl+Q/W/E/R: upgrade skill)は強化可能なスキルがあるときだけスキルバー上部に表示する。SkillCooldownHud本体は変更していない。

@@ -392,3 +392,7 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - `HeroSkillUpgrades`: Q/W/E/Rのランク(最大2)とLv6追加強化の使用状況を保持。GAME_DESIGN 6章の順序(Lv2〜4でQ/W/E各1回、Lv5でR、Lv6で任意スキルの追加強化)に従う。ランクによるスキル性能変化は今後のタスクで実装(GetRank参照想定)。
 - `PlayerInputHub`: 強化用修飾キー(左右Ctrl)を追加。Ctrl押下中はQ/W/E/RのPressed/PressedThisFrameを抑制し(ReleasedThisFrameは抑制しない)、Upgrade*PressedThisFrameを公開する。
 - `SkillUpgradeHud`: GameManagerが実行時に生成。画面下部中央にQ/W/E/Rスロット(仮アイコン)とランクピップを表示し、強化可能時に上向き矢印(通常=緑、Lv6追加強化=金色)を表示する。本格的なスキルアイコンはフェーズ8で差し替え想定。
+
+### フェーズ7-fix1: スキル強化UIを既存HUDへ統合
+
+- `SkillUpgradeHud`: 独自のCanvas・Q/W/E/Rスロット生成を廃止。SkillCooldownHud(Scripts/UI)が生成する「Player Status HUD Canvas」内の「Status Panel/Skill Bar/Skill Slot Q〜R」を定期スキャンで探し、各スロットの子として上向き矢印とランクピップを追加する(生成タイミング非依存のリトライ方式)。SkillCooldownHud本体は変更しない。操作ヒントは強化可能なスキルがあるときだけ表示する。SkillCooldownHud側でCanvas・スロット名を変更する場合はSkillUpgradeHudの検索名も更新が必要。
