@@ -10,6 +10,9 @@ using UnityEngine;
 /// - 最後にダメージを与えた敵ヒーローをキル者とする。ミニオン・タワーにとどめを刺された場合は
 ///   キルポイントなし(死亡した側の連続キルのみリセットする)。
 /// ヒーロー(PlayerClickMovement)とTeamMemberは実行時に増えるため定期走査で購読する。
+/// - テストプレイ用: RespawnControllerを持つ非ヒーロー(トレーニングダミー・攻撃ダミー)もキル対象として追跡する。
+///   ダミーは倒されるたびに連続キル数が1増える扱いにし、2回目以降の撃破でシャットダウン報酬も順に確認できる。
+///   (実際のヒーロー同士のキル判定には影響しない)
 /// </summary>
 public class HeroKillRewards : MonoBehaviour
 {
@@ -22,6 +25,7 @@ public class HeroKillRewards : MonoBehaviour
         public PlayerClickMovement Hero;
         public HealthController Health;
         public TeamMember Member;
+        public bool IsTestDummy;
         public Transform LastAttacker;
         public int KillStreak;
         public Action<DamageContext, float> DamageHandler;
@@ -80,6 +84,34 @@ public class HeroKillRewards : MonoBehaviour
             health.Died += state.DiedHandler;
             _heroes.Add(health, state);
         }
+
+        // テストプレイ用: RespawnControllerを持つ非ヒーロー(トレーニングダミーなど)もキル対象として追跡する。
+        // ミニオン・タワーはRespawnControllerを持たないため対象外。ヒーローは上の走査で追跡済みのため除外する。
+        foreach (RespawnController respawn in FindObjectsByType<RespawnController>(FindObjectsSortMode.None))
+        {
+            if (respawn == null || respawn.GetComponent<PlayerClickMovement>() != null)
+            {
+                continue;
+            }
+
+            HealthController health = respawn.GetComponent<HealthController>();
+            if (health == null || _heroes.ContainsKey(health))
+            {
+                continue;
+            }
+
+            HeroState state = new HeroState
+            {
+                Health = health,
+                Member = respawn.GetComponent<TeamMember>(),
+                IsTestDummy = true,
+            };
+            state.DamageHandler = (context, damage) => HandleDamageTaken(state, context);
+            state.DiedHandler = () => HandleHeroDied(state);
+            health.DamageTaken += state.DamageHandler;
+            health.Died += state.DiedHandler;
+            _heroes.Add(health, state);
+        }
     }
 
     private static void Unsubscribe(HeroState state)
@@ -101,6 +133,12 @@ public class HeroKillRewards : MonoBehaviour
 
     private void HandleHeroDied(HeroState victim)
     {
+        if (victim.IsTestDummy)
+        {
+            HandleTestDummyDied(victim);
+            return;
+        }
+
         // TeamMemberは実行時付与のため、死亡時点で改めて取得する。
         if (victim.Member == null && victim.Hero != null)
         {
@@ -146,6 +184,41 @@ public class HeroKillRewards : MonoBehaviour
 
         // 死亡した側の連続キルは誰に倒されてもリセットする。
         victim.KillStreak = 0;
+        victim.LastAttacker = null;
+    }
+
+    // テストプレイ用: ダミー撃破でもキルポイント・シャットダウン報酬を確認できるようにする。
+    // ダミーは倒されるたびに連続キル数が1増える扱いにし、2回目以降の撃破で
+    // シャットダウン報酬(+10/+20/+30pt)を順に確認できる。
+    private void HandleTestDummyDied(HeroState victim)
+    {
+        string victimName = victim.Health != null ? victim.Health.name : "(不明)";
+        PlayerClickMovement killerHero = victim.LastAttacker != null
+            ? victim.LastAttacker.GetComponentInParent<PlayerClickMovement>()
+            : null;
+
+        if (killerHero == null)
+        {
+            Debug.Log($"HeroKillRewards: {victimName}が死亡しましたがヒーローのとどめではないためポイントなし。");
+            victim.LastAttacker = null;
+            return;
+        }
+
+        // ダミーはTeamMemberを持たないことが多いため、キル者のチーム(未設定ならブルー)へ付与する。
+        TeamMember killerMember = killerHero.GetComponent<TeamMember>();
+        Team killerTeam = killerMember != null ? killerMember.Team : Team.Blue;
+
+        PointsManager.AddPoints(killerTeam, KillPoints, "hero kill (test dummy)");
+        int shutdownBonus = GetShutdownBonus(victim.KillStreak);
+        if (shutdownBonus > 0)
+        {
+            PointsManager.AddPoints(killerTeam, shutdownBonus, $"shutdown ({victim.KillStreak} kill streak, test dummy)");
+        }
+
+        Debug.Log($"HeroKillRewards: テストプレイ用: {victimName}を撃破(キル+{KillPoints}pt / シャットダウン+{shutdownBonus}pt)。次の撃破はシャットダウン+{GetShutdownBonus(victim.KillStreak + 1)}pt。");
+
+        // 次の撃破でシャットダウンを確認できるよう、ダミーの連続キル数を1進める。
+        victim.KillStreak++;
         victim.LastAttacker = null;
     }
 
