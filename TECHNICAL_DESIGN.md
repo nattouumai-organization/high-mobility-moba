@@ -375,3 +375,4 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - PointsManager(静的クラス)がチーム毎のポイントを保持し、PointsChangedイベントで変化を通知する。SubsystemRegistrationで再生開始毎にリセットする。
 - ミニオン死亡時、半径ProximityPointRange(=12f・仕様未定義のため仮値)以内の敵ヒーローに2pt、最後にダメージを与えたヒーローに追加3ptを付与する(MinionController.AwardDeathPoints)。
 - GameManagerが起動時にPointsHudを生成し、画面左上に合計ポイントを表示する(内蔵フォントに日本語グリフが無いため英語表記)。
+- UI Imageはスプライト未設定だとFilledタイプが機能せず常に全面描画されるため、WorldHealthBarがFill Imageに白スプライト(Texture2D.whiteTexture)を自動補完する。

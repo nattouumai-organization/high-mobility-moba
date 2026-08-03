@@ -9,6 +9,8 @@ using UnityEngine.UI;
 /// 対象が死亡した場合はHPバーを非表示にし、復活した場合は再表示する。HP数値のテキスト表示は今回実装しない。
 /// World Space Canvasの子(Background / Fill)と合わせて使用する。
 /// 実行時生成の場合はInitializeRuntimeでHP取得元とFill Imageを設定する(タワーのHPバーなど)。
+/// スプライト未設定のUI ImageはFilledタイプが機能せず常に全面描画される(fillAmountが反映されない)ため、
+/// Fill Imageにスプライトが無い場合は白スプライトを自動補完する。
 /// </summary>
 public class WorldHealthBar : MonoBehaviour
 {
@@ -20,6 +22,9 @@ public class WorldHealthBar : MonoBehaviour
 
     private Camera _mainCamera;
     private Canvas _canvas;
+
+    // 実行時生成バー用に補完する白スプライト(全HPバーで共有)。
+    private static Sprite _sharedFillSprite;
 
     private void Awake()
     {
@@ -74,6 +79,7 @@ public class WorldHealthBar : MonoBehaviour
 
         _healthController = healthController;
         _fillImage = fillImage;
+        EnsureFillSprite();
 
         if (_healthController != null && isActiveAndEnabled)
         {
@@ -84,8 +90,30 @@ public class WorldHealthBar : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Fill Imageにスプライトが無い場合は白スプライトを補完する。
+    /// スプライト未設定のImageは常に全面描画され、FilledタイプのfillAmountが反映されないため。
+    /// </summary>
+    private void EnsureFillSprite()
+    {
+        if (_fillImage == null || _fillImage.sprite != null)
+        {
+            return;
+        }
+
+        if (_sharedFillSprite == null)
+        {
+            Texture2D texture = Texture2D.whiteTexture;
+            _sharedFillSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
+        }
+
+        _fillImage.sprite = _sharedFillSprite;
+    }
+
     private void Start()
     {
+        EnsureFillSprite();
+
         // HealthControllerの初期通知と実行順が前後しても表示が揃うよう、開始時に最新値を反映する。
         if (_healthController != null)
         {
