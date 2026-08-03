@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// レーンを進軍するミニオン(GAME_DESIGN.md 3章)。GameManagerがウェーブごとにSpawnで生成する。
@@ -13,6 +14,8 @@ using UnityEngine;
 /// - 経路上の障害物(タワー・本拠地)はObstacleAvoidanceで最短側へ迂回し、ぶつからずに移動する(攻撃対象の構造物は除く)。
 /// - 攻撃は通常攻撃扱い(isBasicAttack: true)。タワー・本拠地は通常攻撃のみダメージを受けるため、
 ///   ミニオンの攻撃は構造物にも有効。
+///   頭上にワールド空間のHPバーを表示する(フェーズ6)。
+///   死亡時に近くの敵ヒーローへ2pt、ラストヒットしたヒーローへ追加3ptを付与する(フェーズ6)。
 /// </summary>
 public class MinionController : MonoBehaviour, IIncomingDamageModifier
 {
@@ -48,6 +51,11 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
     // 分離処理: 半径の合計+余白より近づいたミニオン同士を、最大SeparationSpeed(m/秒)で押し離す。
     private const float SeparationPadding = 0.1f;
     private const float SeparationSpeed = 2f;
+    private const float HealthBarWorldScale = 0.01f;
+    private const float HealthBarClearance = 0.4f;
+    private const float ProximityPointRange = 12f;
+    private const int ProximityPoints = 2;
+    private const int LastHitBonusPoints = 3;
 
     private static readonly List<MinionController> Active = new List<MinionController>();
 
@@ -80,6 +88,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
 
     // このフレームで移動を試みたか(攻撃中はスタック判定の対象外にする)。
     private bool _triedToMoveThisFrame;
+    private Transform _lastAttacker;
+    private GameObject _healthBarRoot;
 
     /// <summary>所属チーム。</summary>
     public Team Team => _team;
@@ -155,6 +165,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
             // HealthController.AwakeのキャッシュはこのAddComponentより先に実行済みのため再取得させる。
             _health.RefreshDamageModifiers();
             _health.Died += HandleDied;
+            _health.DamageTaken += HandleDamageTaken;
+            CreateHealthBar();
         }
     }
 
@@ -173,6 +185,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         if (_health != null)
         {
             _health.Died -= HandleDied;
+            _health.DamageTaken -= HandleDamageTaken;
         }
     }
 
@@ -527,8 +540,113 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
     }
 
+    private void HandleDamageTaken(DamageContext context, float damage)
+    {
+        if (context.Attacker != null)
+        {
+            _lastAttacker = context.Attacker;
+        }
+    }
+
+    /// <summary>
+    /// 死亡時のポイント付与。範囲内(ProximityPointRange)の敵ヒーローに2pt、
+    /// ラストヒットしたヒーローに追加3ptを与える。範囲12fは仕様未定義のための仮値。
+    /// </summary>
+    private void AwardDeathPoints()
+    {
+        var heroes = FindObjectsByType<PlayerClickMovement>(FindObjectsSortMode.None);
+        foreach (var hero in heroes)
+        {
+            if (hero == null)
+            {
+                continue;
+            }
+
+            var member = hero.GetComponent<TeamMember>();
+            if (member == null || member.Team == _team)
+            {
+                continue;
+            }
+
+            var heroHealth = hero.GetComponent<HealthController>();
+            if (heroHealth != null && heroHealth.IsDead)
+            {
+                continue;
+            }
+
+            int points = 0;
+            string reason = null;
+            if (Vector3.Distance(hero.transform.position, transform.position) <= ProximityPointRange)
+            {
+                points += ProximityPoints;
+                reason = "minion death nearby";
+            }
+
+            if (_lastAttacker != null && (_lastAttacker == hero.transform || _lastAttacker.IsChildOf(hero.transform)))
+            {
+                points += LastHitBonusPoints;
+                reason = reason == null ? "minion last hit" : reason + " + last hit";
+            }
+
+            if (points > 0)
+            {
+                PointsManager.AddPoints(member.Team, points, reason);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 頭上のHPバーを実行時生成する。ミニオンは一様スケールなので子オブジェクトでも歪まない。
+    /// </summary>
+    private void CreateHealthBar()
+    {
+        if (_health == null || _healthBarRoot != null)
+        {
+            return;
+        }
+
+        float scale = Mathf.Max(transform.localScale.y, 0.0001f);
+
+        _healthBarRoot = new GameObject("MinionHealthBar");
+        _healthBarRoot.transform.SetParent(transform, false);
+        _healthBarRoot.transform.localPosition = Vector3.up * ((scale + HealthBarClearance) / scale);
+        _healthBarRoot.transform.localScale = Vector3.one * (HealthBarWorldScale / scale);
+
+        var canvas = _healthBarRoot.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        var canvasRect = _healthBarRoot.GetComponent<RectTransform>();
+        canvasRect.sizeDelta = new Vector2(90f, 12f);
+
+        CreateBarImage("Background", _healthBarRoot.transform, new Color(0.08f, 0.08f, 0.08f, 0.85f));
+
+        var fill = CreateBarImage("Fill", _healthBarRoot.transform, Color.Lerp(_team.GetTeamColor(), Color.white, 0.2f));
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fill.fillAmount = 1f;
+
+        var healthBar = _healthBarRoot.AddComponent<WorldHealthBar>();
+        healthBar.InitializeRuntime(_health, fill);
+    }
+
+    private static Image CreateBarImage(string name, Transform parent, Color color)
+    {
+        var imageObject = new GameObject(name);
+        imageObject.transform.SetParent(parent, false);
+        var rect = imageObject.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        var image = imageObject.AddComponent<Image>();
+        image.color = color;
+        return image;
+    }
+
     private void HandleDied()
     {
+        AwardDeathPoints();
+
         // 死体がターゲット選択・索敵に引っかからないようにコライダーを無効化し、少し遅らせて破棄する。
         Collider bodyCollider = GetComponent<Collider>();
         if (bodyCollider != null)

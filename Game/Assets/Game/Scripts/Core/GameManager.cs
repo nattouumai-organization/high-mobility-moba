@@ -8,6 +8,7 @@ using UnityEngine;
 /// - ヒーロー(PlayerClickMovementを持つオブジェクト)へは開始直後にTeamMember(ブルー)を付与する。
 ///   タワーはTeamMemberを持つ敵しか索敵しないため、この付与が無いとタワーがヒーローを攻撃しない。
 /// - タワー・本拠地の破壊通知を受け取る(勝敗UI・リスタートはフェーズ5タスク7で実装予定)。
+/// - ポイントHUD(PointsHud)を実行時に生成する(フェーズ6)。
 /// </summary>
 [DefaultExecutionOrder(-250)]
 public class GameManager : MonoBehaviour
@@ -44,6 +45,11 @@ public class GameManager : MonoBehaviour
         }
 
         Instance = this;
+
+        if (GetComponent<PointsHud>() == null)
+        {
+            gameObject.AddComponent<PointsHud>();
+        }
     }
 
     private void OnDestroy()
