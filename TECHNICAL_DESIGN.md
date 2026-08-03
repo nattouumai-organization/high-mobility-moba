@@ -376,3 +376,6 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - ミニオン死亡時、半径ProximityPointRange(=12f・仕様未定義のため仮値)以内の敵ヒーローに2pt、最後にダメージを与えたヒーローに追加3ptを付与する(MinionController.AwardDeathPoints)。
 - GameManagerが起動時にPointsHudを生成し、画面左上に合計ポイントを表示する(内蔵フォントに日本語グリフが無いため英語表記)。
 - UI Imageはスプライト未設定だとFilledタイプが機能せず常に全面描画されるため、WorldHealthBarがFill Imageに白スプライト(Texture2D.whiteTexture)を自動補完する。
+- HeroKillRewards(GameManagerが実行時生成)がヒーローのDamageTaken/Diedを購読し、最後に攻撃した敵ヒーローのチームへ通常キル25ptを付与する。ミニオン・タワーにとどめを刺された場合はキルポイントなし(連続キルのみリセット)。
+- 連続キル数をヒーロー毎に記録し、撃破された側が1/2/3以上の連続キル中なら撃破側へ追加10/20/30ptのシャットダウン報酬を付与する。
+- TowerControllerがHealthChangedを監視し、与ダメージ累計1,000毎に攻撃側12pt・防衛側5pt、破壊時に攻撃側へ追加20ptを付与する(HP回復があっても最大到達段階で判定し二重付与しない)。

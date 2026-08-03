@@ -18,6 +18,7 @@ using UnityEngine.UI;
 ///   4. 最後にAR60で通常ダメージを軽減(CharacterStatsを持たないため自前で適用)。
 /// - 頭上にワールド空間のHPバーを実行時生成する(WorldHealthBarを再利用)。
 /// - 破壊されるとGameManagerへ通知し、自チームの本拠地が攻撃可能になる。
+/// - タワー段階報酬(フェーズ6): HPを1,000削られる毎に攻撃側チームに12pt・防衛側チームに5pt、破壊時は攻撃側に追加20ptを付与する。
 /// </summary>
 public class TowerController : MonoBehaviour, IIncomingDamageModifier
 {
@@ -40,6 +41,12 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private const float HealthBarHeightOffset = 3.2f;
     private const float HealthBarWorldScale = 0.01f;
 
+    // タワー段階報酬(GAME_DESIGN.md 6章): HPを1,000削った攻撃側12pt・同段階の防衛側5pt、破壊した攻撃側は追加20pt。
+    private const float StageDamageStep = 1000f;
+    private const int StageAttackerPoints = 12;
+    private const int StageDefenderPoints = 5;
+    private const int DestroyAttackerPoints = 20;
+
     private static readonly List<TowerController> Towers = new List<TowerController>();
 
     private Team _team = Team.Blue;
@@ -50,6 +57,9 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private int _consecutiveHits;
     private float _consecutiveResetTimer;
     private bool _isDestroyed;
+
+    // 段階報酬を付与済みの1,000ダメージ単位の数(HP回復で削り量が巻き戻っても二重付与しない)。
+    private int _awardedDamageStages;
 
     // アグロ中の敵ヒーロー(タワー下で味方ヒーローを攻撃したプレイヤー)。最優先で狙う。
     private Transform _aggroHero;
@@ -91,6 +101,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             // HealthController.AwakeのキャッシュはこのAddComponentより先に実行済みのため再取得させる。
             _health.RefreshDamageModifiers();
             _health.Died += HandleDied;
+            _health.HealthChanged += HandleHealthChangedForStageRewards;
             CreateHealthBar();
         }
     }
@@ -110,6 +121,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         if (_health != null)
         {
             _health.Died -= HandleDied;
+            _health.HealthChanged -= HandleHealthChangedForStageRewards;
         }
 
         // 味方ヒーローの被ダメージ監視をすべて解除する。
@@ -507,6 +519,21 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         return false;
     }
 
+    // HP変化を監視し、1,000削られる毎に攻撃側と12pt・防衛側へ5ptを付与する。
+    // 回復で削り量が巻き戻っても、これまでの最大到達段階を保持して二重付与しない。
+    private void HandleHealthChangedForStageRewards(float currentHealth, float maxHealth)
+    {
+        float damageDealt = Mathf.Max(0f, maxHealth - currentHealth);
+        int reachedStages = Mathf.FloorToInt(damageDealt / StageDamageStep);
+
+        while (_awardedDamageStages < reachedStages)
+        {
+            _awardedDamageStages++;
+            PointsManager.AddPoints(_team.Opponent(), StageAttackerPoints, $"tower stage {_awardedDamageStages} (attacker)");
+            PointsManager.AddPoints(_team, StageDefenderPoints, $"tower stage {_awardedDamageStages} (defender)");
+        }
+    }
+
     private void HandleDied()
     {
         if (_isDestroyed)
@@ -515,6 +542,9 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _isDestroyed = true;
+
+        // タワー破壊の追加報酬(攻撃側のみ)。
+        PointsManager.AddPoints(_team.Opponent(), DestroyAttackerPoints, "tower destroyed");
         if (GameManager.Instance != null)
         {
             GameManager.Instance.NotifyTowerDestroyed(_team);
