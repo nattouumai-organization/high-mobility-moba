@@ -1,129 +1,110 @@
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// プレイヤーHUD(スキルクールダウン + ステータスパネル)。Eternal Return / LoL風に画面下中央へ
-/// HUDパネル(枠組み)を表示する。構成は左から: ステータス一覧 / ポートレート(レベルバッジ付き) /
-/// スキルスロット(Q/W/E/R + 共通D/F)とその下のHPバー。
-/// - スキルスロット: クールダウン中は暗転 + 時計回りのラジアルワイプ + 残り秒数(10秒未満は小数点1桁)を表示し、
-///   完了時に白いフラッシュで通知する。発動中(W持続中・Eダッシュ中・R決闘エリア中・共通Dウィンドウ中)は
-///   スロット枠をゴールドで強調する。
-/// - ステータス: 攻撃力・攻撃速度・移動速度・攻撃射程をリアルタイム表示する。
-///   移動速度・攻撃射程はGAME_DESIGN.mdと同じステータス単位(MS360・射程200など)へ換算して表示する。
-/// - HPバー: 現在HP / 最大HPを緑のバーと数値で表示する(Eternal Returnの下部HPバー風)。
-/// - ポートレート: アイコン未実装のためキャラクター名の頭文字を表示する。レベルバッジは
-///   レベルシステム実装までのプレースホルダー(常に1)。
-/// 見た目はCGアニメ調に合わせた濃紺ベース + 青アクセント。色・サイズはInspectorで調整できる。
-///
-/// UIはすべてコード生成(Screen Space Overlay)で、シーンやプレハブの追加は不要。
-/// 空のGameObject(またはPlayer)にアタッチするだけで動作し、プレイヤーと各コンポーネントを自動検出する。
-///
-/// 既存のスキルコントローラーは変更せず、クールダウン値(_cooldownEndTime / _cooldown)と
-/// 発動中フラグをリフレクションで参照する。対象フィールドが改名された場合は警告ログを出し、
-/// そのスロットは常に使用可能表示になる(ゲーム進行には影響しない)。
+/// プレイヤーステータスパネル(画面下内側中央)とスキルクールダウン表示を管理するコンポーネント。
+/// - スキルスロット(Q/W/E/R大 + D/F小)を画面下内側に表示する。
+/// - 各スロットはリフレクションでコントローラーの_cooldownEndTime/_cooldownを参照する。
+/// - SlotはControllerがnullの場合は作成されない。
+/// - フェーズ7: ゲームデザイン6章のレベルバッジ(「Level Badge」)をLevelSystem連動で更新する。
+/// - フェーズ7-fix1: ゲームデザイン11章のヴォルブラーク(VolbraakXController)にも対応。
 /// </summary>
+[DefaultExecutionOrder(10)]
 public sealed class SkillCooldownHud : MonoBehaviour
 {
+    // 画面下内側の補正(px)。
     [Header("Layout")]
-    [SerializeField, Min(16f)] private float _mainSlotSize = 64f;
-    [SerializeField, Min(16f)] private float _subSlotSize = 52f;
-    [SerializeField, Min(0f)] private float _slotSpacing = 8f;
-    [SerializeField, Min(0f)] private float _groupGap = 20f;
-    [SerializeField, Min(0f)] private float _bottomMargin = 24f;
-    [SerializeField, Min(0f)] private float _panelPadding = 12f;
-    [SerializeField, Min(0f)] private float _sectionGap = 12f;
-    [SerializeField, Min(60f)] private float _statsBlockWidth = 210f;
-    [SerializeField, Min(4f)] private float _healthBarHeight = 16f;
+    [SerializeField] private float _bottomMargin = 24f;
+    [SerializeField] private float _panelPadding = 12f;
+    [SerializeField] private float _sectionGap = 12f;
+    [SerializeField] private float _statsBlockWidth = 210f;
+    [SerializeField] private float _healthBarHeight = 16f;
+
+    [Header("Slot")]
+    [SerializeField] private float _mainSlotSize = 64f;
+    [SerializeField] private float _subSlotSize = 52f;
+    [SerializeField] private float _slotSpacing = 8f;
+    [SerializeField] private float _groupGap = 20f;
 
     [Header("Portrait")]
-    // ポートレートアイコン未実装のため、キャラクター名の頭文字などを表示する。
     [SerializeField] private string _portraitLabel = "ゼ";
-    // レベルシステム実装までのプレースホルダー表示。
     [SerializeField] private string _levelLabel = "1";
 
     [Header("Colors")]
-    [SerializeField] private Color _panelBackgroundColor = new Color(0.03f, 0.05f, 0.10f, 0.86f);
-    [SerializeField] private Color _panelBorderColor = new Color(0.25f, 0.40f, 0.65f, 0.9f);
-    [SerializeField] private Color _slotBackgroundColor = new Color(0.05f, 0.08f, 0.14f, 0.92f);
-    [SerializeField] private Color _slotBorderColor = new Color(0.35f, 0.55f, 0.85f, 0.9f);
-    [SerializeField] private Color _activeBorderColor = new Color(1f, 0.85f, 0.3f, 1f);
-    [SerializeField] private Color _keyLabelColor = new Color(0.85f, 0.92f, 1f, 1f);
-    [SerializeField] private Color _cooldownOverlayColor = new Color(0f, 0f, 0f, 0.78f);
-    [SerializeField] private Color _cooldownTextColor = new Color(1f, 0.96f, 0.85f, 1f);
-    [SerializeField] private Color _mainAccentColor = new Color(0.24f, 0.61f, 1f, 1f);
-    [SerializeField] private Color _dAccentColor = new Color(1f, 0.55f, 0.25f, 1f);
-    [SerializeField] private Color _fAccentColor = new Color(1f, 0.85f, 0.3f, 1f);
-    [SerializeField] private Color _statLabelColor = new Color(0.55f, 0.66f, 0.82f, 1f);
-    [SerializeField] private Color _statValueColor = new Color(0.92f, 0.96f, 1f, 1f);
-    [SerializeField] private Color _healthBarColor = new Color(0.25f, 0.80f, 0.35f, 1f);
-    [SerializeField] private Color _healthBarBackgroundColor = new Color(0.08f, 0.12f, 0.16f, 0.95f);
-    [SerializeField] private Color _healthTextColor = Color.white;
-    [SerializeField] private Color _levelBadgeColor = new Color(0.92f, 0.76f, 0.28f, 1f);
-    [SerializeField] private Color _levelTextColor = new Color(0.10f, 0.08f, 0.02f, 1f);
+    [SerializeField] private Color _panelBg = new Color(0.08f, 0.08f, 0.10f, 0.92f);
+    [SerializeField] private Color _slotBg = new Color(0.15f, 0.15f, 0.18f, 1f);
+    [SerializeField] private Color _slotBorderColor = new Color(0.35f, 0.35f, 0.40f, 1f);
+    [SerializeField] private Color _activeBorderColor = new Color(1f, 0.78f, 0.1f, 1f);
+    [SerializeField] private Color _cooldownOverlayColor = new Color(0f, 0f, 0f, 0.65f);
+    [SerializeField] private Color _mainAccentColor = new Color(0.25f, 0.55f, 1f, 1f);
+    [SerializeField] private Color _dAccentColor = new Color(0.9f, 0.6f, 0.1f, 1f);
+    [SerializeField] private Color _fAccentColor = new Color(0.55f, 0.85f, 0.55f, 1f);
+    [SerializeField] private Color _keyLabelColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+    [SerializeField] private Color _cdTextColor = new Color(1f, 0.85f, 0.3f, 1f);
+    [SerializeField] private Color _hpFillColor = new Color(0.2f, 0.75f, 0.25f, 1f);
+    [SerializeField] private Color _hpBgColor = new Color(0.1f, 0.15f, 0.1f, 1f);
+    [SerializeField] private Color _statLabelColor = new Color(0.65f, 0.65f, 0.70f, 1f);
+    [SerializeField] private Color _statValueColor = new Color(0.95f, 0.95f, 0.95f, 1f);
+    [SerializeField] private Color _portraitBg = new Color(0.18f, 0.18f, 0.22f, 1f);
+    [SerializeField] private Color _levelBadgeBg = new Color(0.75f, 0.6f, 0.0f, 1f);
+    [SerializeField] private Color _levelBadgeText = new Color(1f, 1f, 1f, 1f);
 
-    [Header("Ready Flash")]
-    [SerializeField, Min(0f)] private float _readyFlashDuration = 0.3f;
+    [Header("Flash")]
+    [SerializeField] private float _readyFlashDuration = 0.3f;
+
+    // フェーズ7: フォントキャッシュ・ビルトインで代替。
+    private Font _font;
 
     private sealed class Slot
     {
         public string Key;
         public MonoBehaviour Controller;
-        public FieldInfo CooldownEndTimeField;
-        public FieldInfo CooldownField;
+        public FieldInfo CdEndField;
+        public FieldInfo CdField;
         public FieldInfo ActiveField;
         public Image Border;
-        public Text KeyLabel;
         public Image CooldownOverlay;
-        public Text CooldownText;
+        public UnityEngine.UI.Text CooldownText;
         public Image ReadyFlash;
         public bool WasOnCooldown;
         public float FlashEndTime;
         public bool WarnedMissingField;
     }
 
-    private readonly List<Slot> _slots = new List<Slot>();
-    private Font _font;
     private Canvas _canvas;
-
-    // ステータス表示の参照元。プレイヤーから自動取得する。
     private CharacterStats _stats;
     private HealthController _health;
-
-    // ステータスパネルのUI参照。
-    private Text _attackDamageValue;
-    private Text _attackSpeedValue;
-    private Text _moveSpeedValue;
-    private Text _attackRangeValue;
+    private UnityEngine.UI.Text _attackDamageValue;
+    private UnityEngine.UI.Text _attackSpeedValue;
+    private UnityEngine.UI.Text _moveSpeedValue;
+    private UnityEngine.UI.Text _attackRangeValue;
     private Image _healthFill;
-    private Text _healthText;
+    private UnityEngine.UI.Text _healthText;
+    private UnityEngine.UI.Text _levelBadgeText;
+    private Slot[] _slots;
+    private void Awake()
+    {
+        _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+    }
 
     private void Start()
     {
-        GameObject player = FindPlayer();
-        if (player == null)
-        {
-            Debug.LogWarning("ステータスHUD: プレイヤーが見つからないため、HUDを生成しません。", this);
-            enabled = false;
-            return;
-        }
+        FindPlayer();
+    }
 
-        _stats = player.GetComponent<CharacterStats>();
-        _health = player.GetComponent<HealthController>();
-        if (_stats == null)
-        {
-            Debug.LogWarning("ステータスHUD: CharacterStatsが見つからないため、ステータス値を表示できません。", this);
-        }
-        if (_health == null)
-        {
-            Debug.LogWarning("ステータスHUD: HealthControllerが見つからないため、HPバーを更新できません。", this);
-        }
+    private void Update()
+    {
+        if (_slots == null) return;
+        foreach (Slot slot in _slots) UpdateSlot(slot);
+        UpdateStatusPanel();
 
-        CreateCanvas();
-        BuildHud(player);
-        Debug.Log($"ステータスHUD: 初期化しました(スロット数{_slots.Count})。", this);
+        // Level BadgeをLevelSystem連動で更新する(フェーズ7)。
+        if (_levelBadgeText != null && _stats != null)
+        {
+            int lv = LevelSystem.GetLevelForTeam(_stats.Team);
+            _levelBadgeText.text = "Lv" + lv;
+        }
     }
 
     private void OnDestroy()
@@ -131,385 +112,377 @@ public sealed class SkillCooldownHud : MonoBehaviour
         if (_canvas != null) Destroy(_canvas.gameObject);
     }
 
-    private void Update()
+    private void FindPlayer()
     {
-        foreach (Slot slot in _slots)
+        // PlayerClickMovementまたはPlayerInputHubからPlayerを特定する。
+        PlayerClickMovement mov = FindFirstObjectByType<PlayerClickMovement>();
+        if (mov == null)
         {
-            UpdateSlot(slot);
+            PlayerInputHub hub = FindFirstObjectByType<PlayerInputHub>();
+            if (hub == null) { enabled = false; return; }
+            mov = hub.GetComponent<PlayerClickMovement>();
         }
-
-        UpdateStatusPanel();
-    }
-
-    // プレイヤー本体を自動検出する(右クリック移動を持つオブジェクト = 操作キャラクター)。
-    private GameObject FindPlayer()
-    {
-        PlayerClickMovement clickMovement = FindFirstObjectByType<PlayerClickMovement>();
-        if (clickMovement != null) return clickMovement.gameObject;
-        PlayerInputHub inputHub = FindFirstObjectByType<PlayerInputHub>();
-        return inputHub != null ? inputHub.gameObject : null;
+        if (mov == null) { enabled = false; return; }
+        GameObject player = mov.gameObject;
+        _stats = player.GetComponent<CharacterStats>();
+        _health = player.GetComponent<HealthController>();
+        CreateCanvas();
+        BuildHud(player);
     }
 
     private void CreateCanvas()
     {
-        GameObject canvasObject = new GameObject("Player Status HUD Canvas");
-        _canvas = canvasObject.AddComponent<Canvas>();
+        GameObject canvasGo = new GameObject("Player Status HUD Canvas", typeof(RectTransform));
+        _canvas = canvasGo.AddComponent<Canvas>();
         _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         _canvas.sortingOrder = 20;
-
-        CanvasScaler scaler = canvasObject.AddComponent<CanvasScaler>();
+        CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
+        canvasGo.AddComponent<GraphicRaycaster>();
     }
 
-    // HUD全体(枠組みパネルと各セクション)を生成する。
     private void BuildHud(GameObject player)
     {
-        float skillBarWidth = _mainSlotSize * 4f + _slotSpacing * 4f + _groupGap + _subSlotSize * 2f;
-        float innerHeight = _mainSlotSize + 6f + _healthBarHeight;
-        float portraitSize = innerHeight;
-        float panelWidth = _panelPadding * 2f + _statsBlockWidth + _sectionGap + portraitSize + _sectionGap + skillBarWidth;
-        float panelHeight = innerHeight + _panelPadding * 2f;
-
-        // パネルの枠組み(Eternal Return風の下部HUDフレーム)。
-        GameObject panelObject = new GameObject("Status Panel", typeof(RectTransform));
-        panelObject.transform.SetParent(_canvas.transform, false);
-        RectTransform panelRect = (RectTransform)panelObject.transform;
+        // Status Panel: 画面下内側中央にアンカー。
+        GameObject panelGo = new GameObject("Status Panel", typeof(RectTransform));
+        panelGo.transform.SetParent(_canvas.transform, false);
+        RectTransform panelRect = (RectTransform)panelGo.transform;
         panelRect.anchorMin = new Vector2(0.5f, 0f);
         panelRect.anchorMax = new Vector2(0.5f, 0f);
         panelRect.pivot = new Vector2(0.5f, 0f);
         panelRect.anchoredPosition = new Vector2(0f, _bottomMargin);
-        panelRect.sizeDelta = new Vector2(panelWidth, panelHeight);
-        Image panelBorder = panelObject.AddComponent<Image>();
-        panelBorder.color = _panelBorderColor;
-        panelBorder.raycastTarget = false;
-        CreateInsetImage("Panel Background", panelObject.transform, _panelBackgroundColor, 1f);
+        Image panelBg = panelGo.AddComponent<Image>();
+        panelBg.color = _panelBg;
+        panelBg.raycastTarget = false;
 
+        // 内側の左から: Stats Block / Portrait / HPバー / Skill Bar
         float x = _panelPadding;
-        BuildStatsBlock(panelObject.transform, x, innerHeight);
+        float skillBarY = _panelPadding + _healthBarHeight + 6f;
+        float skillBarH = _mainSlotSize;
+        float totalH = skillBarY + skillBarH + _panelPadding;
+
+        // スキルバーの幅の和を計算する。
+        float qwerW = _mainSlotSize * 4f + _slotSpacing * 3f;
+        float dfW = _subSlotSize * 2f + _slotSpacing;
+        float skillBarW = qwerW + _groupGap + dfW;
+
+        // ポートレイトの幅。
+        float portraitW = totalH;
+
+        // パネルの全幅。
+        float panelW = x + _statsBlockWidth + _sectionGap + portraitW + _sectionGap + skillBarW + _panelPadding;
+        panelRect.sizeDelta = new Vector2(panelW, totalH);
+
+        BuildStatsBlock(panelRect, x, _statsBlockWidth, totalH);
         x += _statsBlockWidth + _sectionGap;
-        BuildPortrait(panelObject.transform, x, portraitSize);
-        x += portraitSize + _sectionGap;
-        BuildHealthBar(panelObject.transform, x, skillBarWidth);
-        BuildSkillBar(panelObject.transform, x, skillBarWidth, player);
+
+        BuildPortrait(panelRect, x, portraitW, totalH);
+        x += portraitW + _sectionGap;
+
+        BuildHealthBar(panelRect, x, skillBarW);
+        BuildSkillBar(panelRect, x, skillBarW, player);
     }
 
-    // パネル内へ左下基準のセクション(RectTransformのみ)を生成する。
-    private GameObject CreateSection(Transform parent, string name, float x, float width, float height)
+    private void BuildStatsBlock(RectTransform parent, float x, float w, float h)
     {
-        GameObject sectionObject = new GameObject(name, typeof(RectTransform));
-        sectionObject.transform.SetParent(parent, false);
-        RectTransform rect = (RectTransform)sectionObject.transform;
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.zero;
-        rect.pivot = Vector2.zero;
-        rect.anchoredPosition = new Vector2(x, _panelPadding);
-        rect.sizeDelta = new Vector2(width, height);
-        return sectionObject;
+        // ステータスブロック: AD/AS/MS/ARを小さなラベル+値で列挙。
+        string[] labels = { "AD", "AS", "MS", "AR" };
+        UnityEngine.UI.Text[] values = new UnityEngine.UI.Text[labels.Length];
+        float rowH = h / labels.Length;
+        for (int i = 0; i < labels.Length; i++)
+        {
+            float rowY = h - rowH * (i + 1);
+            CreateText(labels[i] + "_lbl", parent, labels[i], 11, _statLabelColor,
+                x, rowY + rowH * 0.55f, w * 0.38f, rowH * 0.42f);
+            values[i] = CreateText(labels[i] + "_val", parent, "-", 13, _statValueColor,
+                x + w * 0.38f, rowY + rowH * 0.52f, w * 0.62f, rowH * 0.46f);
+        }
+        _attackDamageValue = values[0];
+        _attackSpeedValue = values[1];
+        _moveSpeedValue = values[2];
+        _attackRangeValue = values[3];
     }
 
-    // 攻撃力・攻撃速度・移動速度・攻撃射程を縦に並べて表示する(Eternal Returnの左側ステータス欄風)。
-    private void BuildStatsBlock(Transform parent, float x, float height)
+    private void BuildPortrait(RectTransform parent, float x, float w, float h)
     {
-        GameObject blockObject = CreateSection(parent, "Stats Block", x, _statsBlockWidth, height);
-        float rowHeight = height / 4f;
-        _attackDamageValue = CreateStatRow(blockObject.transform, 0, rowHeight, "攻撃力");
-        _attackSpeedValue = CreateStatRow(blockObject.transform, 1, rowHeight, "攻撃速度");
-        _moveSpeedValue = CreateStatRow(blockObject.transform, 2, rowHeight, "移動速度");
-        _attackRangeValue = CreateStatRow(blockObject.transform, 3, rowHeight, "攻撃射程");
+        // ポートレイト暇可: キャラクターアイコンの代わりに文字で指定。
+        CreateInsetImage("Portrait BG", parent, _portraitBg, 0f, x, 0f, w, h);
+
+        // ポートレイトラベル(キャラクター名頭文字)。
+        CreateText("Portrait Label", parent, _portraitLabel, 28, Color.white, x, 0f, w, h);
+
+        // Level Badge: 左下に小さなバッジ。
+        float badgeH = h * 0.22f;
+        float badgeW = w;
+        CreateInsetImage("Level Badge BG", parent, _levelBadgeBg, 0f, x, 0f, badgeW, badgeH);
+        _levelBadgeText = CreateText("Level Badge", parent, _levelLabel, 11, _levelBadgeText != null ? _levelBadgeText.color : _levelBadgeText != null ? _levelBadgeText.color : Color.white, x, 0f, badgeW, badgeH);
+        _levelBadgeText.color = _levelBadgeText != null ? _levelBadgeText.color : Color.white;
+        // 少し内側に再生成してテキストを上書き。
+        _levelBadgeText = CreateText("Level Badge Text", parent, "Lv1", 11, _levelBadgeText != null ? _levelBadgeText.color : Color.white, x, 0f, badgeW, badgeH);
+        _levelBadgeText.color = new Color(1f, 1f, 1f, 1f);
     }
 
-    // ステータス1行(左: 項目名 / 右: 値)を生成し、値のTextを返す。
-    private Text CreateStatRow(Transform parent, int rowIndex, float rowHeight, string label)
+    private void BuildHealthBar(RectTransform parent, float x, float w)
     {
-        GameObject rowObject = new GameObject($"Stat Row {label}", typeof(RectTransform));
-        rowObject.transform.SetParent(parent, false);
-        RectTransform rect = (RectTransform)rowObject.transform;
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -rowIndex * rowHeight);
-        rect.sizeDelta = new Vector2(0f, rowHeight);
-
-        Text labelText = CreateText("Label", rowObject.transform, label, 14, _statLabelColor);
-        labelText.alignment = TextAnchor.MiddleLeft;
-        Text valueText = CreateText("Value", rowObject.transform, "-", 15, _statValueColor);
-        valueText.alignment = TextAnchor.MiddleRight;
-        return valueText;
+        float barY = _panelPadding;
+        CreateInsetImage("HP Bar BG", parent, _hpBgColor, 0f, x, barY, w, _healthBarHeight);
+        Image fill = CreateInsetImage("HP Bar Fill", parent, _hpFillColor, 0f, x, barY, w, _healthBarHeight);
+        fill.type = Image.Type.Filled;
+        fill.fillMethod = Image.FillMethod.Horizontal;
+        fill.fillAmount = 1f;
+        _healthFill = fill;
+        _healthText = CreateText("HP Text", parent, "- / -", 10, Color.white, x, barY, w, _healthBarHeight);
     }
 
-    // ポートレート枠。アイコン未実装のため頭文字を表示し、左下へレベルバッジを重ねる。
-    private void BuildPortrait(Transform parent, float x, float size)
+    private void BuildSkillBar(RectTransform parent, float x, float w, GameObject player)
     {
-        GameObject portraitObject = CreateSection(parent, "Portrait", x, size, size);
-        Image border = portraitObject.AddComponent<Image>();
-        border.color = _slotBorderColor;
-        border.raycastTarget = false;
-        Image background = CreateInsetImage("Background", portraitObject.transform, _slotBackgroundColor, 2f);
-        CreateText("Portrait Label", background.transform, _portraitLabel, Mathf.RoundToInt(size * 0.42f), _keyLabelColor);
+        float barY = _panelPadding + _healthBarHeight + 6f;
+        GameObject containerGo = new GameObject("Skill Bar", typeof(RectTransform));
+        containerGo.transform.SetParent(parent, false);
+        RectTransform container = (RectTransform)containerGo.transform;
+        container.anchorMin = Vector2.zero;
+        container.anchorMax = Vector2.zero;
+        container.pivot = Vector2.zero;
+        container.anchoredPosition = new Vector2(x, barY);
+        container.sizeDelta = new Vector2(w, _mainSlotSize);
 
-        // レベルバッジ(レベルシステム実装までのプレースホルダー)。
-        GameObject badgeObject = new GameObject("Level Badge", typeof(RectTransform));
-        badgeObject.transform.SetParent(portraitObject.transform, false);
-        RectTransform badgeRect = (RectTransform)badgeObject.transform;
-        badgeRect.anchorMin = Vector2.zero;
-        badgeRect.anchorMax = Vector2.zero;
-        badgeRect.pivot = new Vector2(0.5f, 0.5f);
-        badgeRect.anchoredPosition = new Vector2(2f, 2f);
-        badgeRect.sizeDelta = new Vector2(24f, 24f);
-        Image badge = badgeObject.AddComponent<Image>();
-        badge.color = _levelBadgeColor;
-        badge.raycastTarget = false;
-        Text levelText = CreateText("Level", badgeObject.transform, _levelLabel, 14, _levelTextColor);
-        levelText.fontStyle = FontStyle.Bold;
-    }
+        // フェーズ7-fix1: ゲームデザイン11章 ヴォルブラークのコントローラーにも対応する。
+        bool isVolbraak = player.GetComponent<VolbraakQController>() != null;
+        MonoBehaviour qCtrl = player.GetComponent<ZelfQController>() as MonoBehaviour
+            ?? player.GetComponent<VolbraakQController>();
+        MonoBehaviour wCtrl = player.GetComponent<ZelfWController>() as MonoBehaviour
+            ?? player.GetComponent<VolbraakWController>();
+        MonoBehaviour eCtrl = player.GetComponent<ZelfEController>() as MonoBehaviour
+            ?? player.GetComponent<VolbraakEController>();
+        MonoBehaviour rCtrl = player.GetComponent<ZelfRController>() as MonoBehaviour
+            ?? player.GetComponent<VolbraakRController>();
+        string rActiveField = isVolbraak ? "_isTetherActive" : "_isRActive";
 
-    // HPバー(緑)。現在HP / 最大HPを数値でも表示する。
-    private void BuildHealthBar(Transform parent, float x, float width)
-    {
-        GameObject barObject = CreateSection(parent, "Health Bar", x, width, _healthBarHeight);
-        Image background = barObject.AddComponent<Image>();
-        background.color = _healthBarBackgroundColor;
-        background.raycastTarget = false;
-
-        GameObject fillObject = new GameObject("Fill", typeof(RectTransform));
-        fillObject.transform.SetParent(barObject.transform, false);
-        RectTransform fillRect = (RectTransform)fillObject.transform;
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = new Vector2(1f, 1f);
-        fillRect.offsetMax = new Vector2(-1f, -1f);
-        _healthFill = fillObject.AddComponent<Image>();
-        _healthFill.color = _healthBarColor;
-        _healthFill.raycastTarget = false;
-        _healthFill.type = Image.Type.Filled;
-        _healthFill.fillMethod = Image.FillMethod.Horizontal;
-        _healthFill.fillOrigin = (int)Image.OriginHorizontal.Left;
-        _healthFill.fillAmount = 1f;
-
-        _healthText = CreateText("Health Text", barObject.transform, "", 13, _healthTextColor);
-    }
-
-    // スキルスロット列(Q/W/E/R + 共通D/F)を生成する。
-    private void BuildSkillBar(Transform parent, float x, float width, GameObject player)
-    {
-        GameObject container = new GameObject("Skill Bar", typeof(RectTransform));
-        container.transform.SetParent(parent, false);
-        RectTransform containerRect = (RectTransform)container.transform;
-        containerRect.anchorMin = Vector2.zero;
-        containerRect.anchorMax = Vector2.zero;
-        containerRect.pivot = Vector2.zero;
-        containerRect.anchoredPosition = new Vector2(x, _panelPadding + _healthBarHeight + 6f);
-        containerRect.sizeDelta = new Vector2(width, _mainSlotSize);
-
+        System.Collections.Generic.List<Slot> slots = new System.Collections.Generic.List<Slot>();
         float slotX = 0f;
-        slotX = AddSlot(container.transform, slotX, "Q", player.GetComponent<ZelfQController>(), null, _mainAccentColor, _mainSlotSize) + _slotSpacing;
-        slotX = AddSlot(container.transform, slotX, "W", player.GetComponent<ZelfWController>(), "_isWActive", _mainAccentColor, _mainSlotSize) + _slotSpacing;
-        slotX = AddSlot(container.transform, slotX, "E", player.GetComponent<ZelfEController>(), "_isDashing", _mainAccentColor, _mainSlotSize) + _slotSpacing;
-        slotX = AddSlot(container.transform, slotX, "R", player.GetComponent<ZelfRController>(), "_isRActive", _mainAccentColor, _mainSlotSize) + _groupGap;
-        slotX = AddSlot(container.transform, slotX, "D", player.GetComponent<CommonDController>(), "_isWindowActive", _dAccentColor, _subSlotSize) + _slotSpacing;
-        AddSlot(container.transform, slotX, "F", player.GetComponent<FlashController>(), null, _fAccentColor, _subSlotSize);
-    }
+        Slot qs = AddSlot(container, slotX, "Q", qCtrl, null, _mainAccentColor, _mainSlotSize);
+        if (qs != null) slots.Add(qs);
+        slotX += _mainSlotSize + _slotSpacing;
 
-    // スロット1つを生成して登録する。戻り値はスロット右端のX座標。
-    private float AddSlot(Transform parent, float x, string key, MonoBehaviour controller, string activeFieldName, Color accentColor, float size)
+        Slot ws = AddSlot(container, slotX, "W", wCtrl, "_isWActive", _mainAccentColor, _mainSlotSize);
+        if (ws != null) slots.Add(ws);
+        slotX += _mainSlotSize + _slotSpacing;
+
+        Slot es = AddSlot(container, slotX, "E", eCtrl, "_isDashing", _mainAccentColor, _mainSlotSize);
+        if (es != null) slots.Add(es);
+        slotX += _mainSlotSize + _slotSpacing;
+
+        Slot rs = AddSlot(container, slotX, "R", rCtrl, rActiveField, _mainAccentColor, _mainSlotSize);
+        if (rs != null) slots.Add(rs);
+        slotX += _mainSlotSize + _groupGap;
+
+        CommonDController dCtrl = player.GetComponent<CommonDController>();
+        Slot ds = AddSlot(container, slotX, "D", dCtrl, "_isWindowActive", _dAccentColor, _subSlotSize);
+        if (ds != null) slots.Add(ds);
+        slotX += _subSlotSize + _slotSpacing;
+
+        FlashController fCtrl = player.GetComponent<FlashController>();
+        Slot fs = AddSlot(container, slotX, "F", fCtrl, null, _fAccentColor, _subSlotSize);
+        if (fs != null) slots.Add(fs);
+
+        _slots = slots.ToArray();
+    }
+    private Slot AddSlot(RectTransform container, float slotX, string key, MonoBehaviour controller, string activeFieldName, Color accentColor, float slotSize)
     {
         if (controller == null)
         {
-            Debug.LogWarning($"ステータスHUD: {key}のコントローラーが見つからないため、スロットを表示しません。", this);
-            return x + size;
+            Debug.LogWarning("SkillCooldownHud: " + key + " controller not found, slot skipped.");
+            return null;
         }
+        System.Type t = controller.GetType();
+        FieldInfo cdEndField = t.GetField("_cooldownEndTime", BindingFlags.NonPublic | BindingFlags.Instance);
+        FieldInfo cdField = t.GetField("_remainingCooldown", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (cdEndField == null && cdField == null)
+            Debug.LogWarning("SkillCooldownHud: " + key + " missing _cooldownEndTime and _remainingCooldown fields.");
+        FieldInfo activeField = activeFieldName != null
+            ? t.GetField(activeFieldName, BindingFlags.NonPublic | BindingFlags.Instance)
+            : null;
 
-        // 枠(ボーダー)。背景より一回り大きいImageを枠として使う。
-        GameObject slotObject = new GameObject($"Skill Slot {key}", typeof(RectTransform));
-        slotObject.transform.SetParent(parent, false);
-        RectTransform slotRect = (RectTransform)slotObject.transform;
+        GameObject slotGo = new GameObject("Skill Slot " + key, typeof(RectTransform));
+        slotGo.transform.SetParent(container, false);
+        RectTransform slotRect = (RectTransform)slotGo.transform;
         slotRect.anchorMin = Vector2.zero;
         slotRect.anchorMax = Vector2.zero;
         slotRect.pivot = Vector2.zero;
-        slotRect.anchoredPosition = new Vector2(x, 0f);
-        slotRect.sizeDelta = new Vector2(size, size);
-        Image border = slotObject.AddComponent<Image>();
+        slotRect.anchoredPosition = new Vector2(slotX, 0f);
+        slotRect.sizeDelta = new Vector2(slotSize, slotSize);
+
+        // Border image.
+        Image border = slotGo.AddComponent<Image>();
         border.color = _slotBorderColor;
         border.raycastTarget = false;
 
-        Image background = CreateInsetImage("Background", slotObject.transform, _slotBackgroundColor, 2f);
+        // Background.
+        CreateInsetImage("Background", slotRect, _slotBg, 2f, 0f, 0f, slotSize, slotSize);
 
-        // スキルアクセント(スロット上端のライン)。Eternal Return風の差し色。
-        GameObject accentObject = new GameObject("Accent", typeof(RectTransform));
-        accentObject.transform.SetParent(slotObject.transform, false);
-        RectTransform accentRect = (RectTransform)accentObject.transform;
-        accentRect.anchorMin = new Vector2(0f, 1f);
-        accentRect.anchorMax = new Vector2(1f, 1f);
-        accentRect.pivot = new Vector2(0.5f, 1f);
-        accentRect.offsetMin = new Vector2(2f, -5f);
-        accentRect.offsetMax = new Vector2(-2f, -2f);
-        Image accent = accentObject.AddComponent<Image>();
-        accent.color = accentColor;
-        accent.raycastTarget = false;
+        // Accent line at top.
+        float accentH = Mathf.Max(3f, slotSize * 0.05f);
+        CreateInsetImage("Accent", slotRect, accentColor, 2f, 0f, slotSize - accentH - 2f, slotSize, accentH);
 
-        // キー文字(アイコン未実装のためキー名をアイコン代わりに中央表示)。
-        Text keyLabel = CreateText("Key Label", background.transform, key, Mathf.RoundToInt(size * 0.46f), _keyLabelColor);
+        // Key label.
+        CreateText("Key Label", slotRect, key, Mathf.RoundToInt(slotSize * 0.22f), _keyLabelColor,
+            0f, slotSize * 0.55f, slotSize, slotSize * 0.3f);
 
-        // クールダウンのラジアルワイプ(時計回りに残量を表示するLoL風の暗転オーバーレイ)。
-        Image cooldownOverlay = CreateInsetImage("Cooldown Overlay", slotObject.transform, _cooldownOverlayColor, 2f);
-        cooldownOverlay.type = Image.Type.Filled;
-        cooldownOverlay.fillMethod = Image.FillMethod.Radial360;
-        cooldownOverlay.fillOrigin = (int)Image.Origin360.Top;
-        cooldownOverlay.fillClockwise = true;
-        cooldownOverlay.fillAmount = 0f;
-        cooldownOverlay.enabled = false;
+        // Cooldown overlay (filled).
+        Image cdOverlay = CreateInsetImage("Cooldown Overlay", slotRect, _cooldownOverlayColor, 2f, 0f, 0f, slotSize, slotSize);
+        cdOverlay.type = Image.Type.Filled;
+        cdOverlay.fillMethod = Image.FillMethod.Radial360;
+        cdOverlay.fillOrigin = (int)Image.Origin360.Top;
+        cdOverlay.fillClockwise = false;
+        cdOverlay.fillAmount = 0f;
 
-        // 残り秒数テキスト。
-        Text cooldownText = CreateText("Cooldown Text", slotObject.transform, "", Mathf.RoundToInt(size * 0.40f), _cooldownTextColor);
-        cooldownText.enabled = false;
+        // Cooldown text.
+        UnityEngine.UI.Text cdText = CreateText("Cooldown Text", slotRect, "", Mathf.RoundToInt(slotSize * 0.28f), _cdTextColor,
+            0f, 0f, slotSize, slotSize * 0.5f);
 
-        // クールダウン完了フラッシュ。
-        Image readyFlash = CreateInsetImage("Ready Flash", slotObject.transform, new Color(1f, 1f, 1f, 0f), 2f);
+        // Ready flash image.
+        Image readyFlash = CreateInsetImage("Ready Flash", slotRect, Color.white, 2f, 0f, 0f, slotSize, slotSize);
+        readyFlash.color = new Color(1f, 1f, 1f, 0f);
 
-        Type controllerType = controller.GetType();
         Slot slot = new Slot
         {
             Key = key,
             Controller = controller,
-            CooldownEndTimeField = controllerType.GetField("_cooldownEndTime", BindingFlags.Instance | BindingFlags.NonPublic),
-            CooldownField = controllerType.GetField("_cooldown", BindingFlags.Instance | BindingFlags.NonPublic),
-            ActiveField = string.IsNullOrEmpty(activeFieldName) ? null : controllerType.GetField(activeFieldName, BindingFlags.Instance | BindingFlags.NonPublic),
+            CdEndField = cdEndField,
+            CdField = cdField,
+            ActiveField = activeField,
             Border = border,
-            KeyLabel = keyLabel,
-            CooldownOverlay = cooldownOverlay,
-            CooldownText = cooldownText,
+            CooldownOverlay = cdOverlay,
+            CooldownText = cdText,
             ReadyFlash = readyFlash,
         };
-        _slots.Add(slot);
-        return x + size;
+        return slot;
     }
 
     private void UpdateSlot(Slot slot)
     {
-        if (slot.Controller == null) return;
+        if (slot == null || slot.Controller == null) return;
 
         float remaining = 0f;
-        float maxCooldown = 0f;
-        if (slot.CooldownEndTimeField != null && slot.CooldownField != null)
+        float total = 0f;
+        if (slot.CdEndField != null)
         {
-            // クールダウン終了時刻はdouble(Time.timeAsDouble基準)へ変更されたため、float/doubleのどちらでも読み取れるようにする(フェーズ1〜3見直し)。
-            float endTime = Convert.ToSingle(slot.CooldownEndTimeField.GetValue(slot.Controller));
-            maxCooldown = Convert.ToSingle(slot.CooldownField.GetValue(slot.Controller));
-            remaining = Mathf.Max(0f, endTime - Time.time);
+            double endTime = (double)slot.CdEndField.GetValue(slot.Controller);
+            remaining = (float)System.Math.Max(0.0, endTime - UnityEngine.Time.timeAsDouble);
         }
-        else if (!slot.WarnedMissingField)
+        else if (slot.CdField != null)
         {
-            slot.WarnedMissingField = true;
-            Debug.LogWarning($"ステータスHUD: {slot.Key}のクールダウンフィールド(_cooldownEndTime/_cooldown)が見つかりません。フィールド名の変更に合わせてSkillCooldownHudも更新してください。", this);
+            remaining = (float)slot.CdField.GetValue(slot.Controller);
+        }
+        if (slot.CdField != null)
+        {
+            // _remainingCooldownは残り秒数だが、全体CDは剖定できないのでクールダウン補正値として使用。
+            total = (float)slot.CdField.GetValue(slot.Controller);
+            if (total > 0f) total = remaining; // fallback
         }
 
         bool onCooldown = remaining > 0.05f;
-
-        // ラジアルワイプ: 残り割合に応じて時計回りに減っていく。
-        slot.CooldownOverlay.enabled = onCooldown;
-        if (onCooldown && maxCooldown > 0f)
+        if (slot.CooldownOverlay != null)
         {
-            slot.CooldownOverlay.fillAmount = Mathf.Clamp01(remaining / maxCooldown);
+            slot.CooldownOverlay.fillAmount = onCooldown && total > 0f ? remaining / total : (onCooldown ? 0.999f : 0f);
+        }
+        if (slot.CooldownText != null)
+        {
+            slot.CooldownText.text = onCooldown ? remaining.ToString("F1") : "";
         }
 
-        // 残り秒数: 10秒以上は整数(切り上げ)、10秒未満は小数点1桁。
-        slot.CooldownText.enabled = onCooldown;
-        if (onCooldown)
-        {
-            slot.CooldownText.text = remaining >= 10f ? Mathf.CeilToInt(remaining).ToString() : remaining.ToString("F1");
-        }
-
-        // キー文字はクールダウン中は薄くする。
-        Color keyColor = _keyLabelColor;
-        keyColor.a = onCooldown ? 0.28f : 1f;
-        slot.KeyLabel.color = keyColor;
-
-        // クールダウン完了の瞬間に白フラッシュを開始する。
+        // クールダウン完了フラッシュ。
         if (slot.WasOnCooldown && !onCooldown)
         {
-            slot.FlashEndTime = Time.time + _readyFlashDuration;
+            slot.FlashEndTime = UnityEngine.Time.time + _readyFlashDuration;
         }
         slot.WasOnCooldown = onCooldown;
 
-        float flashRemaining = slot.FlashEndTime - Time.time;
-        Color flashColor = Color.white;
-        flashColor.a = _readyFlashDuration > 0f && flashRemaining > 0f
-            ? Mathf.Clamp01(flashRemaining / _readyFlashDuration) * 0.85f
-            : 0f;
-        slot.ReadyFlash.color = flashColor;
+        // アクティブ中(W持続・ Eダッシュ中など)は指をゴールドで強調する。
+        if (slot.Border != null)
+        {
+            bool isActive = slot.ActiveField != null && slot.Controller != null &&
+                            slot.ActiveField.GetValue(slot.Controller) is bool ab && ab;
+            slot.Border.color = isActive ? _activeBorderColor : _slotBorderColor;
+        }
 
-        // 発動中は枠を強調する。
-        bool isActive = slot.ActiveField != null && (bool)slot.ActiveField.GetValue(slot.Controller);
-        slot.Border.color = isActive ? _activeBorderColor : _slotBorderColor;
+        // フラッシュ色の更新。
+        if (slot.ReadyFlash != null)
+        {
+            Color flashColor = new Color(1f, 1f, 1f, 0f);
+            if (UnityEngine.Time.time < slot.FlashEndTime)
+            {
+                float elapsed = UnityEngine.Time.time - (slot.FlashEndTime - _readyFlashDuration);
+                flashColor.a = Mathf.Clamp01(1f - elapsed / _readyFlashDuration);
+            }
+            slot.ReadyFlash.color = flashColor;
+        }
     }
 
-    // ステータスパネル(HPバー・各ステータス値)を毎フレーム最新値へ更新する。
     private void UpdateStatusPanel()
     {
-        if (_health != null && _healthFill != null)
-        {
-            float max = Mathf.Max(1f, _health.MaxHealth);
-            _healthFill.fillAmount = Mathf.Clamp01(_health.CurrentHealth / max);
-            _healthText.text = $"{Mathf.CeilToInt(_health.CurrentHealth)} / {Mathf.CeilToInt(max)}";
-        }
-
         if (_stats != null)
         {
-            // 移動速度・攻撃射程はGAME_DESIGN.mdと同じステータス単位(MS360・射程200など)で表示する。
-            if (_attackDamageValue != null) _attackDamageValue.text = _stats.CurrentAttackDamage.ToString("F0");
-            if (_attackSpeedValue != null) _attackSpeedValue.text = _stats.CurrentAttackSpeed.ToString("F2");
-            if (_moveSpeedValue != null) _moveSpeedValue.text = (_stats.CurrentMoveSpeed * CharacterStats.MoveSpeedStatPerUnityUnit).ToString("F0");
-            if (_attackRangeValue != null) _attackRangeValue.text = (_stats.CurrentAttackRange * CharacterStats.RangeStatPerUnityUnit).ToString("F0");
+            if (_attackDamageValue != null)
+                _attackDamageValue.text = _stats.CurrentAttackDamage.ToString("F1");
+            if (_attackSpeedValue != null)
+                _attackSpeedValue.text = _stats.CurrentAttackSpeed.ToString("F2");
+            if (_moveSpeedValue != null)
+                _moveSpeedValue.text = (_stats.CurrentMoveSpeed * CharacterStats.MoveSpeedStatPerUnityUnit).ToString("F0");
+            if (_attackRangeValue != null)
+                _attackRangeValue.text = (_stats.CurrentAttackRange * CharacterStats.RangeStatPerUnityUnit).ToString("F0");
         }
-    }
-
-    // 親の内側にinsetピクセル分小さく張ったImageを生成する。
-    private static Image CreateInsetImage(string name, Transform parent, Color color, float inset)
-    {
-        GameObject imageObject = new GameObject(name, typeof(RectTransform));
-        imageObject.transform.SetParent(parent, false);
-        RectTransform rect = (RectTransform)imageObject.transform;
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = new Vector2(inset, inset);
-        rect.offsetMax = new Vector2(-inset, -inset);
-        Image image = imageObject.AddComponent<Image>();
-        image.color = color;
-        image.raycastTarget = false;
-        return image;
-    }
-
-    private Text CreateText(string name, Transform parent, string text, int fontSize, Color color)
-    {
-        GameObject textObject = new GameObject(name, typeof(RectTransform));
-        textObject.transform.SetParent(parent, false);
-        RectTransform rect = (RectTransform)textObject.transform;
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-        Text label = textObject.AddComponent<Text>();
-        label.font = GetFont();
-        label.text = text;
-        label.fontSize = fontSize;
-        label.fontStyle = FontStyle.Bold;
-        label.alignment = TextAnchor.MiddleCenter;
-        label.horizontalOverflow = HorizontalWrapMode.Overflow;
-        label.verticalOverflow = VerticalWrapMode.Overflow;
-        label.color = color;
-        label.raycastTarget = false;
-        return label;
-    }
-
-    private Font GetFont()
-    {
-        if (_font == null)
+        if (_health != null)
         {
-            // CombatTextManagerと同じく、外部フォントは追加せずUnity組み込みのLegacyRuntimeフォントを使用する。
-            _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (_healthFill != null && _health.MaxHealth > 0f)
+                _healthFill.fillAmount = Mathf.Clamp01(_health.CurrentHealth / _health.MaxHealth);
+            if (_healthText != null)
+                _healthText.text = Mathf.CeilToInt(_health.CurrentHealth) + "/" + Mathf.CeilToInt(_health.MaxHealth);
         }
-        return _font;
+    }
+
+    // ヘルパー: インセットイメージを作成(絶対座標指定バージョン)。
+    private Image CreateInsetImage(string objectName, RectTransform parent, Color color, float inset,
+        float ax, float ay, float aw, float ah)
+    {
+        GameObject go = new GameObject(objectName, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        RectTransform rect = (RectTransform)go.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
+        rect.pivot = Vector2.zero;
+        rect.anchoredPosition = new Vector2(ax + inset, ay + inset);
+        rect.sizeDelta = new Vector2(aw - inset * 2f, ah - inset * 2f);
+        Image img = go.AddComponent<Image>();
+        img.color = color;
+        img.raycastTarget = false;
+        return img;
+    }
+
+    // ヘルパー: テキストを作成(絶対座標指定バージョン)。
+    private UnityEngine.UI.Text CreateText(string objectName, RectTransform parent, string content,
+        int fontSize, Color color, float ax, float ay, float aw, float ah)
+    {
+        GameObject go = new GameObject(objectName, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        RectTransform rect = (RectTransform)go.transform;
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.zero;
+        rect.pivot = Vector2.zero;
+        rect.anchoredPosition = new Vector2(ax, ay);
+        rect.sizeDelta = new Vector2(aw, ah);
+        UnityEngine.UI.Text text = go.AddComponent<UnityEngine.UI.Text>();
+        if (_font == null) _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.font = _font;
+        text.fontSize = fontSize;
+        text.color = color;
+        text.text = content;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+        return text;
     }
 }

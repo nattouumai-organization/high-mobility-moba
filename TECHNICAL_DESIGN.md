@@ -393,6 +393,7 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - `PlayerInputHub`: 強化用修飾キー(左右Ctrl)を追加。Ctrl押下中はQ/W/E/RのPressed/PressedThisFrameを抑制し(ReleasedThisFrameは抑制しない)、Upgrade*PressedThisFrameを公開する。
 - `SkillUpgradeHud`: GameManagerが実行時に生成。画面下部中央にQ/W/E/Rスロット(仮アイコン)とランクピップを表示し、強化可能時に上向き矢印(通常=緑、Lv6追加強化=金色)を表示する。本格的なスキルアイコンはフェーズ8で差し替え想定。
 
-### フェーズ7-fix1: スキル強化UIを既存HUDへ統合
+### フェーズ7-fix2: Ctrl+スキルキー応用完全抑制 & ヴォルブラークHUD
 
-- `SkillUpgradeHud`: 独自のCanvas・Q/W/E/Rスロット生成を廃止。SkillCooldownHud(Scripts/UI)が生成する「Player Status HUD Canvas」内の「Status Panel/Skill Bar/Skill Slot Q〜R」を定期スキャンで探し、各スロットの子として上向き矢印とランクピップを追加する(生成タイミング非依存のリトライ方式)。SkillCooldownHud本体は変更しない。操作ヒントは強化可能なスキルがあるときだけ表示する。SkillCooldownHud側でCanvas・スロット名を変更する場合はSkillUpgradeHudの検索名も更新が必要。
+- `PlayerInputHub`(Scripts/Characters): `Update()`を追加。Q/W/E/Rキーの`WasPressedThisFrame()`時に`UpgradeModifierPressed`の状態をフラグ(`_qPressedWithModifier`等)に保存。`QReleasedThisFrame`等のゲッターでフラグを参照し、Ctrlを先に離してからスキルキーを離した場合(NormalCast)も正しくトリガーを抑制する。
+- `SkillCooldownHud`(Scripts/UI): `BuildSkillBar`でZelfコントローラーがなければVolbraakコントローラーを使用する。Rのアクティブフィールドはインスタンス比較で切り替える。

@@ -27,6 +27,11 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _upgradeModifierAction;
 
     private bool _initialized;
+    // 各スキルキーがCtrl押下中に押されたかどうか。Update()で記録し、ReleasedThisFrameで参照する。
+    private bool _qPressedWithModifier;
+    private bool _wPressedWithModifier;
+    private bool _ePressedWithModifier;
+    private bool _rPressedWithModifier;
 
     // --- スキル強化修飾キー(Ctrl)とCtrl+スキルキー(フェーズ7) ---
     public bool UpgradeModifierPressed => _upgradeModifierAction != null && _upgradeModifierAction.IsPressed();
@@ -38,22 +43,22 @@ public sealed class PlayerInputHub : MonoBehaviour
     // --- Q ---
     public bool QPressedThisFrame => !UpgradeModifierPressed && _qAction != null && _qAction.WasPressedThisFrame();
     public bool QPressed => !UpgradeModifierPressed && _qAction != null && _qAction.IsPressed();
-    public bool QReleasedThisFrame => _qAction != null && _qAction.WasReleasedThisFrame();
+    public bool QReleasedThisFrame => !_qPressedWithModifier && _qAction != null && _qAction.WasReleasedThisFrame();
 
     // --- W ---
     public bool WPressedThisFrame => !UpgradeModifierPressed && _wAction != null && _wAction.WasPressedThisFrame();
     public bool WPressed => !UpgradeModifierPressed && _wAction != null && _wAction.IsPressed();
-    public bool WReleasedThisFrame => _wAction != null && _wAction.WasReleasedThisFrame();
+    public bool WReleasedThisFrame => !_wPressedWithModifier && _wAction != null && _wAction.WasReleasedThisFrame();
 
     // --- E ---
     public bool EPressedThisFrame => !UpgradeModifierPressed && _eAction != null && _eAction.WasPressedThisFrame();
     public bool EPressed => !UpgradeModifierPressed && _eAction != null && _eAction.IsPressed();
-    public bool EReleasedThisFrame => _eAction != null && _eAction.WasReleasedThisFrame();
+    public bool EReleasedThisFrame => !_ePressedWithModifier && _eAction != null && _eAction.WasReleasedThisFrame();
 
     // --- R ---
     public bool RPressedThisFrame => !UpgradeModifierPressed && _rAction != null && _rAction.WasPressedThisFrame();
     public bool RPressed => !UpgradeModifierPressed && _rAction != null && _rAction.IsPressed();
-    public bool RReleasedThisFrame => _rAction != null && _rAction.WasReleasedThisFrame();
+    public bool RReleasedThisFrame => !_rPressedWithModifier && _rAction != null && _rAction.WasReleasedThisFrame();
 
     // --- 停止コマンド(S) ---
     public bool SPressedThisFrame => _sAction != null && _sAction.WasPressedThisFrame();
@@ -75,6 +80,16 @@ public sealed class PlayerInputHub : MonoBehaviour
     public bool RightClickPressed => _rightClickAction != null && _rightClickAction.IsPressed();
     public bool RightClickPressedThisFrame => _rightClickAction != null && _rightClickAction.WasPressedThisFrame();
     public Vector2 MousePosition => _mousePositionAction != null ? _mousePositionAction.ReadValue<Vector2>() : Vector2.zero;
+
+    // Q/W/E/R押下時にCtrlの状態をフラグに記録する。
+    // ReleasedThisFrameで参照することで、Ctrlを先に離してからスキルキーを離した場合も正しく抑制できる。
+    private void Update()
+    {
+        if (_qAction != null && _qAction.WasPressedThisFrame()) _qPressedWithModifier = UpgradeModifierPressed;
+        if (_wAction != null && _wAction.WasPressedThisFrame()) _wPressedWithModifier = UpgradeModifierPressed;
+        if (_eAction != null && _eAction.WasPressedThisFrame()) _ePressedWithModifier = UpgradeModifierPressed;
+        if (_rAction != null && _rAction.WasPressedThisFrame()) _rPressedWithModifier = UpgradeModifierPressed;
+    }
 
     private void Awake()
     {
