@@ -48,7 +48,7 @@ public sealed class SkillCooldownHud : MonoBehaviour
     [SerializeField] private Color _statValueColor = new Color(0.95f, 0.95f, 0.95f, 1f);
     [SerializeField] private Color _portraitBg = new Color(0.18f, 0.18f, 0.22f, 1f);
     [SerializeField] private Color _levelBadgeBg = new Color(0.75f, 0.6f, 0.0f, 1f);
-    [SerializeField] private Color _levelBadgeText = new Color(1f, 1f, 1f, 1f);
+    [SerializeField] private Color _levelBadgeTextColor = new Color(1f, 1f, 1f, 1f);
 
     [Header("Flash")]
     [SerializeField] private float _readyFlashDuration = 0.3f;
@@ -217,11 +217,7 @@ public sealed class SkillCooldownHud : MonoBehaviour
         float badgeH = h * 0.22f;
         float badgeW = w;
         CreateInsetImage("Level Badge BG", parent, _levelBadgeBg, 0f, x, 0f, badgeW, badgeH);
-        _levelBadgeText = CreateText("Level Badge", parent, _levelLabel, 11, _levelBadgeText != null ? _levelBadgeText.color : _levelBadgeText != null ? _levelBadgeText.color : Color.white, x, 0f, badgeW, badgeH);
-        _levelBadgeText.color = _levelBadgeText != null ? _levelBadgeText.color : Color.white;
-        // 少し内側に再生成してテキストを上書き。
-        _levelBadgeText = CreateText("Level Badge Text", parent, "Lv1", 11, _levelBadgeText != null ? _levelBadgeText.color : Color.white, x, 0f, badgeW, badgeH);
-        _levelBadgeText.color = new Color(1f, 1f, 1f, 1f);
+        _levelBadgeText = CreateText("Level Badge Text", parent, "Lv1", 11, _levelBadgeTextColor, x, 0f, badgeW, badgeH);
     }
 
     private void BuildHealthBar(RectTransform parent, float x, float w)
