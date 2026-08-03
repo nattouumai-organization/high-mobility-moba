@@ -27,7 +27,6 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _upgradeModifierAction;
 
     private bool _initialized;
-    // 各スキルキーがCtrl押下中に押されたかどうか。Update()で記録し、ReleasedThisFrameで参照する。
     private bool _qPressedWithModifier;
     private bool _wPressedWithModifier;
     private bool _ePressedWithModifier;
@@ -81,8 +80,6 @@ public sealed class PlayerInputHub : MonoBehaviour
     public bool RightClickPressedThisFrame => _rightClickAction != null && _rightClickAction.WasPressedThisFrame();
     public Vector2 MousePosition => _mousePositionAction != null ? _mousePositionAction.ReadValue<Vector2>() : Vector2.zero;
 
-    // Q/W/E/R押下時にCtrlの状態をフラグに記録する。
-    // ReleasedThisFrameで参照することで、Ctrlを先に離してからスキルキーを離した場合も正しく抑制できる。
     private void Update()
     {
         if (_qAction != null && _qAction.WasPressedThisFrame()) _qPressedWithModifier = UpgradeModifierPressed;

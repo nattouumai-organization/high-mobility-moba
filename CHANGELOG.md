@@ -413,11 +413,7 @@
 - Q/W/E/Rのスキル強化UIを実装(SkillUpgradeHud/HeroSkillUpgrades)。強化可能なスキルの上に緑の上向き矢印を表示し、Ctrl+Q/W/E/Rの同時押しで強化する(Ctrl押下中は通常のスキル発動を抑制)。
 - Lv6の追加強化選択を実装。Lv6到達後は好きなスキル1つを追加強化でき(1回のみ)、対象の矢印は金色で表示して通常強化と区別する。
 
-## フェーズ7-fix2: Ctrl+スキルキーの完全抑制 & ヴォルブラークHUD対応
+## phase7-fix2: Ctrl+QWER complete suppress & Volbraak HUD
 
-- PlayerInputHub: Update()を追加し、Q/W/E/R押下時にCtrlの状態をフラグに記録する。
-  QReleasedThisFrame等にCtrl同時押しフラグを参照し、NormalCastの発動トリガーも抑制する。
-  これによりCtrl+Q/W/E/Rでスキル強化所作時にスキル発動が一切起きなくなる。
-- SkillCooldownHud: BuildSkillBarでZelfコントローラーが見つからない場合はVolbraakコントローラーを使用する。
-  フェーズ3実装の既存スロット(Q/W/E/R/D/F)にヴォルブラークのクールダウン表示が反映される。
-  Rのアクティブフィールドはゲームデザイン11章に従いゼルフ=_isRActive/ヴォルブラーク=_isTetherActiveと切り替える。
+- PlayerInputHub: Added Update() to track modifier-key-with-skill-key presses; QReleasedThisFrame etc. also suppressed.
+- SkillCooldownHud: BuildSkillBar now falls back to Volbraak controllers. Fixed _levelBadgeText field duplication (CS0102). Fixed _stats.Team -> TeamMember.Team (CS1061).

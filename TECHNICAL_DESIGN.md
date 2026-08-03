@@ -393,7 +393,6 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - `PlayerInputHub`: 強化用修飾キー(左右Ctrl)を追加。Ctrl押下中はQ/W/E/RのPressed/PressedThisFrameを抑制し(ReleasedThisFrameは抑制しない)、Upgrade*PressedThisFrameを公開する。
 - `SkillUpgradeHud`: GameManagerが実行時に生成。画面下部中央にQ/W/E/Rスロット(仮アイコン)とランクピップを表示し、強化可能時に上向き矢印(通常=緑、Lv6追加強化=金色)を表示する。本格的なスキルアイコンはフェーズ8で差し替え想定。
 
-### フェーズ7-fix2: Ctrl+スキルキー応用完全抑制 & ヴォルブラークHUD
+### phase7-fix2: Ctrl+QWER suppress & Volbraak HUD
 
-- `PlayerInputHub`(Scripts/Characters): `Update()`を追加。Q/W/E/Rキーの`WasPressedThisFrame()`時に`UpgradeModifierPressed`の状態をフラグ(`_qPressedWithModifier`等)に保存。`QReleasedThisFrame`等のゲッターでフラグを参照し、Ctrlを先に離してからスキルキーを離した場合(NormalCast)も正しくトリガーを抑制する。
-- `SkillCooldownHud`(Scripts/UI): `BuildSkillBar`でZelfコントローラーがなければVolbraakコントローラーを使用する。Rのアクティブフィールドはインスタンス比較で切り替える。
+- `SkillCooldownHud`: caches `TeamMember` in FindPlayer(); uses `_teamMember.Team` for `LevelSystem.GetLevelForTeam` in Update().
