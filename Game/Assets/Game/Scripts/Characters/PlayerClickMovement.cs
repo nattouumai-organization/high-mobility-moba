@@ -12,6 +12,7 @@ using UnityEngine;
 /// スタン・スネア中(CrowdControlControllerのIsMovementBlocked)は移動しない。
 /// 移動先の予約(右クリック)は受け付け、CC終了後に移動を再開する。
 /// 経路上に障害物(タワー・本拠地)がある場合は、ObstacleAvoidanceで最短側の接線方向へ迂回し、ぶつからずに移動する。
+/// 迂回中も視点(キャラクターの向き)が実際の進行方向を向くよう、PlayerMouseFacingへ進行方向を毎フレーム通知する。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -36,6 +37,9 @@ public class PlayerClickMovement : MonoBehaviour
     // CC(スタン・スネア)による移動禁止の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
     private CrowdControlController _crowdControl;
 
+    // 向き(回転)の担当。移動中に実際の進行方向を通知するために参照する(存在しない場合はnull)。
+    private PlayerMouseFacing _mouseFacing;
+
     private Camera _mainCamera;
     private Vector3 _destination;
     private bool _hasDestination;
@@ -51,6 +55,7 @@ public class PlayerClickMovement : MonoBehaviour
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
         _crowdControl = GetComponent<CrowdControlController>();
+        _mouseFacing = GetComponent<PlayerMouseFacing>();
 
         if (_characterStats == null)
         {
@@ -162,6 +167,13 @@ public class PlayerClickMovement : MonoBehaviour
         // 経路上に障害物がある場合は、最短側の接線方向へ迂回する(ObstacleAvoidance)。
         Vector3 direction = ObstacleAvoidance.SteerDirection(
             transform.position, toDestination / remainingDistance, AgentRadius, remainingDistance, null);
+
+        // 迂回中も含め、視点(キャラクターの向き)が実際の進行方向を向くようにする。
+        if (_mouseFacing != null)
+        {
+            _mouseFacing.SetMovementLookDirection(direction);
+        }
+
         _characterController.Move(direction * moveDistance);
     }
 

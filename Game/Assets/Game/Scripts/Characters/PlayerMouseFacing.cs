@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// 最後に右クリックしたGround上の地点の方向を、PlayerがY軸のみ回転して向くようにする。
@@ -6,12 +7,12 @@ using UnityEngine;
 /// 毎フレーム更新されるため、Playerはカーソル方向を向き続ける。
 /// TASKS.md「マウス方向へキャラクターが向く処理を実装する」用の試作スクリプト。
 /// 移動はPlayerClickMovementの責務であり、本スクリプトは回転のみを担う。
-/// 右クリック・マウス座標の入力はPlayerInputHub経由で取得する(Mouse.currentを直接読まない。フェーズ1〜3見直しで一元化)。
 /// ZelfQControllerなどの外部スクリプトは、publicメソッドのSetLookTarget / SetLookDirectionで
 /// 目標回転を安全に更新できる(privateフィールドは本スクリプト内部だけで管理する)。
 /// スタン中(CrowdControlControllerのIsStunned)は向きを変えられない。
 /// 右クリックによる目標回転の予約は受け付け、スタン終了後に回転を再開する。
 /// スネア中は通常攻撃などの行動が可能なため、向きの変更は従来どおり許可する。
+/// 移動中(障害物の迂回中を含む)は、PlayerClickMovementから通知される実際の進行方向を優先して向く。
 /// </summary>
 public class PlayerMouseFacing : MonoBehaviour
 {
@@ -28,8 +29,9 @@ public class PlayerMouseFacing : MonoBehaviour
     private Quaternion _targetRotation;
     private bool _hasTargetRotation;
 
-    // 入力の一元管理(右クリック・マウス座標)。他コントローラーと同じくget-or-addで自動追加する。
-    private PlayerInputHub _inputHub;
+    // 移動処理(PlayerClickMovement)から進行方向の通知を受けた最後のフレーム番号。
+    // 移動中はカーソル方向よりも実際の進行方向(迂回を含む)を優先する。
+    private int _movementFacingFrame = -1;
 
     // CC(スタン)による回転禁止の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
     private CrowdControlController _crowdControl;
@@ -39,8 +41,6 @@ public class PlayerMouseFacing : MonoBehaviour
         _mainCamera = Camera.main;
         _targetRotation = transform.rotation;
         _crowdControl = GetComponent<CrowdControlController>();
-        _inputHub = GetComponent<PlayerInputHub>();
-        if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
     }
 
     private void Update()
@@ -87,21 +87,40 @@ public class PlayerMouseFacing : MonoBehaviour
         _hasTargetRotation = true;
     }
 
+    /// <summary>
+    /// 移動処理(PlayerClickMovement)から毎フレーム呼び出され、実際の進行方向(障害物の迂回を含む)へ
+    /// 向きを合わせる。移動中は右クリックのカーソル方向よりも進行方向を優先する。
+    /// スタン中に回転しない挙動は、従来どおりRotateTowardsTarget側の判定で維持される。
+    /// </summary>
+    public void SetMovementLookDirection(Vector3 direction)
+    {
+        SetLookDirection(direction);
+        _movementFacingFrame = Time.frameCount;
+    }
+
     private void UpdateTargetRotationFromRightClick()
     {
-        if (_inputHub == null || _mainCamera == null)
+        // 移動中は実際の進行方向を優先するため、カーソル方向への目標回転の上書きを行わない。
+        // Updateの実行順(本スクリプトと移動処理のどちらが先か)に依存しないよう、直前フレームの通知も有効とみなす。
+        if (_movementFacingFrame >= 0 && Time.frameCount - _movementFacingFrame <= 1)
+        {
+            return;
+        }
+
+        Mouse mouse = Mouse.current;
+        if (mouse == null || _mainCamera == null)
         {
             return;
         }
 
         // 最後に右クリックした方向を向く仕様のため、右クリック入力があったフレームだけ目標回転を更新する。
         // 長押し中は毎フレームが右クリック入力として扱われ、カーソル方向を向き続ける。
-        if (!_inputHub.RightClickPressed)
+        if (!mouse.rightButton.isPressed)
         {
             return;
         }
 
-        Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
+        Ray ray = _mainCamera.ScreenPointToRay(mouse.position.ReadValue());
         if (!Physics.Raycast(ray, out RaycastHit hitInfo, Mathf.Infinity, _groundLayer))
         {
             // Ground外を右クリックした場合は、最後に向いていた方向を維持する。

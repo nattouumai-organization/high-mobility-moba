@@ -356,3 +356,9 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - ClampDestination: 目的地が円の内側の場合、円の外周(中心ちょうどを指した場合は現在位置側の縁)へ目的地を押し出す。
 - 障害物一覧はTowerController/NexusControllerから1秒間隔で自動収集する(タワー破壊・生成などのシーン変化に追従)。
 - 使用箇所: PlayerClickMovement(CharacterController.Moveの方向補正+目的地補正。半径はCharacterControllerから取得)、MinionController(進軍・追跡の方向補正。先読み3m)。攻撃対象の構造物はignore指定で障害物から除外し、接近攻撃を妨げない。ダッシュ系スキル(ゼルフE・フラッシュなど)は直進のまま。
+
+### 迂回時の視点(向き)の調整(fix13)
+- PlayerClickMovementは移動中、ObstacleAvoidanceで補正した実際の進行方向をPlayerMouseFacing.SetMovementLookDirection()へ毎フレーム通知する
+- PlayerMouseFacingは通知を受けたフレーム(Updateの実行順の差を吸収するため直前フレームも含む)の間、右クリックのカーソル方向による目標回転の上書きを行わず、進行方向を優先する
+- 回転自体は従来どおりRotation Speed(毎秒度数)によるRotateTowardsの滑らかな回転で、スタン中は回転しない
+- ミニオンは迂回後の進行方向をFaceDirectionで向く実装が既にあるため変更なし
