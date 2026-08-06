@@ -393,6 +393,12 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - `PlayerInputHub`: 強化用修飾キー(左右Ctrl)を追加。Ctrl押下中はQ/W/E/RのPressed/PressedThisFrameを抑制し(ReleasedThisFrameは抑制しない)、Upgrade*PressedThisFrameを公開する。
 - `SkillUpgradeHud`: GameManagerが実行時に生成。画面下部中央にQ/W/E/Rスロット(仮アイコン)とランクピップを表示し、強化可能時に上向き矢印(通常=緑、Lv6追加強化=金色)を表示する。本格的なスキルアイコンはフェーズ8で差し替え想定。
 
-### phase7-fix2: Ctrl+QWER suppress & Volbraak HUD
+### phase7-runes: ルーンシステム + 選択画面
 
-- `SkillCooldownHud`: caches `TeamMember` in FindPlayer(); uses `_teamMember.Team` for `LevelSystem.GetLevelForTeam` in Update().
+- `RuneType` enum: None/Relentless/Indomitable/Pursuit/Siege。
+- `RuneSelectionManager`: DontDestroyOnLoadシングルトン。CharacterSelectionManagerと同様の設計。
+- `RelentlessRune`: HealthController.DamageTakenサブスクリプション。3秒リングバッファ。
+- `IndomitableRune`: 追加シールドAbsorbWithShield公開メソッド(将来HealthController御山用)。
+- `PursuitRune`: PlayerInputHub.EPressedThisFrame/FPressedThisFrameでE/Fを検出。
+- `SiegeRune`: TowerController向けstatic GetMultiplierメソッド。
+- `RuneSelectionUI/RuneHoverHandler`: Unity UGUIでプロシージャル生成。

@@ -69,6 +69,11 @@ public class GameManager : MonoBehaviour
         {
             gameObject.AddComponent<SkillUpgradeHud>();
         }
+
+        if (GetComponent<RuneApplier>() == null)
+        {
+            gameObject.AddComponent<RuneApplier>();
+        }
     }
 
     private void OnDestroy()

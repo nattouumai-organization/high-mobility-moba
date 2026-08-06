@@ -413,7 +413,21 @@
 - Q/W/E/Rのスキル強化UIを実装(SkillUpgradeHud/HeroSkillUpgrades)。強化可能なスキルの上に緑の上向き矢印を表示し、Ctrl+Q/W/E/Rの同時押しで強化する(Ctrl押下中は通常のスキル発動を抑制)。
 - Lv6の追加強化選択を実装。Lv6到達後は好きなスキル1つを追加強化でき(1回のみ)、対象の矢印は金色で表示して通常強化と区別する。
 
-## phase7-fix2: Ctrl+QWER complete suppress & Volbraak HUD
+## phase7-runes: ルーン実装 + ルーン選択画面
 
-- PlayerInputHub: Added Update() to track modifier-key-with-skill-key presses; QReleasedThisFrame etc. also suppressed.
-- SkillCooldownHud: BuildSkillBar now falls back to Volbraak controllers. Fixed _levelBadgeText field duplication (CS0102). Fixed _stats.Team -> TeamMember.Team (CS1061).
+- RuneType/RuneSelectionManager: ルーン選択結果保持シングルトン。DontDestroyOnLoad。
+- RelentlessRune(連撃): HealthControllerサブスクリプションで命中検出。3回攠3s以内に45+AD35%ダメージ+MS12%(1.5s)。CD8s。
+- IndomitableRune(不屈): 最大HP15%以上の2sダメージ受れと8%シールド(2.5s)。CD40s。
+- PursuitRune(追撃): PlayerInputHub.EPressedThisFrame/FPressedThisFrameでE/F検出。1.25s以内命中に40+AD30%+15%スロウ(0.5s)。CD12s。
+- SiegeRune(攻城): 味方ミニオンが敵タワー射程内の間タワーダメージ12%増加　2。SiegeRune.GetMultiplierで連携準備済。
+- RuneHoverHandler: ホバーイベントインターフェース実装。
+- RuneSelectionUI: ルーン選択画面UI。左=自分キャラ名(青)/右=Training Dummy(赤)/中央下=円形アイコン4個・ホバーツールチップ。
+- SC_RuneSelect.unity: キャラ選択画面の次に表示する新規シーン。
+- CharacterSelectionUI: 確定ボタンをSC_RuneSelectへ遷移に変更。
+- GameManager: RuneApplierをAddComponentで導入。
+- RuneApplier: SC_Prototype起動後にBlueチームのヒーローへルーン付与。
+
+## phase7-runes-fix1: CS0191修正（ルーンのダメージ付与）
+
+- RelentlessRune / PursuitRune: `DamageContext`はreadonly structのためオブジェクト初期化子（`new DamageContext { Attacker = ... }`）では生成不可（CS0191）。
+- 既存の`HealthController.TakeDamage(float damage, Transform attacker, DamageType damageType)`オーバーロードを使用する形に変更。DamageContextはHealthController内部で正しく構築されるため、軍減判定（IIncomingDamageModifier）も従来通り機能する。

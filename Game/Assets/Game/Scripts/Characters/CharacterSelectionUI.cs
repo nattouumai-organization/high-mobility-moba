@@ -11,7 +11,6 @@ using UnityEngine.UI;
 /// 開始ボタンをUnity UI Canvas上へ構築する(外部アセット・外部フォントは使用しない)。
 /// Availableのキャラクターだけを選択可能にし、Coming Soonのカードは半透明の選択不可として表示する。
 /// 選択中のCharacterDataはCharacterSelectionManagerへ渡し、開始ボタンでSC_Prototypeを読み込む。
-/// SC_Prototype側では、PlayerCharacterApplierが選択結果をPlayerへ適用する(フェーズ4前準備)。
 /// スキルの詳細説明はCharacterData側が保持しており、将来ツールチップや別パネルとして表示できる
 /// (この画面では短い一覧のみ表示する)。
 /// </summary>
@@ -51,12 +50,12 @@ public class CharacterSelectionUI : MonoBehaviour
     [SerializeField] private List<CharacterEntry> _characters = new List<CharacterEntry>();
 
     [Header("シーン遷移")]
-    [SerializeField] private string _prototypeSceneName = "SC_Prototype";
+    [SerializeField] private string _runeSelectSceneName = "SC_RuneSelect";
 
     [Header("画面テキスト")]
     [SerializeField] private string _titleText = "HIGH MOBILITY MOBA";
     [SerializeField] private string _subtitleText = "キャラクターを選択";
-    [SerializeField] private string _startButtonLabel = "プロトタイプを開始";
+    [SerializeField] private string _startButtonLabel = "ルーンを選択";
     [SerializeField] private string _availableLabel = "選択可能";
     [SerializeField] private string _comingSoonLabel = "Coming Soon";
     [SerializeField] private string _selectedLabelPrefix = "選択中：";
@@ -351,32 +350,7 @@ public class CharacterSelectionUI : MonoBehaviour
             "基礎AR：" + data.BaseArmor + "\n" +
             "基礎MS：" + data.BaseMoveSpeed + "\n" +
             "AA Range：" + data.BaseAttackRange;
-        _detailSkillsText.text = BuildSkillSummaryText(entry);
-    }
-
-    /// <summary>
-    /// 詳細パネルのスキル一覧テキストを作る。Inspectorの短い一覧(_skillSummaryLines)が設定されていればそれを優先し、
-    /// 未設定の場合はCharacterDataのP〜Rスキル説明から自動生成する(フェーズ4前準備: ヴォルブラーク追加用)。
-    /// </summary>
-    private static string BuildSkillSummaryText(CharacterEntry entry)
-    {
-        if (entry.SkillSummaryLines != null && entry.SkillSummaryLines.Length > 0)
-        {
-            return string.Join("\n", entry.SkillSummaryLines);
-        }
-
-        CharacterData data = entry.Data;
-        if (data == null)
-        {
-            return "";
-        }
-
-        return
-            "P：" + data.PassiveDescription + "\n" +
-            "Q：" + data.QDescription + "\n" +
-            "W：" + data.WDescription + "\n" +
-            "E：" + data.EDescription + "\n" +
-            "R：" + data.RDescription;
+        _detailSkillsText.text = string.Join("\n", entry.SkillSummaryLines);
     }
 
     private void OnStartButtonClicked()
@@ -392,9 +366,9 @@ public class CharacterSelectionUI : MonoBehaviour
             return;
         }
 
-        // 選択結果を保持したままSC_Prototypeを読み込む(Playerへの適用はSC_Prototype側のPlayerCharacterApplierが行う)。
+        // 選択結果を保持したままSC_Prototypeを読み込む(Playerへの適用は今回行わない)。
         CharacterSelectionManager.GetOrCreateInstance().SelectCharacter(selected.Data);
-        SceneManager.LoadScene(_prototypeSceneName);
+        SceneManager.LoadScene(_runeSelectSceneName);
     }
 
     private RectTransform CreateUiObject(string name, Transform parent)
