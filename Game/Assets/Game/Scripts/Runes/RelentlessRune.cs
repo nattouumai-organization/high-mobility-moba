@@ -37,15 +37,26 @@ public class RelentlessRune : MonoBehaviour
         float now = Time.time;
         _hits.RemoveAll(t => now - t > 3f);
         _hits.Add(now);
-        if (_hits.Count >= 3)
+        if (_hits.Count < 3)
         {
-            _hits.Clear(); _cdEnd = now + 8f;
-            if (_stats == null || !target) return;
-            target.TakeDamage(45f + _stats.CurrentAttackDamage * 0.35f, transform, DamageType.Normal);
-            if (!_msActive) { _msFlat = _stats.BaseMoveSpeed * 0.12f; _stats.AddMoveSpeedBonus(_msFlat); _msActive = true; }
-            _msEnd = Time.time + 1.5f;
-            Debug.Log("[Relentless] activated", this);
+            // 発動確認用ログ: 命中カウントの進捗(3秒以内の命中数)。
+            Debug.Log($"[ルーン/連撃] 命中 {_hits.Count}/3 (3秒以内)", this);
+            return;
         }
+        _hits.Clear(); _cdEnd = now + 8f;
+        if (_stats == null || !target) return;
+        float dmg = 45f + _stats.CurrentAttackDamage * 0.35f;
+        target.TakeDamage(dmg, transform, DamageType.Normal);
+        if (!_msActive) { _msFlat = _stats.BaseMoveSpeed * 0.12f; _stats.AddMoveSpeedBonus(_msFlat); _msActive = true; }
+        _msEnd = Time.time + 1.5f;
+        // 発動確認用ログ: 追加ダメージとMSバフの発動。
+        Debug.Log($"[ルーン/連撃] 発動！ {target.name} へ {dmg:F1} ダメージ + MS12% (1.5秒) / CD 8秒", this);
     }
-    private void ClearMs() { if (!_msActive) return; _stats?.RemoveMoveSpeedBonus(_msFlat); _msActive = false; _msFlat = 0f; }
+    private void ClearMs()
+    {
+        if (!_msActive) return;
+        _stats?.RemoveMoveSpeedBonus(_msFlat); _msActive = false; _msFlat = 0f;
+        // 発動確認用ログ: MSバフの終了。
+        Debug.Log("[ルーン/連撃] MSバフ終了", this);
+    }
 }

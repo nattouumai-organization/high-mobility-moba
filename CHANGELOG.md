@@ -431,3 +431,25 @@
 
 - RelentlessRune / PursuitRune: `DamageContext`はreadonly structのためオブジェクト初期化子（`new DamageContext { Attacker = ... }`）では生成不可（CS0191）。
 - 既存の`HealthController.TakeDamage(float damage, Transform attacker, DamageType damageType)`オーバーロードを使用する形に変更。DamageContextはHealthController内部で正しく構築されるため、軍減判定（IIncomingDamageModifier）も従来通り機能する。
+
+## phase7-runes-fix2: キャラ選択画面が表示されない問題の修正（GUID不整合）
+
+- CharacterSelectionUI.cs.meta: phase7-runesの納品で新規GUIDに上書きしてしまい、SC_CharacterSelect.unityのスクリプト参照（f6b9d2e5...）がMissing Script化していた。元のGUIDを復元。
+- SC_RuneSelect.unity: RuneSelectionUIのスクリプト参照GUIDが仮の値（0000...f001）のままだったため、実際のRuneSelectionUI.cs.metaのGUID（3dbf3191...）に修正。
+- EditorBuildSettings.asset: SC_RuneSelectをビルド対象シーンに追加（SC_CharacterSelect → SC_RuneSelect → SC_Prototype）。未登録だとSceneManager.LoadSceneが失敗する。
+
+## phase7-runes-fix3: キャラクター選択画面のカード・詳細が表示されない問題の修正
+
+### Fixed
+- SC_CharacterSelect.unity: CharacterSelectionUIコンポーネントのシリアライズデータ（_charactersのキャラクター一覧など）が消失していたため、カードが1枚も生成されず灰色のプレースホルダーだけが表示されていた。Missing Script状態（phase7-runesの.meta GUID上書きが原因）でシーンが保存された際にデータが失われたもの。ゼルフ（ZelfData.asset）とヴォルブラーク（VolbraakData.asset）の参照・スキル概要・画面テキスト・見た目設定をシーンに再設定し、以前と同じ表示（左：キャラカード2枚、右：詳細パネル）に復元。スクリプトの変更はなし。
+
+## phase7-runes-debuglog: ルーン発動確認用のコンソールログ追加
+
+### Added
+- 各ルーンの発動状況を確認できる日本語のコンソールログを追加した。プレフィックスは「[ルーン/連撃]」「[ルーン/不屈]」「[ルーン/追撃]」「[ルーン/攻城]」「[ルーン]」。
+  - 連撃: 命中カウント進捗(1/3、2/3)、発動(ダメージ量・対象)、MSバフ終了。
+  - 不屈: 発動(被弾合計・シールド量)、シールドの吸収/破壊/時間切れ。
+  - 追撃: E/F押下による発動ウィンドウ開始(CD中は残りCD秒数を表示)、発動(ダメージ量・対象)。
+  - 攻城: 条件成立/解除の切り替わり、タワーへの1.12倍適用時。
+  - RuneApplier: ルーン未選択時のログを追加(適用ログは既存を日本語化)。
+- ゲーム仕様・数値の変更はなし(ログ追加のみ)。

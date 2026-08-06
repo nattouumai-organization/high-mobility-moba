@@ -1,5 +1,5 @@
 using UnityEngine;
-/// <summary>攻城ルーン(パッシブ): 味方ミニオンが敵タワー射程内 -> タワーダメーコ12%増。</summary>
+/// <summary>攻城ルーン(パッシブ): 味方ミニオンが敵タワー射程内 -> タワーダメージ12%増。</summary>
 public class SiegeRune : MonoBehaviour
 {
     private const float TowerRange = 800f / CharacterStats.RangeStatPerUnityUnit;
@@ -19,11 +19,28 @@ public class SiegeRune : MonoBehaviour
     {
         if (!attacker) return 1f;
         SiegeRune sr = attacker.GetComponentInParent<SiegeRune>();
-        return (sr != null && sr._active) ? 1.12f : 1f;
+        if (sr != null && sr._active)
+        {
+            // 発動確認用ログ: タワーへの攻撃に倍率が適用された瞬間。
+            Debug.Log($"[ルーン/攻城] 発動！ {attacker.name} のタワーダメージ 1.12倍", sr);
+            return 1.12f;
+        }
+        return 1f;
     }
     private void UpdateCondition()
     {
-        if (_tm == null) { _active = false; return; }
+        bool met = CheckCondition();
+        if (met != _active)
+        {
+            // 発動確認用ログ: 条件(味方ミニオンが敵タワー射程内)の切り替わり。
+            if (met) Debug.Log("[ルーン/攻城] 条件成立: 味方ミニオンが敵タワー射程内 (タワーダメージ+12%)", this);
+            else Debug.Log("[ルーン/攻城] 条件解除: 射程内に味方ミニオンなし", this);
+        }
+        _active = met;
+    }
+    private bool CheckCondition()
+    {
+        if (_tm == null) return false;
         foreach (TowerController t in FindObjectsByType<TowerController>(FindObjectsSortMode.None))
         {
             TeamMember tt = t.GetComponent<TeamMember>();
@@ -33,9 +50,9 @@ public class SiegeRune : MonoBehaviour
                 TeamMember mt = m.GetComponent<TeamMember>();
                 if (mt == null || mt.Team != _tm.Team) continue;
                 if (Vector3.Distance(m.transform.position, t.transform.position) <= TowerRange)
-                    { _active = true; return; }
+                    return true;
             }
         }
-        _active = false;
+        return false;
     }
 }

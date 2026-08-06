@@ -17,7 +17,15 @@ public class IndomitableRune : MonoBehaviour
         if (_health != null) { _dmgH = (_, d) => OnDmg(d); _health.DamageTaken += _dmgH; }
     }
     private void OnDestroy() { if (_health && _dmgH != null) _health.DamageTaken -= _dmgH; }
-    private void Update() { if (_shield > 0f && Time.time >= _shieldEnd) _shield = 0f; }
+    private void Update()
+    {
+        if (_shield > 0f && Time.time >= _shieldEnd)
+        {
+            // 発動確認用ログ: シールドが時間切れで消滅。
+            Debug.Log($"[ルーン/不屈] シールド終了 (残り {_shield:F1} を破棄)", this);
+            _shield = 0f;
+        }
+    }
     private void OnDmg(float d)
     {
         if (d <= 0f || Time.time < _cdEnd) return;
@@ -31,13 +39,18 @@ public class IndomitableRune : MonoBehaviour
             _recent.Clear(); _cdEnd = now + 40f;
             _shield = _stats.CurrentMaxHealth * 0.08f;
             _shieldEnd = now + 2.5f;
-            Debug.Log($"[Indomitable] shield={_shield:F1}", this);
+            // 発動確認用ログ: 発動条件(2秒以内に最大HP15%以上被弾)成立。
+            Debug.Log($"[ルーン/不屈] 発動！ 被弾合計 {total:F1} → シールド {_shield:F1} (2.5秒) / CD 40秒", this);
         }
     }
     public float AbsorbWithShield(float incoming)
     {
         if (_shield <= 0f) return incoming;
-        float abs = Mathf.Min(_shield, incoming); _shield -= abs; return incoming - abs;
+        float abs = Mathf.Min(_shield, incoming); _shield -= abs;
+        // 発動確認用ログ: シールドによる吸収量と残量。
+        if (_shield <= 0f) Debug.Log($"[ルーン/不屈] シールドが {abs:F1} 吸収して破壊", this);
+        else Debug.Log($"[ルーン/不屈] シールドが {abs:F1} 吸収 (残り {_shield:F1})", this);
+        return incoming - abs;
     }
     public float ShieldAmount => _shield;
 }

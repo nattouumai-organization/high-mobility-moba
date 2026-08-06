@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/Game/Scenes/SC_CharacterSelect.unity
     guid: b7d0e3f6a9c2418f85d1b4e7c0a52d63
   - enabled: 1
+    path: Assets/Game/Scenes/SC_RuneSelect.unity
+    guid: 9ec3528713474544bbf7b58078638577
+  - enabled: 1
     path: Assets/Game/Scenes/SC_Prototype.unity
     guid: 666271f8bb6e42e49a1f75898d84768a
   m_configObjects:

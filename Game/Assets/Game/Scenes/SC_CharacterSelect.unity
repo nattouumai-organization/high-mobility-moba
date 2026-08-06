@@ -300,6 +300,45 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f6b9d2e5a8c1435d84b7e0a2d3c96f51, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _characters:
+  - _characterData: {fileID: 11400000, guid: a3e6c9f2d5b8417e92c4a7d0b5e83c16, type: 2}
+    _fallbackDisplayName: ゼルフ
+    _fallbackRoleName: 高機動近接ファイター
+    _fallbackThemeColor: {r: 0.2, g: 0.45, b: 1, a: 1}
+    _fallbackStatus: 0
+    _skillSummaryLines:
+    - パッシブ：敵ヒーローへ与えたダメージの5％を回復（ミニオンは半減）
+    - Q：対象へブリンクしてダメージ。他スキル命中で再使用可能
+    - W：双頭剣を回転させ前方からの通常ダメージを軽減
+    - E：指定方向へダッシュし経路の敵へダメージ。敵ヒーロー命中でQ即時再使用
+    - R：敵を中心に決闘エリアを生成。周囲を押し出しエリア内の敵をスロウ
+  - _characterData: {fileID: 11400000, guid: 60a8f7a0cd2d0e649b6ab763ce2a54ae, type: 2}
+    _fallbackDisplayName: ヴォルブラーク
+    _fallbackRoleName: 初心者向けハンマータンク
+    _fallbackThemeColor: {r: 0.85, g: 0.2, b: 0.15, a: 1}
+    _fallbackStatus: 0
+    _skillSummaryLines:
+    - パッシブ：一定時間被弾なしで次の攻撃１回を完全無効化するシールド
+    - Q：地面を叩き範囲攻撃。亀裂を残し上の敵をスロウ
+    - W：シールド獲得後に自動爆発し範囲ダメージ。与ダメージの5％回復
+    - E：突進してダメージとスタン
+    - R：鎖で敵を拘束し、受けたダメージを確定ダメージで自動反射
+  _runeSelectSceneName: SC_RuneSelect
+  _titleText: HIGH MOBILITY MOBA
+  _subtitleText: キャラクターを選択
+  _startButtonLabel: ルーンを選択
+  _availableLabel: 選択可能
+  _comingSoonLabel: Coming Soon
+  _selectedLabelPrefix: 選択中：
+  _referenceResolution: {x: 1920, y: 1080}
+  _screenBackgroundColor: {r: 0.07, g: 0.08, b: 0.11, a: 1}
+  _cardBackgroundColor: {r: 0.13, g: 0.15, b: 0.2, a: 1}
+  _cardNormalFrameColor: {r: 0, g: 0, b: 0, a: 0.6}
+  _selectedFrameColor: {r: 1, g: 0.95, b: 0.55, a: 1}
+  _selectedBrightness: 0.2
+  _comingSoonAlpha: 0.45
+  _detailPanelColor: {r: 0.11, g: 0.13, b: 0.17, a: 1}
+  _startButtonColor: {r: 0.2, g: 0.45, b: 1, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
