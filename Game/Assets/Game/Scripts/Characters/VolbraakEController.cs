@@ -12,6 +12,7 @@ using UnityEngine;
 /// - 突進中はAbilityLockControllerへロックを追加し、通常攻撃・他スキルの入力を禁止する。
 /// - 自身が死亡した場合は突進を即時中断し、ロックを解除する。
 /// - 突進の移動はZelfEControllerと同じ方式(CharacterControllerを一時無効化して直接移動・地面追従・終了時のめり込み解消)。
+/// - Eのダメージには発動ごとのSourceId("VolbraakE#n")を付与する(連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用。phase7-runes-fix4)。
 /// NormalCast: Eキーを押している間は方向線を表示し、離した瞬間に発動 / QuickCast: 押した瞬間に発動。
 /// </summary>
 [DisallowMultipleComponent]
@@ -74,6 +75,10 @@ public sealed class VolbraakEController : MonoBehaviour
     private float _dashSpeed;
     // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する。
     private double _cooldownEndTime;
+    // Eの発動回数と今回発動分のSourceId("VolbraakE#n")。突進中の全命中で共通。
+    // 連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用する(phase7-runes-fix4)。
+    private int _eCastCount;
+    private string _eCastSourceId;
     private bool _clickMovementWasEnabled;
     private bool _characterControllerWasEnabled;
     // 突進がAbilityLockControllerへロックを追加済みか(二重解除・未解除の防止)。
@@ -250,6 +255,11 @@ public sealed class VolbraakEController : MonoBehaviour
         _isDashing = true;
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
 
+        // 今回のE発動を識別するSourceIdを発行する(突進中の全命中で共通。
+        // 連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用)。
+        _eCastCount++;
+        _eCastSourceId = $"VolbraakE#{_eCastCount}";
+
         if (_clickMovement != null)
         {
             _clickMovement.StopMovement();
@@ -375,7 +385,7 @@ public sealed class VolbraakEController : MonoBehaviour
         }
 
         float damage = _baseDamage + (_characterStats != null ? _characterStats.CurrentAttackDamage : 0f) * _adRatio;
-        float actualDamage = health.TakeDamage(damage, transform);
+        float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _eCastSourceId);
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

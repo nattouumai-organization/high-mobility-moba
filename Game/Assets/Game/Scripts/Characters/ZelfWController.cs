@@ -8,6 +8,7 @@ using UnityEngine.InputSystem;
 /// 周囲W Damage Radius以内の敵に合計AD×1.5分のダメージを毎ティック均等に与える。
 /// Character/TrainingDummyに命中した場合はQのCDを即時リセットしロックも解除する。
 /// W発動中はAbilityLockControllerへロックを追加し、通常攻撃・Q・E・Rの入力を一括で禁止する(W終了時に解除)。
+/// Wのダメージには発動ごとのSourceId("ZelfW#n")を付与する(全ティック・全対象で共通。連撃ルーンの1スキル1カウント判定に使用。phase7-runes-fix4)。
 /// </summary>
 [RequireComponent(typeof(HealthController))]
 public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
@@ -64,6 +65,11 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
 
     // WがAbilityLockControllerへロックを追加済みか(二重解除・未解除の防止)。
     private bool _lockAdded;
+
+    // Wの発動回数と今回発動分のSourceId("ZelfW#n")。全ティック・全対象で共通。
+    // 連撃ルーンの1スキル1カウント判定に使用する(phase7-runes-fix4)。
+    private int _wCastCount;
+    private string _wCastSourceId;
 
     public bool IsWActive => _isWActive;
 
@@ -197,6 +203,10 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
         _wQResetTriggered = false;
 
+        // 今回のW発動を識別するSourceIdを発行する(全ティック・全対象で共通。連撃ルーンの1スキル1カウント判定に使用)。
+        _wCastCount++;
+        _wCastSourceId = $"ZelfW#{_wCastCount}";
+
         // W発動中は通常攻撃・Q・E・Rの入力をロックする
         // (各コントローラーがIsLockedを確認する。コンポーネント自体は無効化しない)。
         if (_abilityLock != null && !_lockAdded)
@@ -273,7 +283,7 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             HealthController health = target.Health != null ? target.Health : target.GetComponent<HealthController>();
             if (health == null || health.IsDead) continue;
 
-            float actual = health.TakeDamage(damage, transform);
+            float actual = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _wCastSourceId);
             if (actual <= 0f) continue;
 
             target.PlayHitFlash();

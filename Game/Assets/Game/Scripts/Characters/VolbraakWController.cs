@@ -12,6 +12,7 @@ using UnityEngine;
 ///   Wでは吸収せずPの初撃無効化を優先する(IIncomingDamageModifierの適用順に依存しない)。
 /// - シールドが途中で割れても、爆発は予定どおり発生する。
 /// - 爆発で実際に与えたダメージ×回復率(既定: 5%、ミニオンは半減の2.5%)を自身へ回復する。
+/// - 爆発ダメージには発動ごとのSourceId("VolbraakW#n")を付与する(全対象で共通。連撃ルーンの1スキル1カウント判定に使用。phase7-runes-fix4)。
 /// - 移動を伴わないためスネア中も使用できる。スタン・他スキルの行動ロック中・死亡中は使用不可
 ///   (展開済みのシールド・爆発の進行はロック中も継続する)。自身の死亡時はシールド・爆発を中止する(爆発しない)。
 /// シールド中はPlayerの周囲へ青系リングを、爆発時は爆発半径のリングを短時間表示する(LineRenderer実行時生成)。
@@ -103,6 +104,10 @@ public sealed class VolbraakWController : MonoBehaviour, IIncomingDamageModifier
 
     // 自動爆発の時刻(Time.time基準)。
     private float _explodeTime;
+
+    // W爆発の発生回数。爆発ごとのSourceId("VolbraakW#n")の発行に使用する
+    // (連撃ルーンの1スキル1カウント判定用。phase7-runes-fix4)。
+    private int _explosionCount;
 
     private LineRenderer _shieldRing;
     private LineRenderer _explosionRing;
@@ -238,7 +243,7 @@ public sealed class VolbraakWController : MonoBehaviour, IIncomingDamageModifier
         }
 
         // ヴォルブラークP展開中のミニオン以外からの攻撃は、Pの初撃無効化を優先する(Wシールドは消費しない)。
-        // Pが先に適用済みの場合はcurrentAmountが0になっているため、上の早期returnで抜ける。
+        // Pが先に適用済みの場合はcurrentAmountが0になっているため、上の早期 returnで抜ける。
         if (_passiveShield != null && _passiveShield.IsShieldReady && !IsMinionAttack(context.Attacker))
         {
             return currentAmount;
@@ -295,6 +300,10 @@ public sealed class VolbraakWController : MonoBehaviour, IIncomingDamageModifier
         float ad = _characterStats != null ? _characterStats.CurrentAttackDamage : 0f;
         float damage = _explosionBaseDamage + ad * _explosionADRatio;
 
+        // 今回の爆発を識別するSourceIdを発行する(全対象で共通。連撃ルーンの1スキル1カウント判定に使用)。
+        _explosionCount++;
+        string sourceId = $"VolbraakW#{_explosionCount}";
+
         int hitCount = 0;
         float healAmount = 0f;
 
@@ -329,7 +338,7 @@ public sealed class VolbraakWController : MonoBehaviour, IIncomingDamageModifier
                     continue;
                 }
 
-                float actual = health.TakeDamage(damage, transform);
+                float actual = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: sourceId);
                 if (actual <= 0f)
                 {
                     continue;

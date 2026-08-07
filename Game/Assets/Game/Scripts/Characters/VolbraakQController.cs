@@ -10,6 +10,7 @@ using UnityEngine;
 ///   スロウはソフトCCのため共通Dでは防げない。Tower分類は移動しないためスロウは掛けない(ダメージは与える)。
 /// - Qは移動を伴わないスキルのため、スネア中も使用できる(スタン中・死亡中などは行動ロックにより使用不可)。
 /// - ヴォルブラーク自身が死亡した場合、展開中の亀裂は即時消滅する(行動ロック中も展開済みの亀裂は進行・終了する)。
+/// - 発動時の範囲ダメージには発動ごとのSourceId("VolbraakQ#n")を付与する(全対象で共通。連撃ルーンの1スキル1カウント判定に使用。phase7-runes-fix4)。
 /// NormalCast: Qキーを押している間は方向線を表示し、離した瞬間に発動 / QuickCast: 押した瞬間に発動。
 /// </summary>
 [DisallowMultipleComponent]
@@ -69,6 +70,10 @@ public sealed class VolbraakQController : MonoBehaviour
 
     // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する。
     private double _cooldownEndTime;
+
+    // Qの発動回数。発動ごとのSourceId("VolbraakQ#n")の発行に使用する
+    // (連撃ルーンの1スキル1カウント判定用。phase7-runes-fix4)。
+    private int _qCastCount;
 
     // 展開中の亀裂。_fissureRootがnullのとき亀裂の見た目は存在しない。
     private GameObject _fissureRoot;
@@ -272,12 +277,16 @@ public sealed class VolbraakQController : MonoBehaviour
         float damage = _baseDamage + (_characterStats != null ? _characterStats.CurrentAttackDamage : 0f) * _adRatio;
         if (damage <= 0f) return;
 
+        // 今回のQ発動を識別するSourceIdを発行する(全対象で共通。連撃ルーンの1スキル1カウント判定に使用)。
+        _qCastCount++;
+        string sourceId = $"VolbraakQ#{_qCastCount}";
+
         foreach (Targetable target in FindTargetablesOnFissure())
         {
             HealthController health = target.Health != null ? target.Health : target.GetComponent<HealthController>();
             if (health == null || health.IsDead) continue;
 
-            float actualDamage = health.TakeDamage(damage, transform);
+            float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: sourceId);
             if (actualDamage <= 0f) continue;
             target.PlayHitFlash();
             CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);

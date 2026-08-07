@@ -1,7 +1,11 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-/// <summary>追撃ルーン: E/F後1.25s以内に敵命中→40+AD*30%+15%スロウ0.5s。CD12s。</summary>
+/// <summary>
+/// 追撃ルーン: E/F後1.25s以内に敵命中→40+AD*30%+15%スロウ0.5s。CD12s。
+/// E自身のダメージ(SourceIdがゼルフE/ヴォルブラークE)では発動しない。その際発動ウィンドウは消費せず、
+/// E使用後の次の命中(通常攻撃・Q・Wなど)で発動する(phase7-runes-fix4)。
+/// </summary>
 public class PursuitRune : MonoBehaviour
 {
     private CharacterStats _stats;
@@ -36,15 +40,26 @@ public class PursuitRune : MonoBehaviour
         foreach (HealthController hc in FindObjectsByType<HealthController>(FindObjectsSortMode.None))
         {
             if (!hc || hc.gameObject == gameObject || _subs.ContainsKey(hc)) continue;
-            Action<DamageContext, float> h = (ctx, _) => { if (IsMe(ctx.Attacker)) Hit(hc); };
+            Action<DamageContext, float> h = (ctx, _) => { if (IsMe(ctx.Attacker)) Hit(hc, ctx); };
             hc.DamageTaken += h;
             _subs[hc] = h;
         }
     }
     private bool IsMe(Transform a) => a && (a == transform || a.IsChildOf(transform));
-    private void Hit(HealthController target)
+    // ダメージのSourceIdがE自身(ゼルフE/ヴォルブラークE)のものかどうか(phase7-runes-fix4)。
+    private static bool IsESkillDamage(string sourceId) =>
+        !string.IsNullOrEmpty(sourceId) &&
+        (sourceId.StartsWith("ZelfE#", StringComparison.Ordinal) ||
+         sourceId.StartsWith("VolbraakE#", StringComparison.Ordinal));
+    private void Hit(HealthController target, DamageContext ctx)
     {
         if (!_win || Time.time < _cdEnd) return;
+        // E自身のダメージでは発動しない。発動ウィンドウは消費せず、E使用後の次の命中で発動する(phase7-runes-fix4)。
+        if (IsESkillDamage(ctx.SourceId))
+        {
+            Debug.Log("[ルーン/追撃] E自身のダメージのため発動しません (E使用後の次の命中で発動)", this);
+            return;
+        }
         _win = false; _cdEnd = Time.time + 12f;
         if (_stats == null || !target) return;
         float dmg = 40f + _stats.CurrentAttackDamage * 0.30f;

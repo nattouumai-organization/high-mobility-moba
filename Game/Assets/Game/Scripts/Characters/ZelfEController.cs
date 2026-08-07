@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// ゼルフE(方向ダッシュとダッシュ後ウェーブ)を管理する。
+/// Eのダメージ(ダッシュ経路・ウェーブとも)には発動ごとのSourceId("ZelfE#n")を付与する
+/// (連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用。phase7-runes-fix4)。
+/// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
 public sealed class ZelfEController : MonoBehaviour
@@ -57,6 +62,10 @@ public sealed class ZelfEController : MonoBehaviour
     private float _dashSpeed;
     // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
     private double _cooldownEndTime;
+    // Eの発動回数と今回発動分のSourceId("ZelfE#n")。ダッシュ経路・ウェーブの全命中で共通。
+    // 連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用する(phase7-runes-fix4)。
+    private int _eCastCount;
+    private string _eCastSourceId;
     private bool _hitCharacterClassification;
     private bool _clickMovementWasEnabled;
     private bool _characterControllerWasEnabled;
@@ -244,6 +253,11 @@ public sealed class ZelfEController : MonoBehaviour
         _isDashing = true;
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
 
+        // 今回のE発動を識別するSourceIdを発行する(ダッシュ経路・ウェーブの全命中で共通。
+        // 連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用)。
+        _eCastCount++;
+        _eCastSourceId = $"ZelfE#{_eCastCount}";
+
         if (_waveCoroutine != null) { StopCoroutine(_waveCoroutine); _waveCoroutine = null; }
 
         if (_clickMovement != null)
@@ -370,7 +384,7 @@ public sealed class ZelfEController : MonoBehaviour
     private void ApplyDamage(Targetable target, HealthController health)
     {
         float damage = _baseDamage + _characterStats.CurrentAttackDamage * _adRatio;
-        float actualDamage = health.TakeDamage(damage, transform);
+        float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _eCastSourceId);
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

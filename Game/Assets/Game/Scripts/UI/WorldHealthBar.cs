@@ -11,9 +11,14 @@ using UnityEngine.UI;
 /// 実行時生成の場合はInitializeRuntimeでHP取得元とFill Imageを設定する(タワーのHPバーなど)。
 /// スプライト未設定のUI ImageはFilledタイプが機能せず常に全面描画される(fillAmountが反映されない)ため、
 /// Fill Imageにスプライトが無い場合は白スプライトを自動補完する。
+/// 不屈ルーン(IndomitableRune)のシールド残量は、HPゲージの後ろに重ねた白いゲージとして表示する
+/// ((現在HP+シールド)/最大HPまで白を描画し、その手前に通常のHPゲージを重ねる。シールドなし・死亡中は非表示。phase7-runes-fix4)。
 /// </summary>
 public class WorldHealthBar : MonoBehaviour
 {
+    // 不屈ルーンの探索間隔(秒)。ルーンは試合開始後に実行時でAddComponentされるため、一定間隔で再探索する。
+    private const float ShieldScanInterval = 0.5f;
+
     // HPの取得元。未設定の場合はAwakeで親オブジェクトから取得する。
     [SerializeField] private HealthController _healthController;
 
@@ -22,6 +27,11 @@ public class WorldHealthBar : MonoBehaviour
 
     private Camera _mainCamera;
     private Canvas _canvas;
+
+    // 不屈ルーンのシールド表示用(phase7-runes-fix4)。
+    private IndomitableRune _shieldSource;
+    private float _shieldScanTimer;
+    private Image _shieldFillImage;
 
     // 実行時生成バー用に補完する白スプライト(全HPバーで共有)。
     private static Sprite _sharedFillSprite;
@@ -81,6 +91,15 @@ public class WorldHealthBar : MonoBehaviour
         _fillImage = fillImage;
         EnsureFillSprite();
 
+        // HP取得元が変わるため、シールドゲージは破棄してシールド源も再探索する(phase7-runes-fix4)。
+        if (_shieldFillImage != null)
+        {
+            Destroy(_shieldFillImage.gameObject);
+            _shieldFillImage = null;
+        }
+        _shieldSource = null;
+        _shieldScanTimer = 0f;
+
         if (_healthController != null && isActiveAndEnabled)
         {
             _healthController.HealthChanged += HandleHealthChanged;
@@ -101,13 +120,19 @@ public class WorldHealthBar : MonoBehaviour
             return;
         }
 
+        _fillImage.sprite = GetSharedFillSprite();
+    }
+
+    // 実行時生成バー・シールドゲージ用の共有白スプライトを返す(未作成なら作成する)。
+    private static Sprite GetSharedFillSprite()
+    {
         if (_sharedFillSprite == null)
         {
             Texture2D texture = Texture2D.whiteTexture;
             _sharedFillSprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f));
         }
 
-        _fillImage.sprite = _sharedFillSprite;
+        return _sharedFillSprite;
     }
 
     private void Start()
@@ -124,6 +149,7 @@ public class WorldHealthBar : MonoBehaviour
     private void LateUpdate()
     {
         FaceMainCamera();
+        UpdateShieldGauge();
     }
 
     private void FaceMainCamera()
@@ -140,6 +166,95 @@ public class WorldHealthBar : MonoBehaviour
 
         // カメラと同じ向きに揃えることで、常にカメラ方向を向き、左右が裏返ることもない。
         transform.rotation = _mainCamera.transform.rotation;
+    }
+
+    // 不屈ルーンのシールド残量を白いゲージとして表示する(phase7-runes-fix4)。
+    // シールドゲージは(現在HP+シールド)/最大HPまで描画され、その手前に通常のHPゲージが重なるため、
+    // 見た目上はHPゲージの右側にシールド分の白い帯が伸びる。シールドなし・死亡中は非表示。
+    private void UpdateShieldGauge()
+    {
+        if (_healthController == null || _fillImage == null)
+        {
+            return;
+        }
+
+        // シールド源(不屈ルーン)の遅延探索。ルーンは試合開始後にAddComponentされるため一定間隔で再探索する。
+        if (_shieldSource == null)
+        {
+            _shieldScanTimer -= Time.deltaTime;
+            if (_shieldScanTimer > 0f)
+            {
+                return;
+            }
+
+            _shieldScanTimer = ShieldScanInterval;
+            _shieldSource = _healthController.GetComponent<IndomitableRune>();
+            if (_shieldSource == null)
+            {
+                return;
+            }
+        }
+
+        float shield = _shieldSource.ShieldAmount;
+        bool visible = shield > 0f && !_healthController.IsDead;
+        if (!visible)
+        {
+            if (_shieldFillImage != null)
+            {
+                _shieldFillImage.enabled = false;
+            }
+            return;
+        }
+
+        if (_shieldFillImage == null)
+        {
+            CreateShieldFillImage();
+            if (_shieldFillImage == null)
+            {
+                return;
+            }
+        }
+
+        _shieldFillImage.enabled = true;
+        float maxHealth = _healthController.MaxHealth;
+        _shieldFillImage.fillAmount = maxHealth > 0f
+            ? Mathf.Clamp01((_healthController.CurrentHealth + shield) / maxHealth)
+            : 0f;
+    }
+
+    // シールド表示用の白いFilled Imageを、Fillと同じ親・同じ矩形でFillの直前(背面側)の兄弟として生成する。
+    // Fillより後ろに描画されるため、HP分は通常のHPゲージ色、シールド分だけが白く見える。
+    private void CreateShieldFillImage()
+    {
+        RectTransform fillRect = _fillImage.rectTransform;
+
+        GameObject shieldObject = new GameObject("Shield Fill", typeof(RectTransform));
+        RectTransform shieldRect = shieldObject.GetComponent<RectTransform>();
+        shieldRect.SetParent(fillRect.parent, false);
+        shieldRect.anchorMin = fillRect.anchorMin;
+        shieldRect.anchorMax = fillRect.anchorMax;
+        shieldRect.pivot = fillRect.pivot;
+        shieldRect.anchoredPosition = fillRect.anchoredPosition;
+        shieldRect.sizeDelta = fillRect.sizeDelta;
+        shieldRect.localScale = fillRect.localScale;
+        // Fillの直前の兄弟に差し込み、Fill(HPゲージ)が手前に描画されるようにする。
+        shieldRect.SetSiblingIndex(fillRect.GetSiblingIndex());
+
+        _shieldFillImage = shieldObject.AddComponent<Image>();
+        _shieldFillImage.sprite = GetSharedFillSprite();
+        _shieldFillImage.type = Image.Type.Filled;
+        if (_fillImage.type == Image.Type.Filled)
+        {
+            _shieldFillImage.fillMethod = _fillImage.fillMethod;
+            _shieldFillImage.fillOrigin = _fillImage.fillOrigin;
+        }
+        else
+        {
+            _shieldFillImage.fillMethod = Image.FillMethod.Horizontal;
+            _shieldFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        }
+        _shieldFillImage.color = Color.white;
+        _shieldFillImage.raycastTarget = false;
     }
 
     private void HandleHealthChanged(float currentHealth, float maxHealth)

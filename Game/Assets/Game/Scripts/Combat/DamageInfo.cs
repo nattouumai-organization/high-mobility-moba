@@ -13,10 +13,12 @@ public enum DamageType
 }
 
 /// <summary>
-/// 1回のダメージに関する情報(攻撃者・ダメージ種別・元ダメージ量・反射フラグ)。
+/// 1回のダメージに関する情報(攻撃者・ダメージ種別・元ダメージ量・反射フラグ・発生源ID)。
 /// HealthControllerがHPへ適用する直前に、IIncomingDamageModifier(ゼルフWなど)へ渡す。
 /// 攻撃者が取得できないダメージはAttackerがnullになる。
 /// IsReflectedは反射によるダメージ(ヴォルブラークRの反射など)であることを表し、反射ダメージの再反射防止に使用する。
+/// SourceIdはダメージの発生源(スキルの1回の発動など)を識別するID(既定null)。
+/// 1回のスキル発動で発生した多段ヒット・複数対象ダメージは同じIDを共有する(連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用。phase7-runes-fix4)。
 /// </summary>
 public readonly struct DamageContext
 {
@@ -35,13 +37,20 @@ public readonly struct DamageContext
     /// <summary>通常攻撃によるダメージかどうか。タワー・本拠地は通常攻撃のみダメージを受ける(フェーズ5)。</summary>
     public readonly bool IsBasicAttack;
 
-    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false, bool isBasicAttack = false)
+    /// <summary>
+    /// ダメージ発生源ID(例: "ZelfW#3"、既定null)。
+    /// 1回のスキル発動で発生した多段ヒット・複数対象ダメージは同じIDを共有する(phase7-runes-fix4)。
+    /// </summary>
+    public readonly string SourceId;
+
+    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false, bool isBasicAttack = false, string sourceId = null)
     {
         Attacker = attacker;
         Type = type;
         BaseAmount = baseAmount;
         IsReflected = isReflected;
         IsBasicAttack = isBasicAttack;
+        SourceId = sourceId;
     }
 }
 

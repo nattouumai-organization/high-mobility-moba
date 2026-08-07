@@ -453,3 +453,18 @@
   - 攻城: 条件成立/解除の切り替わり、タワーへの1.12倍適用時。
   - RuneApplier: ルーン未選択時のログを追加(適用ログは既存を日本語化)。
 - ゲーム仕様・数値の変更はなし(ログ追加のみ)。
+
+## phase7-runes-fix4: ルーン挙動の修正(連撃1スキル1カウント・不屈シールド白ゲージ・追撃E除外)
+
+### Added
+- `DamageContext.SourceId`: ダメージ発生源ID(例: "ZelfW#3"、既定null)。1回のスキル発動で発生した多段ヒット・複数対象ダメージは同じIDを共有する
+- `HealthController.TakeDamage`に`sourceId`引数を追加(既定null・既存の呼び出しはそのまま動作)。軽減判定(IIncomingDamageModifier)とDamageTakenイベントの両方のDamageContextへ引き継ぐ
+- ゼルフW/E・ヴォルブラークQ/W/Eのスキルダメージへ発動ごとのSourceIdを付与("ZelfW#n" / "ZelfE#n" / "VolbraakQ#n" / "VolbraakW#n" / "VolbraakE#n")
+- WorldHealthBar: 不屈ルーンのシールド残量をHPバーの白いゲージとして表示((現在HP+シールド)/最大HPまで白を描画し、その手前に通常のHPゲージを重ねる)。シールドなし・死亡中は非表示
+
+### Changed
+- 連撃ルーン: 1回のスキル発動(同一SourceId)は多段ヒット・複数対象命中でも1カウントとして扱う(例: ゼルフWは1発動で1カウント)。SourceIdを持たないダメージ(通常攻撃など)は従来どおり毎ヒットカウント
+- 追撃ルーン: E自身のダメージ(SourceIdがゼルフE/ヴォルブラークE)では発動しない。その際発動ウィンドウは消費せず、E使用後の次の命中(通常攻撃・Q・Wなど)で発動する
+
+### Fixed
+- 不屈ルーンのシールドが実際にはダメージを吸収していなかった問題を修正(IIncomingDamageModifierとしてHealthControllerへ接続し、AddComponent後にRefreshDamageModifiersでキャッシュを再取得。通常ダメージはAR軽減後のHP換算値で消費するVolbraakWと同じ方式のため二重軽減なし)
