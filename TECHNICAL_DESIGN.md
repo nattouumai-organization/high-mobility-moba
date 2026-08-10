@@ -24,7 +24,7 @@ Networking: Unity Transport + Server-authoritative dedicated server
 ### Phase 2: ローカル対戦
 
 - 同一PC上で2キャラクターを操作可能にする
-- ミニオン、タワー、本拠地、ポイント、レベル、勝敗を追加する
+- ミニオン、各チーム2本のタワー、ポイント、レベル、第2タワー破壊による勝敗を追加する
 - スキル判定とゲームバランスを検証する
 
 ### Phase 3: オンライン1v1
@@ -76,6 +76,8 @@ Assets/
 
 ```text
 GameManager
+MatchResultController
+MatchResultUI
 MatchState
 TeamType
 GameTick
@@ -83,6 +85,9 @@ TopDownCameraController
 ```
 
 - 試合開始、勝敗、復活、ゲーム状態を管理する。
+- `GameManager`は`IsMatchEnded`、`WinningTeam`、`LosingTeam`を保持し、第2タワー破壊時だけ`MatchEnded(Action<Team>)`を1試合につき1回発火する。第1タワー破壊では試合を終了しない。
+- `GameManager`は起動時に`MatchResultController`をget-or-addし、SC_Prototypeへの手動アタッチなしで結果UIと停止処理を有効化する。
+- `GameManager`はSC_Prototype用の`PrototypeMatchDebugController`もget-or-addする。旧シーンのMap本体に残る未初期化TowerControllerだけを無効化し、Blue第2タワーの前提判定へ混入させない。InspectorのPlayer Team DebugではPlayerチームを一時固定できる。Minion Attack Debugでは通常ルールで0になった攻撃を維持したまま、有効なミニオン攻撃の1ヒット最終ダメージを一時的に上書きできる。いずれも既定は無効で通常バランスへ影響しない。
 - 状態は `Waiting`、`CharacterSelect`、`Playing`、`Finished` を持つ。
 - `TopDownCameraController`(Scripts/Core) はMain Cameraへ追加するカメラモード管理。ロックモード(既定)ではプレイヤーを中心にカメラが追従し、フリーモードでは追従せずマウスカーソルが画面端(上下左右)にある間その方向へ水平にスクロールする(スクロール速度・画面端の判定幅はInspector設定)。フリーモード中もSpaceを押している間は即座にプレイヤー中心へ戻して追従し、Yでモードを切り替える(フリー→ロック切替時は即座にプレイヤー中心)。追従対象は未設定ならPlayerClickMovement/PlayerInputHubを持つオブジェクトを自動検出し、対象取得時のカメラ位置との相対オフセットを維持するため俰瞰角度・高さはシーン設定のまま。スクロール方向はカメラのY軸回転に合わせたXZ平面上の右・前方向を使用する。入力はPlayerInputHub(CameraCenterPressed / CameraLockTogglePressedThisFrame / MousePosition)を使用し、マップ境界によるスクロール範囲のクランプはマップ実装後に追加する。
 
@@ -193,12 +198,12 @@ MinionController
 MinionSpawner
 WaveController
 TowerController
-NexusController
+NexusController (legacy compatibility only)
 ```
 
-- WaveControllerが20秒ごとに5体のミニオンを出現させる。
-- TowerControllerが敵ヒーローを優先して攻撃する。
-- NexusControllerはタワー破壊後にのみダメージを受ける。
+- GameManagerが20秒ごとに5体のミニオンを出現させる。IsMatchEnded後は新規ウェーブを生成しない。
+- TowerControllerが優先順位に従って敵を攻撃する。第2タワーは同チームの第1タワー破壊まで無敵。
+- 第2タワー破壊だけを正式な勝利条件とする。NexusControllerは旧互換用で、勝敗処理には使用しない。
 
 ## 5. データ設計
 
@@ -254,7 +259,7 @@ Server Role: 移動、スキル、ダメージ、CC、ポイント、勝敗の�
 HP
 ポイント
 レベル
-タワー・本拠地HP
+第1タワー・第2タワーHP
 ```
 
 ## 7. 命名規則
@@ -308,7 +313,7 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 ### MapBuilder(実行順序-300)
 
-- シーンの空オブジェクトにアタッチするだけで1レーンマップ(地面84x24・タワー±16・本拠地±33)を実行時生成する。
+- シーンの空オブジェクトにアタッチするだけで1レーンマップ(地面84x24・第1タワー±16・第2タワー±33)を実行時生成する。本拠地は生成しない。
 - `_laneYawDegrees`(既定-45度)で全体を回転し、ブルー左下→レッド右上の斜めレーンにする。
 - Targetable/Groundレイヤーはレイヤー名(既定"Targetable"/"Ground")から実行時に解決し、PlayerTargetSelectorのLayerMask設定と整合させる。
 - StartでGameManagerの存在を確認し、シーンに無い/無効なら自動生成・有効化する(ミニオン不出撃の自己修復)。
@@ -318,13 +323,15 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 - ウェーブ管理: 開始15秒後に初回、以陀20秒間隔で両チームに近接3体+遠隔2体を出撃。ウェーブレベル=floor((n-1)/2)。
 - ヒーロー(PlayerClickMovement)へのTeamMember(ブルー)付与を担当(開始直後+5秒間隔)。タワーの索敵はTeamMember前提。
-- 本拠地破壊通知でマッチ終了フラグを立てる(勝敗UI・リスタートはタスク7)。
+- 第2タワー破壊通知でIsMatchEndedをtrueにし、WinningTeam/LosingTeamを保持してMatchEnded(Action<Team>)を1回だけ発火する。第1タワー破壊では終了しない。
+- 起動時にMatchResultControllerをget-or-addし、結果UIとゲーム停止処理をシーン手動設定なしで有効化する。
 
 ### 構造物のダメージルール(DamageContext.IsBasicAttack)
 
 - DamageContextにIsBasicAttackフラグを追加。通常攻撃(ヒーローAA・タワー・ミニオン)のみisBasicAttack: trueでTakeDamageを呼ぶ。
 - タワー: 同一チームからのダメージ0 / 通常攻撃以外は0 / 攻撃者周囲8以内に味方ミニオン不在なら確定無効・通常90%軽減 / AR60。
-- 本拠地: 自チームタワー破壊まで完全無敵 / 同一チームダメージ0 / 通常攻撃のみ / AR50。
+- 第2タワー: 自チームの第1タワー破壊まで完全無敵 / 同一チームダメージ0 / 通常攻撃のみ / AR60。
+- NexusControllerは旧シーン・Prefab互換用として残すが、MapBuilderから生成せず勝敗処理にも使用しない。
 - ヒーローの通常攻撃は同一チームの対象をターゲットにしない(PlayerBasicAttackController.GetValidTarget)。さらに右クリック選択段階でも同一チームの対象を除外する(PlayerTargetSelector.IsSameTeam)。
 - 構造物・ミニオンはCharacterStatsを持たないため、HealthController.SetMaxHealth(実行時HP設定)と各ControllerのIIncomingDamageModifierでARを自前適用する。AddComponent後はHealthController.RefreshDamageModifiers()を呼ぶ。
 
@@ -345,13 +352,13 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 ### ミニオン(MinionController)
 
 - 近接: HP420/AD18/AS0.85/射程1.75、遠隔: HP290/AD22/AS0.70/射程5。移動速度3.3。ウェーブレベル成長: 近接HP+20/AD+1.5/AR+1、遠隔HP+14/AD+1.5/AR+0.5。
-- 索敵範囲7以内の最近敵を狙い、敵不在の間はレーン進行方向へ進軍(中心線引き寄せ付き)。無敵状態の本拠地は狙わない。
+- 索敵範囲7以内の最近敵を狙い、敵不在の間はレーン進行方向へ進軍(中心線引き寄せ付き)。無敵状態の第2タワーは狙わない。
 - 分離処理: 半径の合計+余白(0.1m)より近いミニオン同士を最大2m/秒で押し離し、重なりを防ぐ。完全に重なった場合はスポーン順の連番から決定的な方向へ離れる(Unity 6で廃止のGetInstanceIDは使用しない)。
 - 攻撃はisBasicAttack: trueの通常攻撃扱いで構造物にも有効。ActiveMinions(static)をタワーのミニオン同伴判定が参照する。
 
 ### 移動と障害物回避(ObstacleAvoidance)
 
-- 静的ユーティリティObstacleAvoidanceが障害物(タワー・本拠地)をXZ平面上の円として扱う。半径はコライダー形状(タワー=CapsuleColliderの水平半径、本拠地=BoxColliderの水平対角半径)から算出し、移動体半径+余白0.15mを加える。
+- 静的ユーティリティObstacleAvoidanceが障害物(タワー・旧互換本拠地)をXZ平面上の円として扱う。半径はコライダー形状(タワー=CapsuleColliderの水平半径、本拠地=BoxColliderの水平対角半径)から算出し、移動体半径+余白0.15mを加える。
 - SteerDirection: 直進経路が円と交差する場合、目的地への向きから外れる角度が小さい側(=最短側)の接線角+余裕4度へ進行方向を回転する。接触中は接線+外向き成分で縁を回り込む。この距離より先の障害物は無視する上限(残り移動距離・先読み距離)を持つ。
 - ClampDestination: 目的地が円の内側の場合、円の外周(中心ちょうどを指した場合は現在位置側の縁)へ目的地を押し出す。
 - 障害物一覧はTowerController/NexusControllerから1秒間隔で自動収集する(タワー破壊・生成などのシーン変化に追従)。
@@ -380,9 +387,21 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - 連続キル数をヒーロー毎に記録し、撃破された側が1/2/3以上の連続キル中なら撃破側へ追加10/20/30ptのシャットダウン報酬を付与する。
 - TowerControllerがHealthChangedを監視し、与ダメージ累計1,000毎に攻撃側12pt・防衛側5pt、破壊時に攻撃側へ追加20ptを付与する(HP回復があっても最大到達段階で判定し二重付与しない)。
 - ヒーローのチームはGameManagerがレーンのローカルX座標で割り当てる(ブルー陣側=負がブルー、正がレッド)。従来の全員ブルー割当では敵ヒーローが同一チーム扱いになり、キルポイント・シャットダウン報酬が発生しなかった。
-- 本拠地(NexusController)は生成せず、各チームのタワーを2本生成する(1本目X=±16・2本目X=±33、いずれもHP5,000で段階報酬対象)。TowerControllerはtier(何本目か)を持ち、2本目は1本目が破壊されるまで無敵でミニオンの索敵からも除外される。2本目の破壊でGameManagerがマッチ終了(そのチームの負け)として扱う。NexusController.csは未使用としてプロジェクトに残る。
+- 本拠地(NexusController)は生成せず、各チームの第1タワーと第2タワーを生成する(1本目X=±16・2本目X=±33、いずれもHP5,000で段階報酬対象)。TowerControllerはtier(何本目か)を持ち、2本目は1本目が破壊されるまで無敵でミニオンの索敵からも除外される。2本目の破壊でGameManagerがマッチ終了(そのチームの負け)として扱う。NexusController.csは旧シーン・Prefab互換用として残るが、破壊されても勝敗処理を行わない。
 - タワーのHPバーには段階報酬(1,000ダメージ毎)の境界を縦の区切り線で表示する。
 - テストプレイ用: HeroKillRewardsはRespawnControllerを持つ非ヒーロー(トレーニングダミー・攻撃ダミー)もキル対象として追跡する。ヒーローがとどめを刺すとキル25ptを付与し(ダミーがTeamMemberを持たない場合はキル者のチームへ付与)、ダミーは倒されるたびに連続キル数が1増える扱いにして2回目以降の撃破でシャットダウン報酬(+10/+20/+30pt)を順に確認できる。ミニオン・タワーはRespawnControllerを持たないため対象外で、実際のヒーロー同士のキル判定にも影響しない。
+
+### 試合終了と結果UI(MatchResultController / MatchResultUI)
+
+- `MatchResultController`は`GameManager.MatchEnded`を購読し、試合終了処理を1回だけ実行する。
+- 終了直後に結果UIを表示し、PlayerInputHub、移動、視点、通常攻撃、ターゲット選択、Q/W/E/R、共通D、F、復活、ルーン、報酬監視を停止する。
+- 既存MinionControllerを無効化して移動・索敵・通常攻撃を停止し、TowerControllerを無効化して索敵・アグロ更新・通常攻撃を停止する。GameObjectとHPバーはDestroyしない。
+- GameManagerはIsMatchEnded後にウェーブ生成を行わない。
+- UI表示後はWaitForSecondsRealtimeでInspector設定可能な待機時間(既定1.0秒)を待ち、Time.timeScale=0にする。シーン再読込時は1へ復元する。
+- `MatchResultUI`はScreen Space OverlayのCanvasを実行時生成する。ローカルPlayerのTeamMemberから勝敗を判定し、VICTORY/勝利またはDEFEAT/敗北、勝利・敗北チーム、第2タワー破壊説明、両チームのポイントを表示する。Player未生成・Team未設定時は勝利チーム表示へ安全にフォールバックする。
+- 外部画像・外部UIアセットは使用しない。日本語フォントはWindows標準フォントを実行時に選択し、取得できない場合はUnity組み込みフォントへフォールバックする。
+- `NexusController`は旧シーン・Prefab互換用。MapBuilderはNexusを生成せず、Nexus破壊では勝敗処理を行わない。
+- 共通D失敗時はクールダウンのみ消費し、0.30秒硬直は採用しない。
 
 ### フェーズ7-1〜7-4: レベルとスキル強化
 

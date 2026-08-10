@@ -1,48 +1,43 @@
+using System;
 using UnityEngine;
 
 /// <summary>
-/// マッチ進行の管理(フェーズ5)。ミニオンウェーブの出撃とヒーローのチーム設定を担当する。
-/// シーンに無い場合はMapBuilderが自動生成するため、手動でアタッチしなくても動作する。
-/// - ウェーブ: 開始15秒後に初回、以陀20秒間隔で両チームに近接3体+遠隔2体を出撃させる。
-///   ウェーブレベル = floor((ウェーブ番号-1) / 2) でミニオンが徐々に強化される(GAME_DESIGN.md 3章)。
-/// - ヒーロー(PlayerClickMovementを持つオブジェクト)へは開始直後にTeamMemberを付与する。
-///   チームはレーンのどちら側にいるかで決める(ブルー陣側がブルー・レッド陣側がレッド)。
-///   タワーはTeamMemberを持つ敵しか索敵しないため、この付与が無いとタワーがヒーローを攻撃しない。
-/// - タワーの破壊通知を受け取り、2本目のタワーが破壊されたチームの負けとしてマッチを終了する
-///   (勝敗UI・リスタートはフェーズ5タスク7で実装予定)。
-/// - ポイントHUD(PointsHud)を実行時に生成する(フェーズ6)。
-/// - キル・シャットダウン報酬を扱うHeroKillRewardsを実行時に生成する(フェーズ6)。
-/// - レベル成長を扱うHeroLevelGrowthとスキル強化HUDのSkillUpgradeHudを実行時に生成する(フェーズ7)。
+/// マッチ進行を管理する。ミニオンウェーブ、ヒーローのチーム設定、正式な勝敗状態を担当する。
+/// 正式な勝利条件は第2タワーの破壊だけで、本拠地は勝敗条件に使用しない。
 /// </summary>
 [DefaultExecutionOrder(-250)]
 public class GameManager : MonoBehaviour
 {
     private const float HeroCheckInterval = 5f;
 
-    /// <summary>シーン上のGameManager。タワー・本拠地の破壊通知などが参照する。</summary>
     public static GameManager Instance { get; private set; }
 
-    // 初回ウェーブまでの秒数とウェーブ間隔(GAME_DESIGN.md: 初回15秒・以陀20秒)。
     [SerializeField] private float _firstWaveDelay = 15f;
     [SerializeField] private float _waveInterval = 20f;
-
-    // 1ウェーブあたりのミニオン数(近接3体+遠隔2体)。
     [SerializeField] private int _meleePerWave = 3;
     [SerializeField] private int _rangedPerWave = 2;
 
     private float _nextWaveTime;
     private int _waveNumber;
-    private float _heroCheckTimer; // 0のため開始直後の最初のUpdateで実行される。
+    private float _heroCheckTimer;
     private bool _matchEnded;
 
-    /// <summary>2本目のタワー(または本拠地)の破壊によりマッチが終了したかどうか。</summary>
-    public bool MatchEnded => _matchEnded;
+    /// <summary>試合終了済みならtrue。</summary>
+    public bool IsMatchEnded => _matchEnded;
+
+    /// <summary>試合終了時の勝利チーム。</summary>
+    public Team WinningTeam { get; private set; } = Team.Blue;
+
+    /// <summary>試合終了時の敗北チーム。</summary>
+    public Team LosingTeam { get; private set; } = Team.Red;
+
+    /// <summary>第2タワー破壊で1試合につき1回だけ発火する。引数は勝利チーム。</summary>
+    public event Action<Team> MatchEnded;
 
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            // 重複した場合はこのコンポーネントだけを破棄する(GameObjectは他のコンポーネントがいる可能性があるため残す)。
             Debug.LogWarning("GameManager: 既に別のGameManagerが存在するため、このコンポーネントは破棄します。", this);
             Destroy(this);
             return;
@@ -50,29 +45,20 @@ public class GameManager : MonoBehaviour
 
         Instance = this;
 
-        if (GetComponent<PointsHud>() == null)
-        {
-            gameObject.AddComponent<PointsHud>();
-        }
+        AddIfMissing<PointsHud>();
+        AddIfMissing<HeroKillRewards>();
+        AddIfMissing<HeroLevelGrowth>();
+        AddIfMissing<SkillUpgradeHud>();
+        AddIfMissing<RuneApplier>();
+        AddIfMissing<MatchResultController>();
+        AddIfMissing<PrototypeMatchDebugController>();
+    }
 
-        if (GetComponent<HeroKillRewards>() == null)
+    private void AddIfMissing<T>() where T : Component
+    {
+        if (GetComponent<T>() == null)
         {
-            gameObject.AddComponent<HeroKillRewards>();
-        }
-
-        if (GetComponent<HeroLevelGrowth>() == null)
-        {
-            gameObject.AddComponent<HeroLevelGrowth>();
-        }
-
-        if (GetComponent<SkillUpgradeHud>() == null)
-        {
-            gameObject.AddComponent<SkillUpgradeHud>();
-        }
-
-        if (GetComponent<RuneApplier>() == null)
-        {
-            gameObject.AddComponent<RuneApplier>();
+            gameObject.AddComponent<T>();
         }
     }
 
@@ -92,8 +78,11 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
-        // ヒーローへのTeamMember付与(開始直後に1回、以际5秒間隔で再確認)。
-        // リスポーンや途中生成されたヒーローにも付与するため定期的に確認する。
+        if (_matchEnded)
+        {
+            return;
+        }
+
         _heroCheckTimer -= Time.deltaTime;
         if (_heroCheckTimer <= 0f)
         {
@@ -101,46 +90,40 @@ public class GameManager : MonoBehaviour
             EnsureHeroTeamMembers();
         }
 
+        if (Time.time < _nextWaveTime)
+        {
+            return;
+        }
+
+        if (MapBuilder.Instance == null)
+        {
+            _nextWaveTime = Time.time + 1f;
+            return;
+        }
+
+        _waveNumber++;
+        SpawnWave(_waveNumber);
+        _nextWaveTime += _waveInterval;
+    }
+
+    /// <summary>タワー破壊通知。第1タワーでは終了せず、第2タワーだけで終了する。</summary>
+    public void NotifyTowerDestroyed(Team destroyedTowerTeam, int tier = 1)
+    {
         if (_matchEnded)
         {
             return;
         }
 
-        if (Time.time >= _nextWaveTime)
+        if (tier < 2)
         {
-            if (MapBuilder.Instance == null)
-            {
-                // マップが無いシーン(キャラクター選択など)では出撃させず、1秒後に再確認する。
-                _nextWaveTime = Time.time + 1f;
-                return;
-            }
-
-            _waveNumber++;
-            SpawnWave(_waveNumber);
-            _nextWaveTime += _waveInterval;
-        }
-    }
-
-    /// <summary>タワー破壊時にTowerControllerから呼ばれる。2本目(tier=2)の破壊でそのチームの負けとなる。</summary>
-    public void NotifyTowerDestroyed(Team team, int tier = 1)
-    {
-        if (tier >= 2)
-        {
-            if (_matchEnded)
-            {
-                return;
-            }
-
-            _matchEnded = true;
-            Debug.Log($"GameManager: {team}チームの2本目のタワーが破壊されました。{team.Opponent()}チームの勝利です(勝敗UIはフェーズ5タスク7で実装予定)。", this);
+            Debug.Log($"GameManager: {destroyedTowerTeam}チームの第1タワーが破壊されました。第2タワーが攻撃可能になります。", this);
             return;
         }
 
-        Debug.Log($"GameManager: {team}チームの1本目のタワーが破壊されました。{team}チームの2本目のタワーが攻撃可能になります。", this);
+        EndMatch(destroyedTowerTeam.Opponent(), destroyedTowerTeam);
     }
 
-    /// <summary>本拠地破壊時にNexusControllerから呼ばれる。</summary>
-    public void NotifyNexusDestroyed(Team team)
+    private void EndMatch(Team winningTeam, Team losingTeam)
     {
         if (_matchEnded)
         {
@@ -148,27 +131,39 @@ public class GameManager : MonoBehaviour
         }
 
         _matchEnded = true;
-        Debug.Log($"GameManager: {team}チームの本拠地が破壊されました。{team.Opponent()}チームの勝利です(勝敗UIはフェーズ5タスク7で実装予定)。", this);
+        WinningTeam = winningTeam;
+        LosingTeam = losingTeam;
+
+        Debug.Log($"GameManager: {losingTeam}チームの第2タワーが破壊されました。{winningTeam}チームの勝利です。", this);
+        MatchEnded?.Invoke(winningTeam);
     }
 
-    // PlayerClickMovementを持つヒーローへTeamMemberを付与する。
-    // タワーの索敵とタワー側の同一チーム判定はTeamMemberを前提にするため、この付与が必須。
-    // チームはレーンのローカルX座標で決める(ブルー陣側=負がブルー、正がレッド)。
-    // 従来の全員ブルー割当だと敵ヒーローが同一チーム扱いになり、キルポイントが発生しない。
+    /// <summary>
+    /// 旧NexusControllerとの互換入口。本拠地は現在の勝敗条件ではないため、試合終了処理は行わない。
+    /// </summary>
+    [Obsolete("本拠地は廃止されています。勝敗はNotifyTowerDestroyedの第2タワー破壊だけで確定します。")]
+    public void NotifyNexusDestroyed(Team destroyedNexusTeam)
+    {
+        Debug.LogWarning(
+            $"GameManager: 旧本拠地({destroyedNexusTeam})の破壊通知を無視しました。正式な勝利条件は第2タワーの破壊です。",
+            this);
+    }
+
     private void EnsureHeroTeamMembers()
     {
         foreach (PlayerClickMovement hero in FindObjectsByType<PlayerClickMovement>(FindObjectsSortMode.None))
         {
-            if (hero.GetComponent<TeamMember>() == null)
+            if (hero.GetComponent<TeamMember>() != null)
             {
-                TeamMember member = hero.gameObject.AddComponent<TeamMember>();
-                member.SetTeam(ResolveHeroTeam(hero.transform.position));
-                Debug.Log($"GameManager: {hero.name}を{member.Team}チームに設定しました。", hero);
+                continue;
             }
+
+            TeamMember member = hero.gameObject.AddComponent<TeamMember>();
+            member.SetTeam(ResolveHeroTeam(hero.transform.position));
+            Debug.Log($"GameManager: {hero.name}を{member.Team}チームに設定しました。", hero);
         }
     }
 
-    // ヒーローの所属チームを位置から決める。MapBuilderが無いシーン(キャラクター選択など)ではブルー扱い。
     private static Team ResolveHeroTeam(Vector3 worldPosition)
     {
         MapBuilder map = MapBuilder.Instance;
@@ -183,16 +178,24 @@ public class GameManager : MonoBehaviour
 
     private void SpawnWave(int waveNumber)
     {
+        if (_matchEnded)
+        {
+            return;
+        }
+
         int waveLevel = Mathf.Max(0, (waveNumber - 1) / 2);
         SpawnTeamWave(Team.Blue, waveLevel);
         SpawnTeamWave(Team.Red, waveLevel);
         Debug.Log($"GameManager: ウェーブ{waveNumber}を出撃させました(ウェーブレベル{waveLevel}・各チーム 近接{_meleePerWave}体+遠隔{_rangedPerWave}体)。", this);
     }
 
-    // 1チーム分のウェーブを出撃させる。近接は前方に横並び、遠隔は後方に横並びで配置する。
-    // 横並びの基準(lateral)はレーン進行方向と直交する水平ベクトル。
     private void SpawnTeamWave(Team team, int waveLevel)
     {
+        if (_matchEnded)
+        {
+            return;
+        }
+
         MapBuilder map = MapBuilder.Instance;
         if (map == null)
         {

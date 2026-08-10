@@ -20,6 +20,32 @@
 - 削除した要素
 ```
 
+## 2026-08-10
+
+### Added
+- SC_PrototypeのGameManagerへPrototypeMatchDebugControllerを実行時追加し、InspectorからPlayerチームの一時固定とミニオンの1ヒット最終ダメージ上書きを切り替えられるようにした。
+
+### Fixed
+- SC_PrototypeのMap本体に残っていた未初期化TowerControllerがBlue第1タワーとして静的登録され、Blue第2タワーが永久に無敵扱いになる問題を修正した。旧コンポーネントだけを無効化し、MapBuilderが生成する正規タワーは変更しない。
+- 上記の誤った無敵判定により、Red Playerの通常攻撃がBlue第2タワーへダメージを与えられず、Redミニオンも攻撃対象から除外して通過する問題を修正した。
+
+## 2026-08-09
+
+### Added
+- 第2タワー破壊による正式な勝敗処理を追加した。GameManagerがIsMatchEnded、WinningTeam、MatchEndedイベントを保持し、イベントは1試合につき1回だけ発火する。
+- 外部UIアセットを使わない全画面の勝敗UIを追加した。ローカルPlayerのTeamMemberを基準にVICTORY / 勝利またはDEFEAT / 敗北を表示し、勝利・敗北チームと両チームのポイントを表示する。
+- MatchResultControllerを追加し、試合終了時に入力、ヒーローの移動・通常攻撃・スキル、ミニオンの移動・索敵・攻撃、タワーの索敵・攻撃、新規ウェーブ、復活、報酬監視を停止するようにした。
+- 結果UI表示後、Inspectorで変更可能な実時間待機(既定1.0秒)の後にTime.timeScaleを0へ設定する処理を追加した。
+
+### Changed
+- 本拠地破壊による勝利条件を廃止し、第1タワー破壊後に攻撃可能になる第2タワーの破壊を唯一の正式な勝利条件として整理した。
+- NexusControllerを旧シーン・Prefab向けの互換コードとして整理し、破壊されても勝敗処理へ影響しないようにした。
+- 共通D失敗時の仕様を「クールダウン消費のみ、0.30秒硬直なし」としてドキュメントとタスクへ反映した。
+- TASKS.mdのPhase 5勝敗タスクを「第2タワー破壊時の勝敗処理と結果UIを実装する」へ変更し、完了状態にした。
+
+### Removed
+- TASKS.mdから「共通D失敗時の0.30秒硬直を実装する」を削除した。
+
 ## 2026-08-04
 
 ### Added
@@ -426,45 +452,3 @@
 - CharacterSelectionUI: 確定ボタンをSC_RuneSelectへ遷移に変更。
 - GameManager: RuneApplierをAddComponentで導入。
 - RuneApplier: SC_Prototype起動後にBlueチームのヒーローへルーン付与。
-
-## phase7-runes-fix1: CS0191修正（ルーンのダメージ付与）
-
-- RelentlessRune / PursuitRune: `DamageContext`はreadonly structのためオブジェクト初期化子（`new DamageContext { Attacker = ... }`）では生成不可（CS0191）。
-- 既存の`HealthController.TakeDamage(float damage, Transform attacker, DamageType damageType)`オーバーロードを使用する形に変更。DamageContextはHealthController内部で正しく構築されるため、軍減判定（IIncomingDamageModifier）も従来通り機能する。
-
-## phase7-runes-fix2: キャラ選択画面が表示されない問題の修正（GUID不整合）
-
-- CharacterSelectionUI.cs.meta: phase7-runesの納品で新規GUIDに上書きしてしまい、SC_CharacterSelect.unityのスクリプト参照（f6b9d2e5...）がMissing Script化していた。元のGUIDを復元。
-- SC_RuneSelect.unity: RuneSelectionUIのスクリプト参照GUIDが仮の値（0000...f001）のままだったため、実際のRuneSelectionUI.cs.metaのGUID（3dbf3191...）に修正。
-- EditorBuildSettings.asset: SC_RuneSelectをビルド対象シーンに追加（SC_CharacterSelect → SC_RuneSelect → SC_Prototype）。未登録だとSceneManager.LoadSceneが失敗する。
-
-## phase7-runes-fix3: キャラクター選択画面のカード・詳細が表示されない問題の修正
-
-### Fixed
-- SC_CharacterSelect.unity: CharacterSelectionUIコンポーネントのシリアライズデータ（_charactersのキャラクター一覧など）が消失していたため、カードが1枚も生成されず灰色のプレースホルダーだけが表示されていた。Missing Script状態（phase7-runesの.meta GUID上書きが原因）でシーンが保存された際にデータが失われたもの。ゼルフ（ZelfData.asset）とヴォルブラーク（VolbraakData.asset）の参照・スキル概要・画面テキスト・見た目設定をシーンに再設定し、以前と同じ表示（左：キャラカード2枚、右：詳細パネル）に復元。スクリプトの変更はなし。
-
-## phase7-runes-debuglog: ルーン発動確認用のコンソールログ追加
-
-### Added
-- 各ルーンの発動状況を確認できる日本語のコンソールログを追加した。プレフィックスは「[ルーン/連撃]」「[ルーン/不屈]」「[ルーン/追撃]」「[ルーン/攻城]」「[ルーン]」。
-  - 連撃: 命中カウント進捗(1/3、2/3)、発動(ダメージ量・対象)、MSバフ終了。
-  - 不屈: 発動(被弾合計・シールド量)、シールドの吸収/破壊/時間切れ。
-  - 追撃: E/F押下による発動ウィンドウ開始(CD中は残りCD秒数を表示)、発動(ダメージ量・対象)。
-  - 攻城: 条件成立/解除の切り替わり、タワーへの1.12倍適用時。
-  - RuneApplier: ルーン未選択時のログを追加(適用ログは既存を日本語化)。
-- ゲーム仕様・数値の変更はなし(ログ追加のみ)。
-
-## phase7-runes-fix4: ルーン挙動の修正(連撃1スキル1カウント・不屈シールド白ゲージ・追撃E除外)
-
-### Added
-- `DamageContext.SourceId`: ダメージ発生源ID(例: "ZelfW#3"、既定null)。1回のスキル発動で発生した多段ヒット・複数対象ダメージは同じIDを共有する
-- `HealthController.TakeDamage`に`sourceId`引数を追加(既定null・既存の呼び出しはそのまま動作)。軽減判定(IIncomingDamageModifier)とDamageTakenイベントの両方のDamageContextへ引き継ぐ
-- ゼルフW/E・ヴォルブラークQ/W/Eのスキルダメージへ発動ごとのSourceIdを付与("ZelfW#n" / "ZelfE#n" / "VolbraakQ#n" / "VolbraakW#n" / "VolbraakE#n")
-- WorldHealthBar: 不屈ルーンのシールド残量をHPバーの白いゲージとして表示((現在HP+シールド)/最大HPまで白を描画し、その手前に通常のHPゲージを重ねる)。シールドなし・死亡中は非表示
-
-### Changed
-- 連撃ルーン: 1回のスキル発動(同一SourceId)は多段ヒット・複数対象命中でも1カウントとして扱う(例: ゼルフWは1発動で1カウント)。SourceIdを持たないダメージ(通常攻撃など)は従来どおり毎ヒットカウント
-- 追撃ルーン: E自身のダメージ(SourceIdがゼルフE/ヴォルブラークE)では発動しない。その際発動ウィンドウは消費せず、E使用後の次の命中(通常攻撃・Q・Wなど)で発動する
-
-### Fixed
-- 不屈ルーンのシールドが実際にはダメージを吸収していなかった問題を修正(IIncomingDamageModifierとしてHealthControllerへ接続し、AddComponent後にRefreshDamageModifiersでキャッシュを再取得。通常ダメージはAR軽減後のHP換算値で消費するVolbraakWと同じ方式のため二重軽減なし)

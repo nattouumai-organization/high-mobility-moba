@@ -1,11 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// 本拠地(GAME_DESIGN.md 3章)。MapBuilderが実行時に生成し、Initializeで所属チームを設定する。
-/// - 自チームの1本目のタワーが破壊されるまで完全無敵(すべてのダメージを0にする)。
-/// - 受けるダメージはタワーと同じく通常攻撃のみ有効。同一チームからのダメージは0。
-/// - 通常ダメージはAR50で軽減(CharacterStatsを持たないため自前で適用)。
-/// - 破壊されるとGameManagerへ通知し、相手チームの勝利となる。
+/// 旧仕様との互換用。本拠地はMapBuilderから生成されず、現在の正式な勝利条件にも使用しない。
+/// 古いシーンやPrefabに残っていても、第2タワー勝利条件へ影響を与えない。
 /// </summary>
 public class NexusController : MonoBehaviour, IIncomingDamageModifier
 {
@@ -15,20 +12,17 @@ public class NexusController : MonoBehaviour, IIncomingDamageModifier
     private HealthController _health;
     private bool _isDestroyed;
 
-    /// <summary>所属チーム。</summary>
     public Team Team => _team;
 
-    /// <summary>自チームの1本目のタワーが破壊されるまでは無敵。</summary>
+    /// <summary>互換オブジェクトの被ダメージ条件。現在のマッチ進行では参照しない。</summary>
     public bool IsInvulnerable => !TowerController.IsTowerDestroyed(_team);
 
-    /// <summary>生成直後の初期化(MapBuilderから呼び出す)。</summary>
     public void Initialize(Team team)
     {
         _team = team;
         _health = GetComponent<HealthController>();
         if (_health != null)
         {
-            // HealthController.AwakeのキャッシュはこのAddComponentより先に実行済みのため再取得させる。
             _health.RefreshDamageModifiers();
             _health.Died += HandleDied;
         }
@@ -42,16 +36,13 @@ public class NexusController : MonoBehaviour, IIncomingDamageModifier
         }
     }
 
-    /// <summary>受けるダメージの変更(IIncomingDamageModifier)。クラスコメントのルールを適用する。</summary>
     public float ModifyIncomingDamage(DamageContext context, float currentAmount)
     {
-        // 自チームのタワー破壊前は完全無敵。
         if (IsInvulnerable)
         {
             return 0f;
         }
 
-        // 同一チームからのダメージは受けない。
         if (context.Attacker != null)
         {
             TeamMember attackerTeam = context.Attacker.GetComponent<TeamMember>();
@@ -61,13 +52,11 @@ public class NexusController : MonoBehaviour, IIncomingDamageModifier
             }
         }
 
-        // 本拠地も通常攻撃でのみダメージを受ける(スキル・反射は無効)。
         if (!context.IsBasicAttack)
         {
             return 0f;
         }
 
-        // ARによる通常ダメージの軽減。
         if (context.Type == DamageType.Normal)
         {
             currentAmount = currentAmount * 100f / (100f + Armor);
@@ -84,9 +73,8 @@ public class NexusController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _isDestroyed = true;
-        if (GameManager.Instance != null)
-        {
-            GameManager.Instance.NotifyNexusDestroyed(_team);
-        }
+        Debug.LogWarning(
+            $"NexusController: 旧互換用の{_team}本拠地が破壊されましたが、勝敗処理は行いません。正式な勝利条件は第2タワーの破壊です。",
+            this);
     }
 }
