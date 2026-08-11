@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 朧Q。カーソル方向へ貫通する手裏剣を投げ、飛翔終了時に最後に接触した敵ヒーロー/TrainingDummy/ミニオンへ
-/// テレポートする。対象が死亡・無効化・破棄された場合は記録した最後の接触地点へ飛ぶ。
-/// GAME_DESIGNにQダメージの記載がないため、この実装ではダメージを与えない。
+/// 朧Q。カーソル方向へ貫通する手裏剣を投げ、接触した各対象へ20 + AD×50%の通常ダメージを1回与える。
+/// 飛翔終了時に最後に接触した敵チャンピオン/TrainingDummy/ミニオンへテレポートし、
+/// 対象が死亡・無効化・破棄された場合は記録した最後の接触地点へ飛ぶ。
 /// 2ストックを個別ではなく順次リチャージし、発動済みの手裏剣が飛翔中でも残りストックを使用できる。
 /// </summary>
 [DisallowMultipleComponent]
@@ -16,16 +16,20 @@ public sealed class OboroQController : MonoBehaviour
     [Header("Projectile")]
     [SerializeField, Min(0.1f)] private float _projectileRange = 7f;
     [SerializeField, Min(0.1f)] private float _projectileSpeed = 14f;
-    [SerializeField, Min(0.01f)] private float _hitRadius = 0.35f;
-    [SerializeField, Min(0f)] private float _projectileHeight = 0.9f;
+    [SerializeField, Min(0.01f)] private float _hitRadius = 0.6f;
+    [SerializeField, Min(0f)] private float _projectileHeight = 0f;
     [SerializeField, Min(0f)] private float _teleportStopDistance = 0.7f;
+
+    [Header("Damage")]
+    [SerializeField, Min(0f)] private float _baseDamage = 20f;
+    [SerializeField, Min(0f)] private float _adRatio = 0.5f;
 
     [Header("Stocks")]
     [SerializeField, Min(1)] private int _maxCharges = 2;
     [SerializeField, Min(0.1f)] private float _stockRechargeTime = 8f;
 
     [Header("Cast")]
-    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
+    [SerializeField] private SkillCastMode _castMode = SkillCastMode.QuickCast;
     [SerializeField] private LayerMask _groundLayer;
     [SerializeField] private LayerMask _targetableLayer;
 
@@ -156,21 +160,14 @@ public sealed class OboroQController : MonoBehaviour
                        (_abilityLock == null || !_abilityLock.IsLocked) &&
                        (_crowdControl == null || !_crowdControl.IsMovementBlocked) &&
                        (_selfHealth == null || !_selfHealth.IsDead);
-        if (!visible || !OboroCombatUtility.TryGetMouseGroundPoint(_inputHub, ref _mainCamera, _groundLayer, out Vector3 groundPoint))
-        {
-            _rangeIndicator.HideAll();
-            return;
-        }
-
-        Vector3 direction = OboroCombatUtility.Flatten(groundPoint - transform.position);
-        if (direction.sqrMagnitude <= 0.0001f)
+        if (!visible || !TryGetCastDirection(out Vector3 direction))
         {
             _rangeIndicator.HideAll();
             return;
         }
 
         _rangeIndicator.ShowDirectionLine(transform.position + Vector3.up * 0.05f,
-            direction.normalized, _projectileRange, _projectileColor);
+            direction, _projectileRange, _projectileColor);
     }
 
     private void TryCast()
@@ -191,23 +188,51 @@ public sealed class OboroQController : MonoBehaviour
             Debug.Log("朧 Q: ストックがありません。", this);
             return;
         }
-        if (!OboroCombatUtility.TryGetMouseGroundPoint(_inputHub, ref _mainCamera, _groundLayer, out Vector3 point))
+        if (!TryGetCastDirection(out Vector3 direction))
         {
-            Debug.Log("朧 Q: マウスカーソルがGroundを指していません。", this);
-            return;
-        }
-
-        Vector3 direction = OboroCombatUtility.Flatten(point - transform.position);
-        if (direction.sqrMagnitude <= 0.0001f)
-        {
-            Debug.Log("朧 Q: 方向を決定できません。", this);
+            Debug.Log("朧 Q: 発射方向を決定できません。", this);
             return;
         }
 
         _wController?.BreakStealth("Q発動");
         ConsumeCharge();
         _castSequence++;
-        StartCoroutine(ThrowRoutine(direction.normalized, _castSequence));
+        StartCoroutine(ThrowRoutine(direction, _castSequence));
+    }
+
+    /// <summary>
+    /// Groundレイが取れる場合はカーソル地点を優先し、取れない場合は朧の高さの水平面との交点を使う。
+    /// どちらも取れない場合は正面方向へ発射し、Ground設定不足だけでQが不発にならないようにする。
+    /// </summary>
+    private bool TryGetCastDirection(out Vector3 direction)
+    {
+        direction = Vector3.zero;
+        if (OboroCombatUtility.TryGetMouseGroundPoint(_inputHub, ref _mainCamera, _groundLayer, out Vector3 groundPoint))
+        {
+            direction = OboroCombatUtility.Flatten(groundPoint - transform.position);
+        }
+        else
+        {
+            if (_mainCamera == null) _mainCamera = Camera.main;
+            if (_mainCamera != null && _inputHub != null)
+            {
+                Ray ray = _mainCamera.ScreenPointToRay(_inputHub.MousePosition);
+                Plane horizontalPlane = new Plane(Vector3.up, transform.position);
+                if (horizontalPlane.Raycast(ray, out float enter))
+                {
+                    direction = OboroCombatUtility.Flatten(ray.GetPoint(enter) - transform.position);
+                }
+            }
+        }
+
+        if (direction.sqrMagnitude <= 0.0001f)
+        {
+            direction = OboroCombatUtility.Flatten(transform.forward);
+        }
+
+        if (direction.sqrMagnitude <= 0.0001f) return false;
+        direction.Normalize();
+        return true;
     }
 
     private void ConsumeCharge()
@@ -234,6 +259,8 @@ public sealed class OboroQController : MonoBehaviour
         Vector3 lastHitPosition = Vector3.zero;
         bool hasHit = false;
         float traveled = 0f;
+        float rawDamage = _baseDamage + (_stats != null ? _stats.CurrentAttackDamage : 0f) * _adRatio;
+        string sourceId = $"OboroQ#{sequence}";
 
         while (traveled < _projectileRange)
         {
@@ -255,8 +282,17 @@ public sealed class OboroQController : MonoBehaviour
                 lastTarget = candidate;
                 lastHitPosition = candidate.transform.position;
                 hasHit = true;
-                candidate.PlayHitFlash();
-                Debug.Log($"朧 Q: {candidate.name}へ接触し、最後の対象を更新しました。", this);
+
+                HealthController targetHealth = OboroCombatUtility.GetHealth(candidate);
+                float actualDamage = targetHealth != null
+                    ? targetHealth.TakeDamage(rawDamage, transform, DamageType.Normal, sourceId: sourceId)
+                    : 0f;
+                if (actualDamage > 0f)
+                {
+                    candidate.PlayHitFlash();
+                    CombatTextManager.ShowDamageDealt(candidate.transform.position, actualDamage);
+                }
+                Debug.Log($"朧 Q: {candidate.name}へ接触し、{actualDamage:F1}ダメージを与えて最後の対象を更新しました。", this);
             }
 
             yield return null;

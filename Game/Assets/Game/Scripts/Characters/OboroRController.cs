@@ -2,8 +2,9 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 朧R。最大HPの20%以下にいる敵ヒーロー/TrainingDummyを、固定射程200(2 Unity units)で対象指定して処刑する。
-/// 処刑ダメージは発動時現在HPと同量の確定ダメージとしてHealthControllerへ渡すため、ARは無視する一方、
+/// 朧R。最大HPの10%以下にいる敵チャンピオン(Character分類)を、固定射程200(2 Unity units)で対象指定して処刑する。
+/// TeamMemberを持たないTrainingDummyも、ClassificationをCharacterへ変更した場合はテスト対象として扱う。
+/// 処刑ダメージは対象最大HPの10%分の確定ダメージで、ARは無視する一方、
 /// シールドやIIncomingDamageModifierによる軽減/無効化があれば生存できる。対象の共通D成功時は完全不発だがCDを消費する。
 /// WorldHealthBarは本クラスの静的照会APIを使い、対象のHPバーへ処刑閾値マーカーを表示する。
 /// </summary>
@@ -14,7 +15,8 @@ public sealed class OboroRController : MonoBehaviour
     private static readonly HashSet<OboroRController> ActiveControllers = new HashSet<OboroRController>();
 
     [Header("Execute")]
-    [SerializeField, Range(0.01f, 1f)] private float _executeHealthRatio = 0.2f;
+    [SerializeField, Range(0.01f, 1f)] private float _executeHealthRatio = 0.1f;
+    [SerializeField, Range(0.01f, 1f)] private float _executeDamageMaxHealthRatio = 0.1f;
     [SerializeField, Min(0f)] private float _castRange = 2f;
     [SerializeField, Min(0f)] private float _cooldown = 100f;
     [SerializeField, Range(0f, 1f)] private float _deathCooldownReduction = 0.6f;
@@ -211,7 +213,7 @@ public sealed class OboroRController : MonoBehaviour
 
     private bool IsValidTarget(Targetable target)
     {
-        if (!OboroCombatUtility.IsHeroOrTrainingDummy(target) || !OboroCombatUtility.IsEnemy(transform, target)) return false;
+        if (!OboroCombatUtility.IsEnemyChampion(transform, target)) return false;
         return OboroWController.CanBeTargetSelected(target, transform);
     }
 
@@ -254,8 +256,8 @@ public sealed class OboroRController : MonoBehaviour
             _mouseFacing?.SetLookDirection(direction);
         }
 
-        // 現在HPと同量の確定ダメージ。シールド/軽減が0より大きく吸収すればHPが残り、仕様どおり生存できる。
-        float executeDamage = health.CurrentHealth;
+        // 最大HPの10%分の確定ダメージ。閾値以下なら通常は致死だが、シールド/軽減が吸収すれば生存できる。
+        float executeDamage = health.MaxHealth * _executeDamageMaxHealthRatio;
         float actualDamage = health.TakeDamage(executeDamage, transform, DamageType.True,
             sourceId: $"OboroR#{_castSequence}");
         if (actualDamage > 0f)
@@ -287,7 +289,7 @@ public sealed class OboroRController : MonoBehaviour
     }
 
     /// <summary>
-    /// WorldHealthBar用。いずれかの生存中の朧から見て対象が敵ヒーロー/TrainingDummyなら閾値を返す。
+    /// WorldHealthBar用。いずれかの生存中の朧から見て対象が敵チャンピオンなら閾値を返す。
     /// </summary>
     public static bool TryGetExecuteThreshold(HealthController targetHealth, out float ratio, out bool isInExecuteRange)
     {
@@ -302,8 +304,7 @@ public sealed class OboroRController : MonoBehaviour
         {
             if (controller == null || !controller.isActiveAndEnabled ||
                 (controller._selfHealth != null && controller._selfHealth.IsDead)) continue;
-            if (!OboroCombatUtility.IsHeroOrTrainingDummy(target) ||
-                !OboroCombatUtility.IsEnemy(controller.transform, target)) continue;
+            if (!OboroCombatUtility.IsEnemyChampion(controller.transform, target)) continue;
 
             ratio = Mathf.Clamp01(controller._executeHealthRatio);
             isInExecuteRange = targetHealth.MaxHealth > 0f &&

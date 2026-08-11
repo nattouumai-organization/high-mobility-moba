@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 朧W。解除条件が成立するまで透明化し、MSを上げる。
+/// 朧W。3秒間透明化し、MSを上げる。解除条件が先に成立した場合はその時点で終了する。
 /// 対象指定攻撃は受けられないが、Collider/Targetableは維持するため方向・地点指定スキルには命中する。
 /// 敵が近い場合は輪郭リングを表示し、敵タワー射程内では輪郭表示に加えて通常どおり対象指定可能になる。
 /// 攻撃、Q/E/R、D/F、W再発動で解除する。
@@ -14,6 +14,7 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
 {
     [Header("Stealth")]
     [SerializeField, Min(0f)] private float _cooldown = 12f;
+    [SerializeField, Min(0f)] private float _duration = 3f;
     [SerializeField, Range(0f, 100f)] private float _moveSpeedBoostPercent = 20f;
     [SerializeField, Min(0f)] private float _enemyOutlineRevealRadius = 3f;
     [SerializeField, Min(0f)] private float _enemyTowerRevealRange = 8f;
@@ -26,12 +27,14 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
 
     [Header("Debug (Runtime)")]
     [SerializeField] private bool _isWActive;
+    [SerializeField] private float _remainingDuration;
     [SerializeField] private float _remainingCooldown;
     [SerializeField] private bool _isOutlineRevealed;
     [SerializeField] private bool _isInsideEnemyTowerRange;
 
     // HUDの既存経路と同じフィールド名。
     private double _cooldownEndTime;
+    private double _effectEndTime;
     private HealthController _health;
     private CharacterStats _stats;
     private PlayerInputHub _inputHub;
@@ -93,6 +96,13 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
 
         if (_isWActive)
         {
+            _remainingDuration = (float)System.Math.Max(0.0, _effectEndTime - Time.timeAsDouble);
+            if (Time.timeAsDouble >= _effectEndTime)
+            {
+                Deactivate("効果時間終了", restoreRenderers: true);
+                return;
+            }
+
             _isInsideEnemyTowerRange = EvaluateEnemyTowerRange();
             _isOutlineRevealed = _isInsideEnemyTowerRange || IsEnemyNear();
             if (_outline != null) _outline.enabled = _isOutlineRevealed;
@@ -110,6 +120,7 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
+        _remainingDuration = 0f;
         _isOutlineRevealed = false;
         _isInsideEnemyTowerRange = false;
         if (_outline != null) _outline.enabled = false;
@@ -135,6 +146,8 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _isWActive = true;
+        _effectEndTime = Time.timeAsDouble + _duration;
+        _remainingDuration = _duration;
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
         _remainingCooldown = _cooldown;
         _rendererStates.Clear();
@@ -167,6 +180,8 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
     {
         if (!_isWActive) return;
         _isWActive = false;
+        _effectEndTime = 0.0;
+        _remainingDuration = 0f;
         _isOutlineRevealed = false;
         _isInsideEnemyTowerRange = false;
         if (_outline != null) _outline.enabled = false;
@@ -196,6 +211,8 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
     private void HandleRevived()
     {
         _isWActive = false;
+        _effectEndTime = 0.0;
+        _remainingDuration = 0f;
         _appliedMoveSpeedBonus = 0f;
         if (_outline != null) _outline.enabled = false;
     }

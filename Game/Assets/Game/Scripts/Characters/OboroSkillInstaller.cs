@@ -8,8 +8,15 @@ using UnityEngine;
 [DisallowMultipleComponent]
 public sealed class OboroSkillInstaller : MonoBehaviour
 {
+    private const float SpawnY = 1f;
+
     private void Awake()
     {
+        // PlayerSpawnerを使わない既存シーンでも、朧の生成直後のワールドYを1へ統一する。
+        Vector3 spawnPosition = transform.position;
+        spawnPosition.y = SpawnY;
+        transform.position = spawnPosition;
+
         Ensure<OboroPassiveBackstab>();
         // Q/E/RのAwakeが透明化解除先を取得できるよう、Wを先に追加する。
         Ensure<OboroWController>();

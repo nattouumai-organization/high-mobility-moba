@@ -58,8 +58,8 @@ public static class OboroCombatUtility
     }
 
     /// <summary>
-    /// 敵かどうかを判定する。TeamMemberが両方にある場合はチーム差を必須とし、
-    /// TeamMemberを持たないTrainingDummyだけはローカル検証対象として許可する。
+    /// 敵かどうかを判定する。TeamMemberが両方にある場合はチーム差を必須とする。
+    /// TeamMemberを持たないCharacter分類は、TrainingDummyを敵チャンピオンの代用にするローカル検証経路として許可する。
     /// </summary>
     public static bool IsEnemy(Transform owner, Targetable target, bool allowTrainingDummy = true)
     {
@@ -72,7 +72,34 @@ public static class OboroCombatUtility
             return ownerTeam.Team != targetTeam.Team;
         }
 
-        return allowTrainingDummy && target.Classification == TargetClassification.TrainingDummy;
+        if (targetTeam == null)
+        {
+            if (target.Classification == TargetClassification.Character) return true;
+            return allowTrainingDummy && target.Classification == TargetClassification.TrainingDummy;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// E/R用の敵チャンピオン判定。通常のヒーローは敵TeamMemberを必須とし、
+    /// TeamMemberのないテスト対象はClassificationをCharacterへ変更した場合だけ許可する。
+    /// </summary>
+    public static bool IsEnemyChampion(Transform owner, Targetable target)
+    {
+        if (!IsAlive(target) || target.Classification != TargetClassification.Character || IsOwner(owner, target))
+        {
+            return false;
+        }
+
+        TeamMember ownerTeam = owner != null ? owner.GetComponentInParent<TeamMember>() : null;
+        TeamMember targetTeam = target.GetComponentInParent<TeamMember>();
+        if (ownerTeam != null && targetTeam != null)
+        {
+            return ownerTeam.Team != targetTeam.Team;
+        }
+
+        return targetTeam == null;
     }
 
     /// <summary>敵ヒーロー専用判定。TrainingDummy・Minion・Towerは含めない。</summary>

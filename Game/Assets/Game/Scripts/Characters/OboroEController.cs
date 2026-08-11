@@ -1,7 +1,8 @@
 using UnityEngine;
 
 /// <summary>
-/// 朧E。マウス下の敵ヒーロー/TrainingDummyを指定し、射程外なら自動接近する。
+/// 朧E。マウス下の敵チャンピオン(Character分類)を指定し、射程外なら自動接近する。
+/// TeamMemberを持たないTrainingDummyも、ClassificationをCharacterへ変更した場合はテスト用敵チャンピオンとして扱う。
 /// 発動時に開始地点を可視化して対象の真後ろへ移動し、「通常攻撃 + E追加ダメージ」を1回の通常ダメージとして与える。
 /// 通常攻撃部分は朧Pの背後判定対象になる。帰還待機中はAbilityLockControllerで通常攻撃・全スキルを禁止し、
 /// その間にスタンまたはスネアを受けた場合は開始地点へ戻らず、その場に残る。
@@ -254,7 +255,7 @@ public sealed class OboroEController : MonoBehaviour
 
     private bool IsValidTarget(Targetable target)
     {
-        if (!OboroCombatUtility.IsHeroOrTrainingDummy(target) || !OboroCombatUtility.IsEnemy(transform, target)) return false;
+        if (!OboroCombatUtility.IsEnemyChampion(transform, target)) return false;
         return OboroWController.CanBeTargetSelected(target, transform);
     }
 

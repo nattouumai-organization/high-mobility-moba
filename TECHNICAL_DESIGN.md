@@ -166,7 +166,7 @@ VolbraakRController
 - `CharacterSelectionUI` はSC_CharacterSelectのキャラクターカード・詳細パネル・開始ボタンを制御する。UIはInspectorで設定したキャラクター一覧(CharacterData参照+Coming Soon用フォールバック表示)から実行時にUnity UI Canvas上へ構築し、Availableのキャラクターのみ選択可能にする。フォントはUnity組み込みのLegacyRuntimeを使用し、New Input System対応のEventSystemも実行時に生成する。詳細パネルのスキル一覧はInspectorの短い一覧を優先し、未設定の場合はCharacterDataのP〜Rスキル説明から自動生成する。
 - `PlayerCharacterApplier` はPlayerプレハブ(PF_Player_Base)へアタッチして全Prefab Variantで共通使用し、シーン開始時にCharacterSelectionManagerが保持する選択中CharacterDataをCharacterStats.SetCharacterData()へ適用する(未選択でSC_Prototypeを直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用)。選択キャラクターがゼルフ以外の場合はゼルフ固有スキルコンポーネント(ZelfPassiveHeal / ZelfQ/W/E/RController)をDestroyImmediateで取り除き、移動・通常攻撃・共通D・Fなどの共通コンポーネントだけで動作させる(各キャラクターの固有スキルは実装後にこのクラスへ登録する)。同様に、ヴォルブラーク以外を選択した場合はヴォルブラーク固有のVolbraakPassiveShield(P)・VolbraakQController(Q)・VolbraakWController(W)・VolbraakEController(E)・VolbraakRController(R)を取り除く。DefaultExecutionOrder(-100)で他コンポーネントのAwakeより先に実行し、PlayerのRendererへテーマカラーも適用する(Inspectorで無効化可能)。Prefab Variant方式では各Variantは自分のスキルコンポーネントしか持たないため取り外しは通常何も行われず、CharacterDataとVariantの組み合わせをInspectorで誤設定した場合の安全網として機能する。各VariantのFallback Character Dataにはそのキャラクター自身のCharacterDataを設定する。
 - `OboroData`はGAME_DESIGN.mdの朧基礎値を一元管理する(HP590/+90、HPreg3.0/+0.25、AD63/+5.5、AS0.78/+1.5%、AR22/+3.5、MS370、AA射程125)。Character StatusはAvailableで、SC_CharacterSelectからPF_Player_Oboroを選択・生成できる。P/Q/W/E/RはPF_Player_OboroのOboroSkillInstallerが実行時に重複なく構成する。
-- `PlayerSpawner`(Scripts/Characters)は試合シーン(SC_Prototype)開始時に、キャラクター選択結果に応じたPlayerプレハブ(Prefab Variant)をスポナーの位置・向きへ生成する。選択中CharacterDataのPlayer Prefabを生成し、未選択で直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用する。シーンへPlayerが直接配置されている場合は生成をスキップする(移行前シーン用の安全網)。DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネント(TopDownCameraController / SkillRangePreviewなど)のAwakeより先に生成する。
+- `PlayerSpawner`(Scripts/Characters)は試合シーン(SC_Prototype)開始時に、キャラクター選択結果に応じたPlayerプレハブ(Prefab Variant)をスポナーの位置・向きへ生成する。選択中CharacterDataのPlayer Prefabを生成し、未選択で直接起動した場合はInspectorのFallback Character Data(ZelfData想定)を使用する。シーンへPlayerが直接配置されている場合は生成をスキップする(移行前シーン用の安全網)。朧選択時だけ生成ワールド座標のYを1へ固定し、スポナー側の高いYを継承しない。DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネント(TopDownCameraController / SkillRangePreviewなど)のAwakeより先に生成する。
 - `PlayerLayerMaskFallback` はPlayerCharacterApplierのAwakeから呼ばれる静的ヘルパー。Player配下の全コンポーネントの `_groundLayer` / `_targetableLayer` フィールドを調べ、未設定(Nothing)のものだけをレイヤー名(GroundLayer / TargetableLayer、無ければ6 / 7番)から自動補正する。Inspector設定済みの値は上書きせず、FlashControllerのWall Layerのような意図的な未設定フィールドは対象外。Prefab Variantへスキルコンポーネントを追加し直した際のLayerMask未設定によるスキル不発を防ぐ安全網。
 - Playerプレハブ構成(Prefabs/Characters/): `PF_Player_Base` がすべてのキャラクター共通のコンポーネント(移動・視点・ターゲット選択・通常攻撃・HP/復活・共通D・Fフラッシュ・PlayerInputHub・PlayerCharacterApplierなど)だけを持つ親プレハブ。各キャラクターは `PF_Player_Zelf`(ZelfPassiveHeal / ZelfQ/W/E/RControllerを追加)・`PF_Player_Volbraak`(VolbraakPassiveShield / VolbraakQ/W/E/RControllerを追加)・`PF_Player_Oboro`(OboroSkillInstallerからP/Q/W/E/Rを構成)のようにPrefab Variantとして作成し、CharacterData(Data/Characters/)のPlayer Prefabへ設定する。新キャラクターの追加手順: CharacterData作成 → PF_Player_BaseからPrefab Variant作成 → 固有スキルコンポーネントを追加(LayerMaskなどのInspector設定も忘れずに) → CharacterDataへVariantとFallbackを設定 → キャラクター選択画面の一覧へ登録。
 - `VolbraakPassiveShield`(Scripts/Characters)はヴォルブラークP(初撃無効化)を管理する。IIncomingDamageModifierとしてHealthControllerからHPへ適用する直前に呼び出され、一定時間(Recharge Duration、既定10秒)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(Normal / True)を問わず完全無効化する(ダメージ0)。シールドは消費まで永続し、ミニオン(TargetClassification.Minion)の攻撃では剥がれない(無効化もされず通常どおり受ける)。タワー(Tower分類)の攻撃も1回無効化するがPを消費する(タワー本体はフェーズ5実装予定。攻撃者のTargetable分類で判定するため実装後そのまま機能する)。攻撃者不明(null)のダメージは無効化の対象。被弾(実際にHPが減るダメージ)があるたびに無被弾タイマーをリセットする(ミニオンからの被弾も含む)。シールド展開中はPlayerの周囲へLineRendererのリングを実行時生成で表示し(Inspectorで無効化可能)、死亡中は再展開せず復活時は展開済みで復活する。
@@ -428,8 +428,8 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 ### 共通構成
 
-- `PF_Player_Oboro`へ`OboroSkillInstaller`を追加し、P/Q/W/E/Rを重複なく実行時構成する。`PlayerCharacterApplier`もOboroの固有コンポーネントを誤Prefab時に除去し、Oboro選択時にInstallerが無い場合は補完する。
-- `OboroCombatUtility`へ敵味方判定、Ground/Targetable LayerMaskのフォールバック、安全なCharacterController瞬間移動、対象の生存判定を集約した。
+- `PF_Player_Oboro`へ`OboroSkillInstaller`を追加し、スポーン直後のワールドY座標を1へ補正してからP/Q/W/E/Rを重複なく実行時構成する。`PlayerCharacterApplier`もOboroの固有コンポーネントを誤Prefab時に除去し、Oboro選択時にInstallerが無い場合は補完する。
+- `OboroCombatUtility`へ敵味方判定、Ground/Targetable LayerMaskのフォールバック、安全なCharacterController瞬間移動、対象の生存判定を集約した。TeamMemberのないテスト対象はClassificationがCharacterの場合だけ、E/R用の敵チャンピオン代用として許可する。
 - 全コントローラーは`PlayerInputHub`、`AbilityLockController`、`CrowdControlController`、`HealthController`、`SkillRangeIndicator`、`Time.timeAsDouble`という既存キャラクターと同じ経路を使用する。
 - `MatchResultController`の停止対象へ朧の全コンポーネントを追加し、発動中の投射物・透明化・E帰還待機・自動接近も試合終了時に停止する。
 - `SkillCooldownHud`は朧Q/W/E/Rを検出し、Qは現在ストック/最大ストックと次ストック回復時間を表示する。
@@ -442,33 +442,34 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 ### Q：手裏剣・2ストック・テレポート
 
-- カーソル方向へ射程7.0、速度14.0、接触半径0.35の貫通手裏剣を投げる。接触対象は敵Character、テスト用TrainingDummy、敵Minionで、Towerは対象外。
+- カーソル方向へ射程7.0、速度14.0、接触半径0.60の貫通手裏剣を投げる。投射高さはPlayerルートと同じ0にし、Y=1のヒーローから近接・遠隔ミニオン双方へ当たる高さにする。接触対象は敵Character、テスト用TrainingDummy、敵Minionで、Towerは対象外。
+- 接触した各対象へ1発につき1回、`20 + Current AD × 0.50`の通常ダメージを与える。Zelf Qの`30 + AD×0.60`、Volbraak Qの`25 + AD×0.80`に対し、貫通・2ストック・テレポートを持つため1ストック当たりの基礎値と係数を低めにした。
 - 飛翔中に接触した最後の対象を記録し、飛翔終了時にその対象へテレポートする。対象が死亡・無効化・破棄された場合は接触時の最後の地点へ飛ぶ。未命中時はテレポートしない。
-- GAME_DESIGN.mdにQダメージの記述がないため、手裏剣自体はダメージを与えない。
+- 既定Cast ModeはQuickCastとし、Q押下フレームで即時発射する。Groundレイを取得できない場合はPlayer高さの水平面との交点、さらに取得できない場合は正面方向を使い、Ground設定だけを理由に不発にしない。
 - 最大2ストック、1ストックの回復時間は既定8秒。残りストックがあれば、先の手裏剣の飛翔中にも次を使用できる。
 
 ### W：透明化
 
-- 持続時間の記述がないため、攻撃、Q/E/R、D/F、W再発動、死亡、試合終了のいずれかまで持続する。既定CD12秒、MS上昇20%。
+- 持続時間は確定値3秒。3秒経過前でも、攻撃、Q/E/R、D/F、W再発動、死亡、試合終了のいずれかで即時解除する。既定CD12秒、MS上昇20%。
 - 本体Rendererだけを非表示にし、ColliderとTargetableは残すため、方向・地点指定スキルの命中判定は維持する。
 - `PlayerTargetSelector`と`PlayerBasicAttackController`は透明中の朧を対象指定から除外する。AIが透明化前の対象参照を保持した場合にも、敵タワー射程外の通常攻撃は`IIncomingDamageModifier`で0にする。方向・地点指定スキル(`IsBasicAttack=false`)は無効化しない。
 - 敵が既定3.0以内にいる場合は紫色の輪郭リングを表示する。敵タワーの既定射程8.0以内では輪郭を表示し、通常どおり対象指定・通常攻撃可能に戻す。
 
 ### E：背後攻撃・帰還
 
-- Character/TrainingDummyを対象指定し、既定射程4.0外では既存Q/Rと同じ方式で自動接近する。右クリック、死亡、対象無効化、CCで接近を中止する。
+- 敵チャンピオン(Character分類)だけを対象指定し、既定射程4.0外では既存Q/Rと同じ方式で自動接近する。TeamMemberのないTrainingDummyもClassificationをCharacterへ変更した場合はテスト用敵チャンピオンとして許可する。右クリック、死亡、対象無効化、CCで接近を中止する。
 - 発動地点へ両者から見える帰還リングを生成し、対象の後方0.8へ移動する。`通常攻撃 + 20 + AD×0.40`を1回の通常ダメージとして与え、背後条件を満たす敵ヒーローならPも同じダメージへ合算する。
 - 0.65秒の帰還待機中は`AbilityLockController`へ`OboroEReturn`ロックを追加する。待機中にスタンまたはスネアを受けた場合は開始地点へ戻らず現在地点に残る。既定CD10秒。
 - `PursuitRune`へ`OboroE#`のSourceId除外を追加し、E自身のダメージでは追撃を発動せず、E後の次の別命中までウィンドウを維持する。
 
 ### R：低HP処刑
 
-- Character/TrainingDummyを対象指定し、固定射程200ステータス=`2.0 Unity units`で発動する。既定処刑閾値は最大HP20%、既定CD100秒。
-- 発動時の現在HPと同量を`DamageType.True`で1回だけ与える。ARは無視するが、HealthControllerへ通常経路で渡すためシールドや`IIncomingDamageModifier`で吸収・軽減・無効化された場合は生存できる。
+- 敵チャンピオン(Character分類)だけを対象指定し、固定射程200ステータス=`2.0 Unity units`で発動する。TeamMemberのないTrainingDummyもClassificationをCharacterへ変更した場合はテスト対象として許可する。処刑閾値は確定値の最大HP10%、既定CD100秒。
+- 発動時は対象最大HPの10%を`DamageType.True`で1回だけ与える。ARは無視するが、HealthControllerへ通常経路で渡すためシールドや`IIncomingDamageModifier`で吸収・軽減・無効化された場合は生存できる。
 - 対象の`CommonDController.TryBlockHardCC`が成功した場合は完全不発とし、クールダウンだけ消費する。
-- `WorldHealthBar`は敵ヒーロー/TrainingDummyのHPバーへ20%位置の縦マーカーを表示し、処刑圏内では赤、圏外では黄にする。
+- `WorldHealthBar`は敵チャンピオンのHPバーへ10%位置の縦マーカーを表示し、処刑圏内では赤、圏外では黄にする。
 - デス時はGAME_DESIGN.mdどおり残りRクールダウンを60%短縮する。
 
 ### 仕様未記載数値の扱い
 
-- GAME_DESIGN.mdに数値が無いQストック回復時間、WのCD/MS/輪郭距離、Eの射程/追加ダメージ/帰還時間/CD、Rの処刑閾値/CDは、すべて各コンポーネントの`SerializeField`としてInspector変更可能な初期調整値にした。上記の既定値は実装・プレイテスト開始点であり、ゲームデザインの確定値ではない。
+- Qストック回復時間、WのCD/MS/輪郭距離、Eの射程/追加ダメージ/帰還時間/CD、RのCDは、各コンポーネントの`SerializeField`としてInspector変更可能な初期調整値にした。Qダメージ、W持続3秒、R処刑閾値10%・最大HP10%ダメージは今回の確定値としてGAME_DESIGN.mdへ反映した。

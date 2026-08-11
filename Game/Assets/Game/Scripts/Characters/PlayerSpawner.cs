@@ -9,11 +9,15 @@ using UnityEngine;
 /// - シーンへPlayerが直接配置されている場合は生成をスキップする(移行前のシーンでも安全に動作する)。
 /// - 生成後のCharacterData適用(ステータス・テーマカラー・安全網のスキル整理)は、
 ///   プレハブ側のPlayerCharacterApplierが従来どおり行う。
+/// - 朧はPrefabの見た目やCharacterController設定に左右されず、スポーン時のワールドY座標を1に固定する。
 /// DefaultExecutionOrder(-200)により、Playerを自動検出する他コンポーネントのAwakeより先に生成する。
 /// </summary>
 [DefaultExecutionOrder(-200)]
 public sealed class PlayerSpawner : MonoBehaviour
 {
+    private const string OboroCharacterId = "Oboro";
+    private const float OboroSpawnY = 1f;
+
     [Header("フォールバック")]
     [Tooltip("キャラクター未選択でSC_Prototypeを直接起動した場合に使用するCharacterData(ZelfData想定)")]
     [SerializeField] private CharacterData _fallbackCharacterData;
@@ -64,10 +68,16 @@ public sealed class PlayerSpawner : MonoBehaviour
             spawnRotation = Quaternion.LookRotation(MapBuilder.Instance.GetLaneForward(Team.Blue));
         }
 
+        // 朧はこれまでスポナー側の高いYを引き継いでいたため、要求仕様どおりワールドY=1へ固定する。
+        if (selected.CharacterId == OboroCharacterId)
+        {
+            spawnPosition.y = OboroSpawnY;
+        }
+
         SpawnedPlayer = Instantiate(prefab, spawnPosition, spawnRotation);
         // "(Clone)"サフィックスを付けず、ヒエラルキー上で分かりやすい名前にする。
         SpawnedPlayer.name = prefab.name;
 
-        Debug.Log($"PlayerSpawner: '{selected.DisplayName}'(Id={selected.CharacterId})のPlayerプレハブ '{prefab.name}' を生成しました。", this);
+        Debug.Log($"PlayerSpawner: '{selected.DisplayName}'(Id={selected.CharacterId})のPlayerプレハブ '{prefab.name}' を生成しました。座標={spawnPosition}", this);
     }
 }
