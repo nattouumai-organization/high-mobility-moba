@@ -20,6 +20,22 @@
 - 削除した要素
 ```
 
+## 2026-08-11
+
+### Added
+- Phase 8の朧を段階実装へ分割し、第1段階としてOboroDataとPF_Player_Oboroを追加した。基礎値はGAME_DESIGN.mdどおりHP590/+90、HPreg3.0/+0.25、AD63/+5.5、AS0.78/+1.5%、AR22/+3.5、MS370、AA射程125。
+- SC_CharacterSelectへ朧をAvailableとして登録し、キャラクター選択からPF_Player_Oboroを生成して共通移動・通常攻撃・HP・共通D・F・レベル成長を確認できるようにした。
+- 朧Pを実装した。敵ヒーローの背後120度以内からの通常攻撃へ20 + ADの40%を加算し、内部クールダウンは設けない。基礎攻撃と追加分は1回のダメージへ合算する。
+- 朧Qを実装した。貫通手裏剣が最後に接触した敵/ミニオンへテレポートし、対象消失時は最後の地点を使用する。最大2ストックで、仕様にダメージ記載がないため手裏剣自体はダメージなしとした。
+- 朧Wを実装した。透明化、MS上昇、攻撃/スキル/再発動解除、近距離輪郭、敵タワー射程内での再対象指定、方向/地点指定スキルの被弾維持を実装した。
+- 朧Eを実装した。対象の背後への移動、通常攻撃+追加ダメージ、開始地点の可視化、帰還までのスキルロック、スタン/スネアによる帰還阻害を実装した。
+- 朧Rを実装した。射程200、低HP処刑、HPバー閾値表示、シールド/軽減での生存、共通Dによる完全不発、デス時残りCD60%短縮を実装した。
+- OboroSkillInstaller、OboroCombatUtility、SkillCooldownHudの2ストック表示、PlayerCharacterApplierの朧安全網、MatchResultControllerの朧停止処理、PursuitRuneのOboroE除外を追加した。
+
+### Changed
+- TASKS.mdの朧P/Q/W/E/Rを実装完了へ更新した。Unity Editorでの全段階統合テストは未完了のため進行中のまま維持する。
+- GAME_DESIGN.mdに数値が無い項目はInspector変更可能な初期調整値として実装し、確定ゲームデザイン値とは区別してTECHNICAL_DESIGN.mdへ記録した。
+
 ## 2026-08-10
 
 ### Added
@@ -443,7 +459,7 @@
 
 - RuneType/RuneSelectionManager: ルーン選択結果保持シングルトン。DontDestroyOnLoad。
 - RelentlessRune(連撃): HealthControllerサブスクリプションで命中検出。3回攠3s以内に45+AD35%ダメージ+MS12%(1.5s)。CD8s。
-- IndomitableRune(不屈): 最大HP15%以上の2sダメージ受れと8%シールド(2.5s)。CD40s。
+- IndomitableRune(不屈): 2秒以内に最大HP15%以上のダメージを受けると、最大HP8%のシールドを2.5秒付与する。CD40秒。
 - PursuitRune(追撃): PlayerInputHub.EPressedThisFrame/FPressedThisFrameでE/F検出。1.25s以内命中に40+AD30%+15%スロウ(0.5s)。CD12s。
 - SiegeRune(攻城): 味方ミニオンが敵タワー射程内の間タワーダメージ12%増加　2。SiegeRune.GetMultiplierで連携準備済。
 - RuneHoverHandler: ホバーイベントインターフェース実装。

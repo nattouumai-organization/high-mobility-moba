@@ -1,83 +1,54 @@
 using UnityEngine;
 
 /// <summary>
-/// 選択中のターゲットに対するゼルフの通常攻撃を管理する。
-/// TASKS.md「ゼルフの通常攻撃を実装する」用のスクリプト。
-/// 選択中のTargetableが攻撃射程内にいる場合のみ、攻撃間隔(Current Attack Speed)ごとに通常攻撃を実行し、
-/// CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与えて被弾フラッシュを発生させる。
-/// HealthControllerが返す実ダメージ量(残りHPを超えない値)を使って、
-/// ダメージ表示(CombatTextManager)とゼルフPの与ダメージ回復(ZelfPassiveHeal)へ通知する。
-/// 射程外のターゲットを選択した場合は、射程内に入るまでPlayerClickMovementで自動接近する。
-/// ターゲットが死亡した場合は攻撃を停止する(選択の解除はPlayerTargetSelectorが行う)。
-/// 弾丸・投射物・ヒットスキャン・攻撃アニメーションは今回実装しない。
-/// 将来的にミニオンなども扱うBasicAttackControllerへ発展させる想定。
-/// 行動ロック(AbilityLockController)中は攻撃も自動接近も行わない。
-/// Q/Rの射程外自動接近中は、移動の二重制御を防ぐため通常攻撃側の自動接近を行わない。
+/// 選択中Targetableへの通常攻撃と射程外自動接近を管理する共通コントローラー。
+/// ゼルフPの回復に加え、朧ではPの背後追加ダメージを同じ1回の通常攻撃ダメージへ合算する。
+/// これにより戦闘テキスト・ルーン命中回数・被弾イベントが二重化しない。
 /// </summary>
 [RequireComponent(typeof(CharacterStats))]
 [RequireComponent(typeof(PlayerTargetSelector))]
 [RequireComponent(typeof(PlayerClickMovement))]
 public class PlayerBasicAttackController : MonoBehaviour
 {
-    // 攻撃速度・攻撃射程の取得元。未設定の場合はAwakeで同じGameObjectから取得する。
     [SerializeField] private CharacterStats _characterStats;
-
-    // 現在のターゲットの取得元。未設定の場合はAwakeで同じGameObjectから取得する。
     [SerializeField] private PlayerTargetSelector _targetSelector;
-
-    // 射程外のターゲットへの自動接近に使用する移動処理。未設定の場合はAwakeで同じGameObjectから取得する。
     [SerializeField] private PlayerClickMovement _clickMovement;
-
-    // ゼルフPの与ダメージ回復。未設定の場合はAwakeで同じGameObjectから取得する(任意)。
     [SerializeField] private ZelfPassiveHeal _passiveHeal;
 
-    // 行動ロック。W発動中・Eダッシュ中・死亡中などは攻撃も自動接近も行わない。
     private AbilityLockController _abilityLock;
-
-    // Q/Rの射程外自動接近との競合防止用(ゼルフ以外のキャラクターではnullでもよい)。
     private ZelfQController _qController;
     private ZelfRController _rController;
-
-    // 次に通常攻撃できる時刻(Time.time基準)。攻撃速度以上の頻度で攻撃しないための管理値。
+    private OboroQController _oboroQController;
+    private OboroEController _oboroEController;
+    private OboroRController _oboroRController;
+    private OboroPassiveBackstab _oboroPassive;
+    private OboroWController _oboroWController;
     private float _nextAttackTime;
-
-    // 射程外のターゲットへ自動接近中かどうか。射程内へ入った瞬間に停止するための管理値。
     private bool _isApproaching;
+    private int _oboroAttackSequence;
 
-    /// <summary>現在のターゲットが攻撃射程内かどうか。ターゲット未選択・無効時はfalse。</summary>
     public bool IsCurrentTargetInRange { get; private set; }
 
     private void Awake()
     {
-        if (_characterStats == null)
-        {
-            _characterStats = GetComponent<CharacterStats>();
-        }
-
-        if (_targetSelector == null)
-        {
-            _targetSelector = GetComponent<PlayerTargetSelector>();
-        }
-
-        if (_clickMovement == null)
-        {
-            _clickMovement = GetComponent<PlayerClickMovement>();
-        }
-
-        if (_passiveHeal == null)
-        {
-            _passiveHeal = GetComponent<ZelfPassiveHeal>();
-        }
+        if (_characterStats == null) _characterStats = GetComponent<CharacterStats>();
+        if (_targetSelector == null) _targetSelector = GetComponent<PlayerTargetSelector>();
+        if (_clickMovement == null) _clickMovement = GetComponent<PlayerClickMovement>();
+        if (_passiveHeal == null) _passiveHeal = GetComponent<ZelfPassiveHeal>();
 
         _abilityLock = GetComponent<AbilityLockController>();
         if (_abilityLock == null) _abilityLock = gameObject.AddComponent<AbilityLockController>();
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
+        _oboroQController = GetComponent<OboroQController>();
+        _oboroEController = GetComponent<OboroEController>();
+        _oboroRController = GetComponent<OboroRController>();
+        _oboroPassive = GetComponent<OboroPassiveBackstab>();
+        _oboroWController = GetComponent<OboroWController>();
     }
 
     private void Update()
     {
-        // 行動ロック中(W発動中・Eダッシュ中・死亡中など)は攻撃も自動接近も行わない。
         if (_abilityLock != null && _abilityLock.IsLocked)
         {
             IsCurrentTargetInRange = false;
@@ -87,39 +58,28 @@ public class PlayerBasicAttackController : MonoBehaviour
 
         Targetable target = GetValidTarget();
         IsCurrentTargetInRange = target != null && IsInAttackRange(target);
-
         if (target == null)
         {
-            // ターゲットがいない・無効・死亡した場合は攻撃を停止する。
-            // 自動接近の途中だった場合は、その場で移動も停止する。
             StopOwnApproach(true);
             return;
         }
 
-        // 射程内外を選択リングの色へ反映する(射程内: 明るい緑 / 射程外: オレンジ)。
         target.SetInAttackRange(IsCurrentTargetInRange);
-
         if (!IsCurrentTargetInRange)
         {
-            // Q/Rの射程外自動接近中は通常攻撃側の自動接近を行わない(移動の二重制御を防ぐ)。
             if (IsSkillApproachActive())
             {
                 StopOwnApproach(false);
                 return;
             }
-
-            // 射程外の場合は攻撃せず、射程内に入るまでターゲットへ自動接近する。
             ApproachTarget(target);
             return;
         }
 
-        // 自動接近中に射程内へ入ったら、その場で停止して攻撃を開始する。
         StopOwnApproach(true);
-
         TryAttack(target);
     }
 
-    // 通常攻撃側の自動接近を停止する。stopMovementがtrueの場合は移動も停止する。
     private void StopOwnApproach(bool stopMovement)
     {
         if (!_isApproaching) return;
@@ -127,109 +87,79 @@ public class PlayerBasicAttackController : MonoBehaviour
         if (stopMovement && _clickMovement != null) _clickMovement.StopMovement();
     }
 
-    // Q/Rの射程外自動接近中かどうか(移動の二重制御防止に使用)。
     private bool IsSkillApproachActive()
     {
         if (_qController != null && _qController.IsApproachingQTarget) return true;
         if (_rController != null && _rController.IsApproachingRTarget) return true;
+        if (_oboroQController != null && _oboroQController.IsApproachingQTarget) return true;
+        if (_oboroEController != null && _oboroEController.IsApproachingETarget) return true;
+        if (_oboroRController != null && _oboroRController.IsApproachingRTarget) return true;
         return false;
     }
 
-    /// <summary>
-    /// 指定したTargetableが現在の攻撃射程内かどうかを判定する。
-    /// TargetableのColliderのPlayerに最も近い点を使い、Y軸を除いた水平距離(XZ平面)だけで判定する。
-    /// </summary>
     public bool IsInAttackRange(Targetable target)
     {
-        if (target == null)
-        {
-            return false;
-        }
-
+        if (target == null) return false;
         Vector3 closestPoint = target.GetClosestPoint(transform.position);
         Vector3 toTarget = closestPoint - transform.position;
         toTarget.y = 0f;
-
         return toTarget.magnitude <= _characterStats.CurrentAttackRange;
     }
 
     private Targetable GetValidTarget()
     {
-        if (_targetSelector == null)
-        {
-            return null;
-        }
-
+        if (_targetSelector == null) return null;
         Targetable target = _targetSelector.CurrentTarget;
+        if (target == null || !target.isActiveAndEnabled || target.IsDead) return null;
+        if (!OboroWController.CanBeTargetSelected(target, transform)) return null;
 
-        // 破棄・無効化・死亡した対象へは攻撃しない(選択の解除自体はPlayerTargetSelectorが行う)。
-        if (target == null || !target.isActiveAndEnabled || target.IsDead)
-        {
-            return null;
-        }
-
-        // 同一チームの対象(味方のタワー・本拠地・ミニオン)は通常攻撃のターゲットにしない。
         TeamMember myTeam = GetComponent<TeamMember>();
-        TeamMember targetTeam = target.GetComponent<TeamMember>();
-        if (myTeam != null && targetTeam != null && myTeam.Team == targetTeam.Team)
-        {
-            return null;
-        }
-
+        TeamMember targetTeam = target.GetComponentInParent<TeamMember>();
+        if (myTeam != null && targetTeam != null && myTeam.Team == targetTeam.Team) return null;
         return target;
     }
 
-    /// <summary>
-    /// 射程外のターゲットへ向けた移動を指示する。
-    /// 射程判定と同じくColliderの最も近い点を目標にし、毎フレーム更新することで
-    /// 将来ターゲットが移動する場合にも追従できるようにする。
-    /// </summary>
     private void ApproachTarget(Targetable target)
     {
-        if (_clickMovement == null)
-        {
-            return;
-        }
-
+        if (_clickMovement == null) return;
         _isApproaching = true;
         _clickMovement.MoveToPosition(target.GetClosestPoint(transform.position));
     }
 
     private void TryAttack(Targetable target)
     {
-        if (Time.time < _nextAttackTime)
-        {
-            return;
-        }
+        if (Time.time < _nextAttackTime) return;
 
-        // 通常攻撃: CharacterStatsのCurrent Attack Damageを対象のHealthControllerへ即時に与え、
-        // 実際に減少させたHP量(実ダメージ。残りHPを超えた過剰ダメージ分は含まない)を受け取る。
-        // 弾丸・投射物は使わず、ダメージは即時に届く。
         HealthController targetHealth = target.Health;
         if (targetHealth != null)
         {
-            // 攻撃者としてPlayerのTransformを渡す(通常ダメージ)。受けた側のダメージ軽減(ゼルフWなど)が前方判定に使用する。
-            // isBasicAttack: trueで通常攻撃として扱う(タワー・本拠地は通常攻撃のみ被弾)。
-            float actualDamage = targetHealth.TakeDamage(_characterStats.CurrentAttackDamage, transform, DamageType.Normal, isBasicAttack: true);
+            // 攻撃が成立する時点で朧Wを解除する。対象が無敵でも「攻撃」入力自体で解除される。
+            _oboroWController?.BreakStealth("通常攻撃");
 
+            float rawDamage = _characterStats.CurrentAttackDamage;
+            float passiveBonus = 0f;
+            bool passiveTriggered = _oboroPassive != null &&
+                                    _oboroPassive.TryGetBonusDamage(target, out passiveBonus);
+            if (passiveTriggered) rawDamage += passiveBonus;
+
+            string sourceId = null;
+            if (_oboroPassive != null)
+            {
+                _oboroAttackSequence++;
+                sourceId = $"OboroAA#{_oboroAttackSequence}";
+            }
+
+            float actualDamage = targetHealth.TakeDamage(rawDamage, transform, DamageType.Normal,
+                isBasicAttack: true, sourceId: sourceId);
             if (actualDamage > 0f)
             {
-                // プレイヤー視点の与ダメージ表示: 攻撃対象の頭上に赤色で1つだけ表示する(二重表示しない)。
                 CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);
-
-                // ゼルフP: 実ダメージ量とターゲット分類を通知し、分類ごとの回復率で与ダメージ回復を行う。
-                if (_passiveHeal != null)
-                {
-                    _passiveHeal.NotifyDamageDealt(actualDamage, target.Classification);
-                }
-
-                // 被弾フラッシュは実ダメージが通った時のみ発生させる
-                // (ゼルフWの軽減などでダメージ0の場合は光らせない。Q/W/Eと同じ基準)。
+                if (_passiveHeal != null) _passiveHeal.NotifyDamageDealt(actualDamage, target.Classification);
+                if (passiveTriggered) _oboroPassive.NotifyTriggered(target, passiveBonus);
                 target.PlayHitFlash();
             }
         }
 
-        // 攻撃間隔はCharacterStatsから毎回取得するため、Inspectorでの攻撃速度変更が次の攻撃から反映される。
         _nextAttackTime = Time.time + _characterStats.AttackInterval;
     }
 }

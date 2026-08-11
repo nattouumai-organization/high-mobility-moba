@@ -63,10 +63,8 @@ LightmapSettings:
     m_CompAOExponentDirect: 0
     m_ExtractAmbientOcclusion: 0
     m_Padding: 2
-    m_LightmapParameters: {fileID: 0}
     m_LightmapsBakeMode: 1
     m_TextureCompression: 1
-    m_ReflectionCompression: 2
     m_MixedBakeMode: 2
     m_BakeBackend: 1
     m_PVRSampling: 1
@@ -323,6 +321,17 @@ MonoBehaviour:
     - W：シールド獲得後に自動爆発し範囲ダメージ。与ダメージの5％回復
     - E：突進してダメージとスタン
     - R：鎖で敵を拘束し、受けたダメージを確定ダメージで自動反射
+  - _characterData: {fileID: 11400000, guid: 0253d48cb5674200990ba02c21d3ebcd, type: 2}
+    _fallbackDisplayName: 朧
+    _fallbackRoleName: 高難度忍者アサシン
+    _fallbackThemeColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
+    _fallbackStatus: 0
+    _skillSummaryLines:
+    - パッシブ：背後からの通常攻撃に追加ダメージ。内部クールダウンなし
+    - Q：手裏剣を投げ、最後に当たった敵かミニオンへテレポート。2ストック
+    - W：透明化してMS上昇。攻撃・スキル・再発動で解除
+    - E：指定敵の背後へ移動して攻撃し、開始地点へ帰還
+    - R：低HPの敵を処刑。シールド・ダメージ軽減・共通Dで対処可能
   _runeSelectSceneName: SC_RuneSelect
   _titleText: HIGH MOBILITY MOBA
   _subtitleText: キャラクターを選択

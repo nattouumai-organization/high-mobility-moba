@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a8b2c7e9f14360a7b3c1d8e2f65a90, type: 3}
+  m_Name: OboroData
+  m_EditorClassIdentifier: 
+  _characterId: Oboro
+  _displayName: 朧
+  _roleName: 高難度忍者アサシン
+  _shortDescription: 黒の忍者。削り、背後攻撃、処刑を得意とする高難度の暗殺者。
+  _themeColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
+  _characterStatus: 0
+  _playerPrefab: {fileID: 7316417391590861337, guid: 9d938522029246088f8366cfca3138ed, type: 3}
+  _baseHp: 590
+  _hpGrowth: 90
+  _baseHpRegeneration: 3
+  _hpRegenerationGrowth: 0.25
+  _baseAttackDamage: 63
+  _attackDamageGrowth: 5.5
+  _baseAttackSpeed: 0.78
+  _attackSpeedGrowthPercent: 1.5
+  _baseArmor: 22
+  _armorGrowth: 3.5
+  _baseMoveSpeed: 370
+  _baseAttackRange: 125
+  _passiveDescription: 敵ヒーローの背後120度以内から行う通常攻撃に、20 + ADの40%の追加通常ダメージ。内部クールダウンなし。
+  _qDescription: 手裏剣を投げ、最後に当たった敵またはミニオンへテレポート。2ストック。対象が消えた場合は最後の地点へ飛ぶ。
+  _wDescription: 透明化。対象指定不可だが方向・地点指定スキルには当たる。MS上昇。攻撃、スキル、再発動で解除。敵の近くでは輪郭が見える。敵タワー内では通常どおり対象指定可能。
+  _eDescription: 指定敵の真後ろへ移動し、通常攻撃＋追加ダメージ。その後、元の地点へ戻る。戻るまでスキル使用不可。CCを受けると帰還阻害され、その場に残る。開始地点は両者に表示。
+  _rDescription: 低HPの敵を処刑。レンジ200。処刑圏はHPバーに明示。シールド・ダメージ軽減で耐えられる。共通Dで不発。
