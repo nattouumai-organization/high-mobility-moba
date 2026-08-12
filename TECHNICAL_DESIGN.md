@@ -450,7 +450,7 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 ### W：透明化
 
-- 持続時間は確定値3秒。3秒経過前でも、攻撃、Q/E/R、D/F、W再発動、死亡、試合終了のいずれかで即時解除する。既定CD12秒、MS上昇20%。
+- 持続時間は確定値3秒。旧Prefab/Inspectorのシリアライズ値に左右されないよう、`OboroWController.EffectDurationSeconds = 3f`の定数を発動時タイマーへ直接使用する。3秒経過前でも、攻撃、Q/E/R、D/F、W再発動、死亡、試合終了のいずれかで即時解除する。既定CD12秒、MS上昇20%。
 - 本体Rendererだけを非表示にし、ColliderとTargetableは残すため、方向・地点指定スキルの命中判定は維持する。
 - `PlayerTargetSelector`と`PlayerBasicAttackController`は透明中の朧を対象指定から除外する。AIが透明化前の対象参照を保持した場合にも、敵タワー射程外の通常攻撃は`IIncomingDamageModifier`で0にする。方向・地点指定スキル(`IsBasicAttack=false`)は無効化しない。
 - 敵が既定3.0以内にいる場合は紫色の輪郭リングを表示する。敵タワーの既定射程8.0以内では輪郭を表示し、通常どおり対象指定・通常攻撃可能に戻す。

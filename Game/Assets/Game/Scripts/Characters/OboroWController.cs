@@ -12,9 +12,11 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterStats))]
 public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
 {
+    // ゲーム仕様の確定値。Prefab/Inspectorの旧シリアライズ値に上書きされないよう定数で固定する。
+    private const float EffectDurationSeconds = 3f;
+
     [Header("Stealth")]
     [SerializeField, Min(0f)] private float _cooldown = 12f;
-    [SerializeField, Min(0f)] private float _duration = 3f;
     [SerializeField, Range(0f, 100f)] private float _moveSpeedBoostPercent = 20f;
     [SerializeField, Min(0f)] private float _enemyOutlineRevealRadius = 3f;
     [SerializeField, Min(0f)] private float _enemyTowerRevealRange = 8f;
@@ -145,10 +147,11 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
             return;
         }
 
+        double activationTime = Time.timeAsDouble;
         _isWActive = true;
-        _effectEndTime = Time.timeAsDouble + _duration;
-        _remainingDuration = _duration;
-        _cooldownEndTime = Time.timeAsDouble + _cooldown;
+        _effectEndTime = activationTime + EffectDurationSeconds;
+        _remainingDuration = EffectDurationSeconds;
+        _cooldownEndTime = activationTime + _cooldown;
         _remainingCooldown = _cooldown;
         _rendererStates.Clear();
         foreach (Renderer renderer in _bodyRenderers)
@@ -167,7 +170,7 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
         _isInsideEnemyTowerRange = EvaluateEnemyTowerRange();
         _isOutlineRevealed = _isInsideEnemyTowerRange || IsEnemyNear();
         if (_outline != null) _outline.enabled = _isOutlineRevealed;
-        Debug.Log("朧 W: 透明化を開始しました。", this);
+        Debug.Log($"朧 W: 透明化を開始しました。効果時間={EffectDurationSeconds:F1}秒", this);
     }
 
     /// <summary>攻撃または他スキルが成立した時点で透明化を解除する。</summary>
