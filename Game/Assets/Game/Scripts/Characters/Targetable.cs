@@ -70,6 +70,12 @@ public class Targetable : MonoBehaviour
     /// <summary>このターゲットの分類。攻撃側(ゼルフPなど)が効果量の判定に使用する。</summary>
     public TargetClassification Classification => _classification;
 
+    /// <summary>SC_Prototypeのダミーを対プレイヤー検証に使う場合だけの例外。</summary>
+    public bool IsTrainingDummyPlayerProxy =>
+        _classification == TargetClassification.Character &&
+        gameObject.name == "TrainingDummy" && !CompareTag("Player") &&
+        GetComponent<TeamMember>() == null;
+
     /// <summary>攻撃射程内として表示中かどうか。PlayerBasicAttackControllerが毎フレーム更新する。</summary>
     public bool IsInAttackRange => _isInAttackRange;
 

@@ -16,6 +16,7 @@ public sealed class RinesSkillController : MonoBehaviour
     private AbilityLockController _lock;
     private PlayerInputHub _input;
     private HeroSkillUpgrades _upgrades;
+    private RinesSkillVisuals _visuals;
     private Camera _camera;
     private double _qCooldownEndTime;
     private double _wCooldownEndTime;
@@ -52,6 +53,8 @@ public sealed class RinesSkillController : MonoBehaviour
         _lock = GetComponent<AbilityLockController>();
         _input = GetComponent<PlayerInputHub>();
         _upgrades = GetComponent<HeroSkillUpgrades>();
+        _visuals = GetComponent<RinesSkillVisuals>();
+        if (_visuals == null) _visuals = gameObject.AddComponent<RinesSkillVisuals>();
         _groundLayer = OboroCombatUtility.ResolveGroundLayer(_groundLayer);
         _targetableLayer = OboroCombatUtility.ResolveTargetableLayer(_targetableLayer);
         _camera = Camera.main;
@@ -64,12 +67,14 @@ public sealed class RinesSkillController : MonoBehaviour
         if (_health != null) _health.Died -= OnDied;
         CancelPending();
         EndE();
+        if (_visuals != null) _visuals.HideAll();
     }
 
     private void OnDisable()
     {
         CancelPending();
         EndE();
+        if (_visuals != null) _visuals.HideAll();
     }
 
     private void Update()
@@ -114,6 +119,7 @@ public sealed class RinesSkillController : MonoBehaviour
         if (remaining > 0f) _rCooldownEndTime = Time.timeAsDouble + remaining * 0.4f;
         CancelPending();
         EndE();
+        if (_visuals != null) _visuals.HideAll();
     }
 
     private void CancelPending()
@@ -170,21 +176,24 @@ public sealed class RinesSkillController : MonoBehaviour
         if (_isEActive || Time.timeAsDouble < _wCooldownEndTime) return;
         _wCooldownEndTime = Time.timeAsDouble + _skillData.WCooldown;
         _sequence++;
-        foreach (Targetable target in TargetsAt(transform.position, _skillData.WRadius))
+        _visuals?.ShowW(_skillData.WRadius);
+        foreach (Targetable target in TargetsAt(transform.position, _skillData.WRadius, true))
         {
             CrowdControlController targetCc = target.GetComponent<CrowdControlController>();
             if (targetCc == null) targetCc = target.gameObject.AddComponent<CrowdControlController>();
             bool hardControlled = RinesRules.IsHardControlled(targetCc);
             if (hardControlled)
             {
-                Hit(target, _skillData.WBaseDamage, _skillData.WAdRatio, HeroSkillSlot.W,
-                    HardCcType.Snare, _skillData.WSnare, "RinesW");
+                if (Hit(target, _skillData.WBaseDamage, _skillData.WAdRatio, HeroSkillSlot.W,
+                    HardCcType.Snare, _skillData.WSnare, "RinesW"))
+                    _visuals?.ShowHit(target.transform, true);
             }
             else
             {
                 targetCc?.ApplySlow(_skillData.WSlowPercent, _skillData.WSlowDuration);
                 DealDamage(target, _skillData.WBaseDamage, _skillData.WAdRatio, HeroSkillSlot.W,
                     false, "RinesW");
+                _visuals?.ShowHit(target.transform, false);
             }
         }
     }
@@ -201,6 +210,7 @@ public sealed class RinesSkillController : MonoBehaviour
         _eEnds = _eStarted + _skillData.EDuration;
         _eSpeedBonus = _stats.BaseMoveSpeed * _skillData.ESpeedPercent / 100f;
         _stats.AddMoveSpeedBonus(_eSpeedBonus);
+        _visuals?.SetEActive(true);
         ScanE();
     }
 
@@ -218,6 +228,7 @@ public sealed class RinesSkillController : MonoBehaviour
 
     private void EndE()
     {
+        if (_visuals != null) _visuals.SetEActive(false);
         if (!_isEActive) return;
         _isEActive = false;
         if (_stats != null) _stats.RemoveMoveSpeedBonus(_eSpeedBonus);
@@ -264,14 +275,15 @@ public sealed class RinesSkillController : MonoBehaviour
             Hit(target, baseDamage, adRatio, slot, cc, duration, source);
     }
 
-    private void Hit(Targetable target, float baseDamage, float adRatio, HeroSkillSlot slot,
+    private bool Hit(Targetable target, float baseDamage, float adRatio, HeroSkillSlot slot,
         HardCcType type, float duration, string source)
     {
         CrowdControlController targetCc = target.GetComponent<CrowdControlController>();
         if (targetCc == null) targetCc = target.gameObject.AddComponent<CrowdControlController>();
         bool passive = RinesRules.IsHardControlled(targetCc);
-        if (targetCc != null && targetCc.ApplyHardCC(type, duration, transform)) return;
+        if (targetCc != null && targetCc.ApplyHardCC(type, duration, transform)) return false;
         DealDamage(target, baseDamage, adRatio, slot, passive, source);
+        return true;
     }
 
     private void DealDamage(Targetable target, float baseDamage, float adRatio,
@@ -289,7 +301,7 @@ public sealed class RinesSkillController : MonoBehaviour
         CombatTextManager.ShowDamageDealt(target.transform.position, actual);
     }
 
-    private List<Targetable> TargetsAt(Vector3 center, float radius)
+    private List<Targetable> TargetsAt(Vector3 center, float radius, bool onlyEnemyPlayers = false)
     {
         var result = new List<Targetable>();
         var seen = new HashSet<Targetable>();
@@ -298,7 +310,8 @@ public sealed class RinesSkillController : MonoBehaviour
         foreach (Collider overlap in overlaps)
         {
             Targetable target = overlap.GetComponentInParent<Targetable>();
-            if (!RinesRules.IsValidTarget(transform, target) || !seen.Add(target)) continue;
+            if (!(onlyEnemyPlayers ? RinesRules.IsValidWTarget(transform, target) :
+                RinesRules.IsValidTarget(transform, target)) || !seen.Add(target)) continue;
             Vector3 delta = OboroCombatUtility.Flatten(target.GetClosestPoint(center) - center);
             if (delta.sqrMagnitude <= radius * radius) result.Add(target);
         }

@@ -19,7 +19,18 @@ public class WorldHealthBar : MonoBehaviour
     private Image _shieldFillImage;
     private Image _oboroExecuteMarker;
     private float _oboroMarkerRatio = -1f;
+    private CrowdControlController _crowdControl;
+    private Image _stunBackdrop;
+    private Image _snareBackdrop;
+    private Text _stunLabel;
+    private Text _snareLabel;
+    private bool _started;
     private static Sprite _sharedFillSprite;
+
+    public bool IsStunLabelVisible => isActiveAndEnabled && _stunLabel != null && _stunLabel.enabled &&
+        _canvas != null && _canvas.enabled;
+    public bool IsSnareLabelVisible => isActiveAndEnabled && _snareLabel != null && _snareLabel.enabled &&
+        _canvas != null && _canvas.enabled;
 
     private void Awake()
     {
@@ -30,12 +41,21 @@ public class WorldHealthBar : MonoBehaviour
 
     private void OnEnable()
     {
+        CrowdControlController.Created -= HandleCrowdControlEvent;
+        CrowdControlController.Created += HandleCrowdControlEvent;
+        CrowdControlController.StatusApplied -= HandleCrowdControlEvent;
+        CrowdControlController.StatusApplied += HandleCrowdControlEvent;
         Subscribe();
+        if (_started) InitializeCrowdControlLabels();
+        UpdateCrowdControlLabels();
     }
 
     private void OnDisable()
     {
         Unsubscribe();
+        CrowdControlController.Created -= HandleCrowdControlEvent;
+        CrowdControlController.StatusApplied -= HandleCrowdControlEvent;
+        HideCrowdControlLabels();
     }
 
     private void Subscribe()
@@ -71,19 +91,31 @@ public class WorldHealthBar : MonoBehaviour
         _shieldSource = null;
         _shieldScanTimer = 0f;
         _oboroMarkerRatio = -1f;
+        _crowdControl = null;
+        if (_stunBackdrop != null) Destroy(_stunBackdrop.gameObject);
+        if (_snareBackdrop != null) Destroy(_snareBackdrop.gameObject);
+        if (_stunLabel != null) Destroy(_stunLabel.gameObject);
+        if (_snareLabel != null) Destroy(_snareLabel.gameObject);
+        _stunBackdrop = null;
+        _snareBackdrop = null;
+        _stunLabel = null;
+        _snareLabel = null;
 
         if (_healthController != null && isActiveAndEnabled)
         {
             Subscribe();
             HandleHealthChanged(_healthController.CurrentHealth, _healthController.MaxHealth);
         }
+        if (_started) InitializeCrowdControlLabels();
     }
 
     private void Start()
     {
+        _started = true;
         EnsureFillSprite();
         if (_healthController != null)
             HandleHealthChanged(_healthController.CurrentHealth, _healthController.MaxHealth);
+        InitializeCrowdControlLabels();
     }
 
     private void LateUpdate()
@@ -91,6 +123,125 @@ public class WorldHealthBar : MonoBehaviour
         FaceMainCamera();
         UpdateShieldGauge();
         UpdateOboroExecuteMarker();
+        UpdateCrowdControlLabels();
+    }
+
+    public static bool IsEnemyPlayer(TeamMember localTeam, HealthController targetHealth)
+    {
+        if (targetHealth == null) return false;
+        Targetable target = targetHealth.GetComponent<Targetable>();
+        if (target == null || target.Classification != TargetClassification.Character) return false;
+        if (target.IsTrainingDummyPlayerProxy) return true;
+        if (localTeam == null || !targetHealth.CompareTag("Player")) return false;
+        TeamMember targetTeam = targetHealth.GetComponent<TeamMember>();
+        return targetTeam != null && localTeam.Team != targetTeam.Team;
+    }
+
+    private void InitializeCrowdControlLabels()
+    {
+        if (_healthController == null || _canvas == null || _stunLabel != null) return;
+        PlayerSpawner spawner = FindFirstObjectByType<PlayerSpawner>();
+        GameObject localPlayer = spawner != null ? spawner.SpawnedPlayer : null;
+        if (localPlayer == null)
+        {
+            PlayerClickMovement movement = FindFirstObjectByType<PlayerClickMovement>();
+            if (movement != null) localPlayer = movement.gameObject;
+        }
+        TeamMember localTeam = localPlayer != null ? localPlayer.GetComponent<TeamMember>() : null;
+        BindCrowdControlLabels(localTeam);
+    }
+
+    private void BindCrowdControlLabels(TeamMember localTeam)
+    {
+        if (!IsEnemyPlayer(localTeam, _healthController)) return;
+        _crowdControl = _healthController.GetComponent<CrowdControlController>();
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        _stunLabel = CreateStatusLabel("Stun Status", "スタン", new Color(1f, 0.65f, 0.2f),
+            font, out _stunBackdrop);
+        _snareLabel = CreateStatusLabel("Snare Status", "スネア", new Color(0.45f, 0.9f, 1f),
+            font, out _snareBackdrop);
+        UpdateCrowdControlLabels();
+    }
+
+    private void HandleCrowdControlEvent(CrowdControlController controller)
+    {
+        if (_healthController == null || controller.gameObject != _healthController.gameObject) return;
+        if (_stunLabel == null) InitializeCrowdControlLabels();
+        if (_stunLabel == null) return;
+        _crowdControl = controller;
+        UpdateCrowdControlLabels();
+    }
+
+    private Text CreateStatusLabel(string objectName, string text, Color color, Font font,
+        out Image backdrop)
+    {
+        GameObject backdropObject = new GameObject(objectName + " Backdrop", typeof(RectTransform));
+        backdropObject.transform.SetParent(transform, false);
+        RectTransform backdropRect = (RectTransform)backdropObject.transform;
+        backdropRect.anchorMin = backdropRect.anchorMax = new Vector2(0.5f, 1f);
+        backdropRect.pivot = new Vector2(0.5f, 0f);
+        backdropRect.sizeDelta = new Vector2(190f, 68f);
+        backdrop = backdropObject.AddComponent<Image>();
+        backdrop.color = new Color(0f, 0f, 0f, 0.72f);
+        backdrop.raycastTarget = false;
+        backdrop.enabled = false;
+
+        GameObject labelObject = new GameObject(objectName, typeof(RectTransform));
+        labelObject.transform.SetParent(transform, false);
+        RectTransform rect = (RectTransform)labelObject.transform;
+        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.sizeDelta = new Vector2(210f, 68f);
+        Text label = labelObject.AddComponent<Text>();
+        label.font = font;
+        label.fontSize = 56;
+        label.fontStyle = FontStyle.Bold;
+        label.alignment = TextAnchor.MiddleCenter;
+        label.horizontalOverflow = HorizontalWrapMode.Overflow;
+        label.verticalOverflow = VerticalWrapMode.Overflow;
+        label.color = color;
+        label.text = text;
+        label.raycastTarget = false;
+        Outline outline = labelObject.AddComponent<Outline>();
+        outline.effectColor = Color.black;
+        outline.effectDistance = new Vector2(2f, -2f);
+        label.enabled = false;
+        return label;
+    }
+
+    private void UpdateCrowdControlLabels()
+    {
+        if (_stunLabel == null || _snareLabel == null) return;
+        bool visible = isActiveAndEnabled && _canvas != null && _canvas.enabled &&
+                       _healthController != null && !_healthController.IsDead &&
+                       _crowdControl != null && _crowdControl.isActiveAndEnabled;
+        bool stunned = visible && _crowdControl.IsStunned;
+        bool snared = visible && _crowdControl.IsSnared;
+        _stunLabel.enabled = stunned;
+        _snareLabel.enabled = snared;
+        _stunBackdrop.enabled = stunned;
+        _snareBackdrop.enabled = snared;
+        if (stunned)
+        {
+            Vector2 position = new Vector2(0f, snared ? 104f : 34f);
+            _stunLabel.rectTransform.anchoredPosition = position;
+            _stunBackdrop.rectTransform.anchoredPosition = position;
+        }
+        if (snared)
+        {
+            Vector2 position = new Vector2(0f, 34f);
+            _snareLabel.rectTransform.anchoredPosition = position;
+            _snareBackdrop.rectTransform.anchoredPosition = position;
+        }
+    }
+
+    private void HideCrowdControlLabels()
+    {
+        if (_stunLabel != null) _stunLabel.enabled = false;
+        if (_snareLabel != null) _snareLabel.enabled = false;
+        if (_stunBackdrop != null) _stunBackdrop.enabled = false;
+        if (_snareBackdrop != null) _snareBackdrop.enabled = false;
     }
 
     private void EnsureFillSprite()
@@ -258,6 +409,7 @@ public class WorldHealthBar : MonoBehaviour
     private void HandleDied()
     {
         if (_canvas != null) _canvas.enabled = false;
+        HideCrowdControlLabels();
     }
 
     private void HandleRevived()
@@ -265,5 +417,6 @@ public class WorldHealthBar : MonoBehaviour
         if (_canvas != null) _canvas.enabled = true;
         if (_healthController != null)
             HandleHealthChanged(_healthController.CurrentHealth, _healthController.MaxHealth);
+        UpdateCrowdControlLabels();
     }
 }

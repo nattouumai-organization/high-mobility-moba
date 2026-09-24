@@ -25,4 +25,16 @@ public static class RinesRules
                target.Classification == TargetClassification.TrainingDummy ||
                target.Classification == TargetClassification.Minion;
     }
+
+    public static bool IsValidWTarget(Transform owner, Targetable target)
+    {
+        if (target == null || target.Classification != TargetClassification.Character ||
+            !OboroCombatUtility.IsAlive(target)) return false;
+        if (target.IsTrainingDummyPlayerProxy)
+            return !OboroCombatUtility.IsOwner(owner, target);
+        if (!target.CompareTag("Player")) return false;
+        TeamMember ownTeam = owner != null ? owner.GetComponentInParent<TeamMember>() : null;
+        TeamMember targetTeam = target.GetComponentInParent<TeamMember>();
+        return ownTeam != null && targetTeam != null && ownTeam.Team != targetTeam.Team;
+    }
 }

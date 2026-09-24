@@ -33,6 +33,12 @@ public class HardCcTestEmitter : MonoBehaviour
 
     private void Start()
     {
+        if (_target == null && GetComponent<Targetable>()?.IsTrainingDummyPlayerProxy == true)
+        {
+            _target = GetComponent<CrowdControlController>();
+            if (_target == null) _target = gameObject.AddComponent<CrowdControlController>();
+        }
+
         if (_target == null)
         {
             PlayerInputHub hub = FindFirstObjectByType<PlayerInputHub>();

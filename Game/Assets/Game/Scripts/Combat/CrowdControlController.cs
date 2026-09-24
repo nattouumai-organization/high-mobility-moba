@@ -25,6 +25,9 @@ public enum HardCcType
 /// </summary>
 public class CrowdControlController : MonoBehaviour
 {
+    public static event System.Action<CrowdControlController> Created;
+    public static event System.Action<CrowdControlController> StatusApplied;
+
     [Header("Debug (Runtime)")]
     [SerializeField] private bool _isStunned;
     [SerializeField] private bool _isSnared;
@@ -75,6 +78,7 @@ public class CrowdControlController : MonoBehaviour
         _clickMovement = GetComponent<PlayerClickMovement>();
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
+        Created?.Invoke(this);
     }
 
     private void OnEnable()
@@ -170,6 +174,7 @@ public class CrowdControlController : MonoBehaviour
 
         if (type == HardCcType.Stun) BeginStun(duration);
         else BeginSnare(duration);
+        StatusApplied?.Invoke(this);
         return false;
     }
 
