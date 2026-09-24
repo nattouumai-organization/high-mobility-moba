@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0e07073199eebb4a8e328910d870583, type: 3}
+  m_Name: RinesSkillData
+  m_EditorClassIdentifier: Assembly-CSharp::RinesSkillData
+  _qBaseDamage: 35
+  _qAdRatio: 0.6
+  _qCooldown: 8
+  _qRange: 6
+  _qRadius: 0.8
+  _qDelay: 0.35
+  _qWindow: 3
+  _qSnare: 0.6
+  _wBaseDamage: 25
+  _wAdRatio: 0.5
+  _wCooldown: 12
+  _wRadius: 2
+  _wSnare: 0.5
+  _wSlowPercent: 25
+  _wSlowDuration: 1
+  _eBaseDamage: 20
+  _eAdRatio: 0.4
+  _eCooldown: 14
+  _eRadius: 0.75
+  _eDuration: 1
+  _eHitTail: 0.2
+  _eSpeedPercent: 30
+  _eSnare: 0.5
+  _rBaseDamage: 100
+  _rAdRatio: 0.8
+  _rCooldown: 100
+  _rRange: 7
+  _rRadius: 1.5
+  _rCenterRadius: 0.5
+  _rWarning: 0.6
+  _rStun: 0.8
+  _passiveMultiplier: 1.2
+  _rankDamageStep: 0.1

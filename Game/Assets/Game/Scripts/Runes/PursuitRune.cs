@@ -66,7 +66,8 @@ public class PursuitRune : MonoBehaviour
         return !string.IsNullOrEmpty(sourceId) &&
                (sourceId.StartsWith("ZelfE#", StringComparison.Ordinal) ||
                 sourceId.StartsWith("VolbraakE#", StringComparison.Ordinal) ||
-                sourceId.StartsWith("OboroE#", StringComparison.Ordinal));
+                sourceId.StartsWith("OboroE#", StringComparison.Ordinal) ||
+                sourceId.StartsWith("RinesE#", StringComparison.Ordinal));
     }
 
     private void Hit(HealthController target, DamageContext context)

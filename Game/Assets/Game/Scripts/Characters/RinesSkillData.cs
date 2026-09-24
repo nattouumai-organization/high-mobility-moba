@@ -1,0 +1,73 @@
+using UnityEngine;
+
+[CreateAssetMenu(menuName = "Game/Characters/Rines Skills")]
+public sealed class RinesSkillData : ScriptableObject
+{
+    [SerializeField] private float _qBaseDamage = 35f;
+    [SerializeField] private float _qAdRatio = 0.6f;
+    [SerializeField] private float _qCooldown = 8f;
+    [SerializeField] private float _qRange = 6f;
+    [SerializeField] private float _qRadius = 0.8f;
+    [SerializeField] private float _qDelay = 0.35f;
+    [SerializeField] private float _qWindow = 3f;
+    [SerializeField] private float _qSnare = 0.6f;
+    [SerializeField] private float _wBaseDamage = 25f;
+    [SerializeField] private float _wAdRatio = 0.5f;
+    [SerializeField] private float _wCooldown = 12f;
+    [SerializeField] private float _wRadius = 2f;
+    [SerializeField] private float _wSnare = 0.5f;
+    [SerializeField] private float _wSlowPercent = 25f;
+    [SerializeField] private float _wSlowDuration = 1f;
+    [SerializeField] private float _eBaseDamage = 20f;
+    [SerializeField] private float _eAdRatio = 0.4f;
+    [SerializeField] private float _eCooldown = 14f;
+    [SerializeField] private float _eRadius = 0.75f;
+    [SerializeField] private float _eDuration = 1f;
+    [SerializeField] private float _eHitTail = 0.2f;
+    [SerializeField] private float _eSpeedPercent = 30f;
+    [SerializeField] private float _eSnare = 0.5f;
+    [SerializeField] private float _rBaseDamage = 100f;
+    [SerializeField] private float _rAdRatio = 0.8f;
+    [SerializeField] private float _rCooldown = 100f;
+    [SerializeField] private float _rRange = 7f;
+    [SerializeField] private float _rRadius = 1.5f;
+    [SerializeField] private float _rCenterRadius = 0.5f;
+    [SerializeField] private float _rWarning = 0.6f;
+    [SerializeField] private float _rStun = 0.8f;
+    [SerializeField] private float _passiveMultiplier = 1.2f;
+    [SerializeField] private float _rankDamageStep = 0.1f;
+
+    public float QBaseDamage => _qBaseDamage;
+    public float QAdRatio => _qAdRatio;
+    public float QCooldown => _qCooldown;
+    public float QRange => _qRange;
+    public float QRadius => _qRadius;
+    public float QDelay => _qDelay;
+    public float QWindow => _qWindow;
+    public float QSnare => _qSnare;
+    public float WBaseDamage => _wBaseDamage;
+    public float WAdRatio => _wAdRatio;
+    public float WCooldown => _wCooldown;
+    public float WRadius => _wRadius;
+    public float WSnare => _wSnare;
+    public float WSlowPercent => _wSlowPercent;
+    public float WSlowDuration => _wSlowDuration;
+    public float EBaseDamage => _eBaseDamage;
+    public float EAdRatio => _eAdRatio;
+    public float ECooldown => _eCooldown;
+    public float ERadius => _eRadius;
+    public float EDuration => _eDuration;
+    public float EHitTail => _eHitTail;
+    public float ESpeedPercent => _eSpeedPercent;
+    public float ESnare => _eSnare;
+    public float RBaseDamage => _rBaseDamage;
+    public float RAdRatio => _rAdRatio;
+    public float RCooldown => _rCooldown;
+    public float RRange => _rRange;
+    public float RRadius => _rRadius;
+    public float RCenterRadius => _rCenterRadius;
+    public float RWarning => _rWarning;
+    public float RStun => _rStun;
+    public float PassiveMultiplier => _passiveMultiplier;
+    public float RankDamageStep => _rankDamageStep;
+}

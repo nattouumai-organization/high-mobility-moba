@@ -23,6 +23,7 @@ public class PlayerBasicAttackController : MonoBehaviour
     private OboroRController _oboroRController;
     private OboroPassiveBackstab _oboroPassive;
     private OboroWController _oboroWController;
+    private RinesSkillController _rinesSkills;
     private float _nextAttackTime;
     private bool _isApproaching;
     private int _oboroAttackSequence;
@@ -45,10 +46,17 @@ public class PlayerBasicAttackController : MonoBehaviour
         _oboroRController = GetComponent<OboroRController>();
         _oboroPassive = GetComponent<OboroPassiveBackstab>();
         _oboroWController = GetComponent<OboroWController>();
+        _rinesSkills = GetComponent<RinesSkillController>();
     }
 
     private void Update()
     {
+        if (_rinesSkills != null && _rinesSkills.IsEActive)
+        {
+            IsCurrentTargetInRange = false;
+            StopOwnApproach(true);
+            return;
+        }
         if (_abilityLock != null && _abilityLock.IsLocked)
         {
             IsCurrentTargetInRange = false;

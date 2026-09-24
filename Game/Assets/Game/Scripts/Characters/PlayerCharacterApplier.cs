@@ -17,6 +17,7 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
     private const string ZelfCharacterId = "Zelf";
     private const string VolbraakCharacterId = "Volbraak";
     private const string OboroCharacterId = "Oboro";
+    private const string RinesCharacterId = "Rines";
 
     private void Awake()
     {
@@ -76,6 +77,10 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
             DestroyImmediateIfPresent<OboroWController>();
             DestroyImmediateIfPresent<OboroEController>();
             DestroyImmediateIfPresent<OboroRController>();
+        }
+        if (characterId != RinesCharacterId)
+        {
+            DestroyImmediateIfPresent<RinesSkillController>();
         }
     }
 

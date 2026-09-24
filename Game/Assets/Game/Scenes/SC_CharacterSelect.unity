@@ -332,6 +332,17 @@ MonoBehaviour:
     - W：透明化してMS上昇。攻撃・スキル・再発動で解除
     - E：指定敵の背後へ移動して攻撃し、開始地点へ帰還
     - R：低HPの敵を処刑。シールド・ダメージ軽減・共通Dで対処可能
+  - _characterData: {fileID: 11400000, guid: 788a9c42871d90c4a8aba3c897750cbc, type: 2}
+    _fallbackDisplayName: "\u30EA\u30CD\u30B9"
+    _fallbackRoleName: "\u96F7\u8853\u5E2B / \u9060\u9694CC"
+    _fallbackThemeColor: {r: 1, g: 0.82, b: 0.2, a: 1}
+    _fallbackStatus: 0
+    _skillSummaryLines:
+    - "P \u91CD\u96F7: \u9023\u7D9ACC\u3067\u30C0\u30E1\u30FC\u30B8\u5897\u52A0"
+    - "Q \u96F7\u6A19: \u518D\u5165\u529B\u3067\u843D\u96F7\u30FB\u30B9\u30CD\u30A2"
+    - "W \u74B0\u96F7: \u5468\u56F2\u3078\u30B9\u30ED\u30FC/\u30B9\u30CD\u30A2"
+    - "E \u96F7\u8D70: \u52A0\u901F\u3057\u3066\u63A5\u89E6\u30B9\u30CD\u30A2"
+    - "R \u5929\u96F7: \u7BC4\u56F2\u653B\u6483\u30FB\u4E2D\u5FC3\u30B9\u30BF\u30F3"
   _runeSelectSceneName: SC_RuneSelect
   _titleText: HIGH MOBILITY MOBA
   _subtitleText: キャラクターを選択

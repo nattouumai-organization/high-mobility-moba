@@ -16,6 +16,7 @@ public sealed class MatchResultController : MonoBehaviour
         "ZelfPassiveHeal", "ZelfQController", "ZelfWController", "ZelfEController", "ZelfRController",
         "VolbraakPassiveShield", "VolbraakQController", "VolbraakWController", "VolbraakEController", "VolbraakRController",
         "OboroSkillInstaller", "OboroPassiveBackstab", "OboroQController", "OboroWController", "OboroEController", "OboroRController",
+        "RinesSkillController",
         "CommonDController", "FlashController", "HeroSkillUpgrades", "SkillRangeIndicator", "SkillRangePreview",
         "PlayerDeathHandler", nameof(RespawnController), "DummyAutoAttack", "HardCcTestEmitter",
         "RelentlessRune", "IndomitableRune", "PursuitRune", "SiegeRune", "HeroKillRewards",
