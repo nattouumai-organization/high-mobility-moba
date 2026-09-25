@@ -18,6 +18,7 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
     private const string VolbraakCharacterId = "Volbraak";
     private const string OboroCharacterId = "Oboro";
     private const string RinesCharacterId = "Rines";
+    private const string LieselotteCharacterId = "Lieselotte";
 
     private void Awake()
     {
@@ -81,6 +82,12 @@ public sealed class PlayerCharacterApplier : MonoBehaviour
         if (characterId != RinesCharacterId)
         {
             DestroyImmediateIfPresent<RinesSkillController>();
+        }
+        if (characterId != LieselotteCharacterId)
+        {
+            DestroyImmediateIfPresent<LieselotteSkillController>();
+            DestroyImmediateIfPresent<LieselotteStatSteal>();
+            DestroyImmediateIfPresent<LieselotteSkillVisuals>();
         }
     }
 

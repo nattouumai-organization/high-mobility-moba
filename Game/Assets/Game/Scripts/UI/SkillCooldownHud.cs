@@ -114,7 +114,8 @@ public sealed class SkillCooldownHud : MonoBehaviour
         _teamMember = player.GetComponent<TeamMember>();
         if (_stats != null && _stats.Data != null)
         {
-            _portraitLabel = _stats.Data.CharacterId == "Rines" ? "ri" :
+            _portraitLabel = _stats.Data.CharacterId == "Lieselotte" ? "li" :
+                _stats.Data.CharacterId == "Rines" ? "ri" :
                 _stats.Data.CharacterId == "Oboro" ? "ob" :
                 _stats.Data.CharacterId == "Volbraak" ? "vo" : "ze";
         }
@@ -215,16 +216,17 @@ public sealed class SkillCooldownHud : MonoBehaviour
         bool isVolbraak = player.GetComponent<VolbraakQController>() != null;
         bool isOboro = player.GetComponent<OboroQController>() != null;
         RinesSkillController rines = player.GetComponent<RinesSkillController>();
+        LieselotteSkillController lieselotte = player.GetComponent<LieselotteSkillController>();
         MonoBehaviour q = player.GetComponent<ZelfQController>() as MonoBehaviour ??
-                          player.GetComponent<VolbraakQController>() as MonoBehaviour ?? player.GetComponent<OboroQController>() as MonoBehaviour ?? rines;
+                          player.GetComponent<VolbraakQController>() as MonoBehaviour ?? player.GetComponent<OboroQController>() as MonoBehaviour ?? rines as MonoBehaviour ?? lieselotte;
         MonoBehaviour w = player.GetComponent<ZelfWController>() as MonoBehaviour ??
-                          player.GetComponent<VolbraakWController>() as MonoBehaviour ?? player.GetComponent<OboroWController>() as MonoBehaviour ?? rines;
+                          player.GetComponent<VolbraakWController>() as MonoBehaviour ?? player.GetComponent<OboroWController>() as MonoBehaviour ?? rines as MonoBehaviour ?? lieselotte;
         MonoBehaviour e = player.GetComponent<ZelfEController>() as MonoBehaviour ??
-                          player.GetComponent<VolbraakEController>() as MonoBehaviour ?? player.GetComponent<OboroEController>() as MonoBehaviour ?? rines;
+                          player.GetComponent<VolbraakEController>() as MonoBehaviour ?? player.GetComponent<OboroEController>() as MonoBehaviour ?? rines as MonoBehaviour ?? lieselotte;
         MonoBehaviour r = player.GetComponent<ZelfRController>() as MonoBehaviour ??
-                          player.GetComponent<VolbraakRController>() as MonoBehaviour ?? player.GetComponent<OboroRController>() as MonoBehaviour ?? rines;
+                          player.GetComponent<VolbraakRController>() as MonoBehaviour ?? player.GetComponent<OboroRController>() as MonoBehaviour ?? rines as MonoBehaviour ?? lieselotte;
         string rActive = isVolbraak ? "_isTetherActive" : isOboro ? null : "_isRActive";
-        string eActive = rines != null ? "_isEActive" : isOboro ? "_isExecuting" : "_isDashing";
+        string eActive = lieselotte != null ? null : rines != null ? "_isEActive" : isOboro ? "_isExecuting" : "_isDashing";
 
         var slots = new System.Collections.Generic.List<Slot>();
         float sx = 0f;
@@ -246,7 +248,7 @@ public sealed class SkillCooldownHud : MonoBehaviour
             return;
         }
         System.Type type = controller.GetType();
-        string cooldownFieldName = controller is RinesSkillController
+        string cooldownFieldName = controller is RinesSkillController || controller is LieselotteSkillController
             ? "_" + key.ToLowerInvariant() + "CooldownEndTime" : "_cooldownEndTime";
         FieldInfo endField = type.GetField(cooldownFieldName, BindingFlags.NonPublic | BindingFlags.Instance);
         FieldInfo cdField = type.GetField("_remainingCooldown", BindingFlags.NonPublic | BindingFlags.Instance);

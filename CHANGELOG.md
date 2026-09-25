@@ -20,6 +20,17 @@
 - 削除した要素
 ```
 
+## 2026-09-26
+
+### Added
+
+- リーゼロッテ・ヴァイスの初期プロトタイプを追加。専用CharacterData・Prefab Variant・仮Material、P/Q/W/E/Rと専用の仮演出、Rの5秒間ステータス奪取を実装した。推測して設定した数値はTASKS.mdに記録した。Unity Editorでの手動確認待ち。
+- 対プレイヤー検証用のTrainingDummyにステータスを付け、従来のHP300・防御0を維持したままR奪取の対象にした。
+
+### Changed
+
+- リネスの手動確認を受け、TASKS.mdの実装項目を完了に更新した。
+
 ## 2026-09-25
 
 ### Changed

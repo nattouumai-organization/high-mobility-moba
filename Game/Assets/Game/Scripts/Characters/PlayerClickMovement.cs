@@ -32,6 +32,7 @@ public class PlayerClickMovement : MonoBehaviour
 
     private ZelfQController _qController;
     private ZelfRController _rController;
+    private LieselotteSkillController _lieselotteSkills;
     private PlayerInputHub _inputHub;
 
     // CC(スタン・スネア)による移動禁止の参照。実行時に後から追加される場合があるため、未取得の間はUpdateで再取得する。
@@ -54,6 +55,7 @@ public class PlayerClickMovement : MonoBehaviour
         _mainCamera = Camera.main;
         _qController = GetComponent<ZelfQController>();
         _rController = GetComponent<ZelfRController>();
+        _lieselotteSkills = GetComponent<LieselotteSkillController>();
         _crowdControl = GetComponent<CrowdControlController>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
 
@@ -70,6 +72,8 @@ public class PlayerClickMovement : MonoBehaviour
         HandleStopCommand();
 
         UpdateDestinationFromRightClick();
+
+        if (_lieselotteSkills != null && _lieselotteSkills.IsRActive) return;
 
         // スタン・スネア中は移動しない(移動先の予約は上で受け付け済み。CC終了後に移動を再開する)。
         if (_crowdControl == null) _crowdControl = GetComponent<CrowdControlController>();

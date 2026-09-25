@@ -24,6 +24,7 @@ public class PlayerBasicAttackController : MonoBehaviour
     private OboroPassiveBackstab _oboroPassive;
     private OboroWController _oboroWController;
     private RinesSkillController _rinesSkills;
+    private LieselotteSkillController _lieselotteSkills;
     private float _nextAttackTime;
     private bool _isApproaching;
     private int _oboroAttackSequence;
@@ -47,6 +48,7 @@ public class PlayerBasicAttackController : MonoBehaviour
         _oboroPassive = GetComponent<OboroPassiveBackstab>();
         _oboroWController = GetComponent<OboroWController>();
         _rinesSkills = GetComponent<RinesSkillController>();
+        _lieselotteSkills = GetComponent<LieselotteSkillController>();
     }
 
     private void Update()
@@ -149,6 +151,8 @@ public class PlayerBasicAttackController : MonoBehaviour
             bool passiveTriggered = _oboroPassive != null &&
                                     _oboroPassive.TryGetBonusDamage(target, out passiveBonus);
             if (passiveTriggered) rawDamage += passiveBonus;
+            if (_lieselotteSkills != null)
+                rawDamage += _lieselotteSkills.PassiveBonusFor(target);
 
             string sourceId = null;
             if (_oboroPassive != null)
@@ -164,6 +168,7 @@ public class PlayerBasicAttackController : MonoBehaviour
                 CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);
                 if (_passiveHeal != null) _passiveHeal.NotifyDamageDealt(actualDamage, target.Classification);
                 if (passiveTriggered) _oboroPassive.NotifyTriggered(target, passiveBonus);
+                _lieselotteSkills?.NotifyBasicAttackHit(target);
                 target.PlayHitFlash();
             }
         }

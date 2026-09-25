@@ -70,6 +70,15 @@ public class HealthController : MonoBehaviour
     /// </summary>
     public event Action<DamageContext, float> DamageTaken;
 
+    /// <summary>一時的な最大HP変更後、変更前の現在HP割合を維持する。</summary>
+    public void PreserveHealthRatio(float ratio)
+    {
+        if (_isDead) return;
+        _currentHealth = Mathf.Clamp01(ratio) * MaxHealth;
+        _lastKnownMaxHealth = MaxHealth;
+        NotifyHealthChanged();
+    }
+
     private void Awake()
     {
         _characterStats = GetComponent<CharacterStats>();

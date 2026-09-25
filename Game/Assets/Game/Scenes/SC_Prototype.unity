@@ -578,6 +578,7 @@ GameObject:
   - component: {fileID: 1246788940}
   - component: {fileID: 1246788941}
   - component: {fileID: 1246788942}
+  - component: {fileID: 1246788943}
   m_Layer: 7
   m_Name: TrainingDummy
   m_TagString: Untagged
@@ -1088,6 +1089,32 @@ MonoBehaviour:
   _deathCooldownReduction: 0.6
   _isWindowActive: 0
   _remainingCooldown: 0
+--- !u!114 &1246788943
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1246788901}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2a7c5d8e4b1439a86c0d9e3b5f78a21, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::CharacterStats
+  _characterData: {fileID: 0}
+  _baseMoveSpeed: 5.9166665
+  _bonusMoveSpeed: 0
+  _baseAttackSpeed: 0.74
+  _bonusAttackSpeedPercent: 0
+  _baseAttackRange: 2
+  _baseMaxHealth: 300
+  _bonusMaxHealth: 0
+  _baseAttackDamage: 55
+  _bonusAttackDamage: 0
+  _baseArmor: 0
+  _bonusArmor: 0
+  _baseHealthRegen: 0
+  _bonusHealthRegen: 0
 --- !u!1 &1260973273
 GameObject:
   m_ObjectHideFlags: 0
