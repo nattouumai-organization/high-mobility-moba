@@ -29,7 +29,7 @@ using UnityEngine.InputSystem;
 /// ゼルフ自身が死亡した場合は決闘エリアを即時終了する。
 /// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// </summary>
-public sealed class ZelfRController : MonoBehaviour
+public sealed class ZelfRController : MonoBehaviour, ICancelableSkillApproach
 {
     // Cast Rangeの既定値。旧バージョンのシーンで0のまま保存されていてもこの値へ自動補正する。
     private const float DefaultCastRange = 7f;

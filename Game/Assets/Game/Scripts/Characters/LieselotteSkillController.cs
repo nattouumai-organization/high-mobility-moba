@@ -20,6 +20,9 @@ public sealed class LieselotteSkillController : MonoBehaviour
     private CrowdControlController _cc;
     private HeroSkillUpgrades _upgrades;
     private LieselotteSkillVisuals _visuals;
+    private SkillRangeIndicator _qPreview;
+    private SkillRangeIndicator _ePreview;
+    private SkillRangeIndicator _rPreview;
     private LieselotteStatSteal _steal;
     private Camera _camera;
     private Targetable _stackTarget;
@@ -38,7 +41,6 @@ public sealed class LieselotteSkillController : MonoBehaviour
     private int _sequence;
     private int _eSequence;
     private double _qCooldownEndTime;
-    private double _wCooldownEndTime;
     private double _eCooldownEndTime;
     private double _rCooldownEndTime;
 
@@ -87,21 +89,64 @@ public sealed class LieselotteSkillController : MonoBehaviour
         _visuals.SetStealActive(_steal != null && _steal.IsActive);
         if (OboroCombatUtility.IsMatchEnded || (_health != null && _health.IsDead))
         {
+            HidePreviews();
             StopR();
             return;
         }
         if (_isRActive)
         {
+            HidePreviews();
             if (_cc != null && _cc.IsMovementBlocked) StopR();
             else StepR();
             return;
         }
         if (_input == null || (_lock != null && _lock.IsLocked) ||
-            (_cc != null && _cc.IsStunned)) return;
-        if (_input.QPressedThisFrame) CastQ();
-        if (_input.EPressedThisFrame) CastE();
-        if (_input.RPressedThisFrame) CastR();
+            (_cc != null && _cc.IsStunned))
+        {
+            HidePreviews();
+            return;
+        }
+        UpdatePreviews();
+        if (_input.QReleasedThisFrame) CastQ();
+        if (_input.EReleasedThisFrame) CastE();
+        if (_input.RReleasedThisFrame) CastR();
         // WはPの3打目で自動発動するパッシブ効果。
+    }
+
+    private void UpdatePreviews()
+    {
+        if (_input.QPressed && QRemainingCooldown <= 0f)
+        {
+            if (_qPreview == null) _qPreview = SkillRangeIndicator.Create(transform, "Lieselotte Q Range");
+            _qPreview.ShowCircle(_skillData.QRange, new Color(1f, 0.45f, 0.55f), 0.05f);
+        }
+        else if (_qPreview != null) _qPreview.HideAll();
+
+        UpdateDirectionPreview(ref _ePreview, _input.EPressed && ERemainingCooldown <= 0f,
+            _skillData.EDistance, "Lieselotte E Range");
+        UpdateDirectionPreview(ref _rPreview, _input.RPressed && RRemainingCooldown <= 0f,
+            _skillData.RDistance, "Lieselotte R Range");
+    }
+
+    private void UpdateDirectionPreview(ref SkillRangeIndicator preview, bool visible,
+        float distance, string name)
+    {
+        if (!visible || !TryAimPoint(out Vector3 point))
+        {
+            if (preview != null) preview.HideAll();
+            return;
+        }
+        if (preview == null) preview = SkillRangeIndicator.Create(transform, name);
+        Vector3 direction = OboroCombatUtility.Flatten(point - transform.position).normalized;
+        preview.ShowDirectionLine(transform.position + Vector3.up * 0.05f, direction,
+            distance, new Color(1f, 0.45f, 0.55f));
+    }
+
+    private void HidePreviews()
+    {
+        if (_qPreview != null) _qPreview.HideAll();
+        if (_ePreview != null) _ePreview.HideAll();
+        if (_rPreview != null) _rPreview.HideAll();
     }
 
     /// <summary>通常攻撃のダメージ計算前に呼ぶ。3打目のみ追加ダメージを返す。</summary>
@@ -137,9 +182,19 @@ public sealed class LieselotteSkillController : MonoBehaviour
 
     private void CastQ()
     {
-        if (Time.timeAsDouble < _qCooldownEndTime ||
-            !OboroCombatUtility.TryGetMouseTarget(_input, ref _camera, _targetableLayer,
-                out Targetable target) || !IsQTarget(target)) return;
+        if (Time.timeAsDouble < _qCooldownEndTime) return;
+        if (!OboroCombatUtility.TryGetMouseTarget(_input, ref _camera, _targetableLayer,
+                out Targetable target) || !IsQTarget(target))
+            target = GetComponent<PlayerTargetSelector>()?.CurrentTarget;
+        if (!IsQTarget(target)) return;
+        SkillApproachController.For(gameObject).CastOrApproach(target, _skillData.QRange,
+            () => CastQTarget(target));
+    }
+
+    private void CastQTarget(Targetable target)
+    {
+        if (_skillData == null || Time.timeAsDouble < _qCooldownEndTime || !IsQTarget(target) ||
+            (_health != null && _health.IsDead) || (_cc != null && _cc.IsStunned)) return;
         Vector3 delta = OboroCombatUtility.Flatten(target.GetClosestPoint(transform.position) -
             transform.position);
         if (delta.sqrMagnitude > _skillData.QRange * _skillData.QRange) return;
@@ -192,13 +247,26 @@ public sealed class LieselotteSkillController : MonoBehaviour
     {
         if (Time.timeAsDouble < _eCooldownEndTime ||
             (_cc != null && _cc.IsMovementBlocked) ||
-            !TryDirection(out Vector3 direction)) return;
+            !TryAimPoint(out Vector3 point)) return;
+        SkillApproachController.For(gameObject).CastOrApproach(point, _skillData.EDistance,
+            () => CastEAt(point));
+    }
+
+    private void CastEAt(Vector3 point)
+    {
+        if (Time.timeAsDouble < _eCooldownEndTime ||
+            (_cc != null && _cc.IsMovementBlocked) ||
+            (_health != null && _health.IsDead) || (_lock != null && _lock.IsLocked)) return;
+        Vector3 direction = OboroCombatUtility.Flatten(point - transform.position);
+        if (direction.sqrMagnitude < 0.01f) return;
+        direction.Normalize();
         _eCooldownEndTime = Time.timeAsDouble + _skillData.ECooldown;
         _sequence++;
         _eSequence = _sequence;
         Vector3 from = transform.position;
         Vector3 to = from + direction * _skillData.EDistance;
         OboroCombatUtility.Teleport(transform, _controller, to, _groundLayer);
+        MovementSkillSignal.Report(gameObject);
         for (float distance = 0f; distance <= _skillData.EDistance; distance +=
             _skillData.EPoolRadius * 1.5f)
         {
@@ -256,9 +324,22 @@ public sealed class LieselotteSkillController : MonoBehaviour
     {
         if (Time.timeAsDouble < _rCooldownEndTime ||
             (_cc != null && _cc.IsMovementBlocked) ||
-            !TryDirection(out _rDirection)) return;
+            !TryAimPoint(out Vector3 point)) return;
+        SkillApproachController.For(gameObject).CastOrApproach(point, _skillData.RDistance,
+            () => CastRAt(point));
+    }
+
+    private void CastRAt(Vector3 point)
+    {
+        if (Time.timeAsDouble < _rCooldownEndTime ||
+            (_cc != null && _cc.IsMovementBlocked) ||
+            (_health != null && _health.IsDead) || (_lock != null && _lock.IsLocked)) return;
+        _rDirection = OboroCombatUtility.Flatten(point - transform.position);
+        if (_rDirection.sqrMagnitude < 0.01f) return;
+        _rDirection.Normalize();
         _rCooldownEndTime = Time.timeAsDouble + _skillData.RCooldown;
         _isRActive = true;
+        MovementSkillSignal.Report(gameObject);
         _rTraveled = 0f;
         GetComponent<PlayerClickMovement>()?.StopMovement();
         _lock?.AddLock(RLock);
@@ -293,15 +374,10 @@ public sealed class LieselotteSkillController : MonoBehaviour
         if (_rTraveled >= _skillData.RDistance - 0.01f || step <= 0f) StopR();
     }
 
-    private bool TryDirection(out Vector3 direction)
+    private bool TryAimPoint(out Vector3 point)
     {
-        direction = Vector3.zero;
-        if (!OboroCombatUtility.TryGetMouseGroundPoint(_input, ref _camera, _groundLayer,
-            out Vector3 point)) return false;
-        direction = OboroCombatUtility.Flatten(point - transform.position);
-        if (direction.sqrMagnitude < 0.01f) return false;
-        direction.Normalize();
-        return true;
+        return OboroCombatUtility.TryGetMouseGroundPoint(_input, ref _camera, _groundLayer,
+            out point) && OboroCombatUtility.Flatten(point - transform.position).sqrMagnitude >= 0.01f;
     }
 
     private float Damage(float baseDamage, float ratio, HeroSkillSlot slot)
@@ -320,6 +396,7 @@ public sealed class LieselotteSkillController : MonoBehaviour
 
     private void OnDied()
     {
+        HidePreviews();
         float remaining = RRemainingCooldown;
         if (remaining > 0f) _rCooldownEndTime = Time.timeAsDouble + remaining * 0.4f;
         StopR();
@@ -335,6 +412,7 @@ public sealed class LieselotteSkillController : MonoBehaviour
 
     private void OnDisable()
     {
+        HidePreviews();
         StopR();
         EndW();
         _steal?.End();

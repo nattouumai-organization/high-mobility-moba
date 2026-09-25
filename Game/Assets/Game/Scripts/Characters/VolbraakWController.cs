@@ -176,8 +176,8 @@ public sealed class VolbraakWController : MonoBehaviour, IIncomingDamageModifier
             Explode();
         }
 
-        // 対象・方向指定のない自己バフのため、押した瞬間に発動する(プレビューなし)。
-        if (_inputHub != null && _inputHub.WPressedThisFrame)
+        // 対象・方向指定のない自己バフも、他の手動スキルと同じく離した瞬間に発動する。
+        if (_inputHub != null && _inputHub.WReleasedThisFrame)
         {
             HandleWPressed();
         }

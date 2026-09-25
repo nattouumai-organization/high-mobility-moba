@@ -10,7 +10,7 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CharacterStats))]
-public sealed class OboroRController : MonoBehaviour
+public sealed class OboroRController : MonoBehaviour, ICancelableSkillApproach
 {
     private static readonly HashSet<OboroRController> ActiveControllers = new HashSet<OboroRController>();
 

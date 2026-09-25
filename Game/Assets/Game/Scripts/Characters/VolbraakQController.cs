@@ -208,8 +208,23 @@ public sealed class VolbraakQController : MonoBehaviour
             return;
         }
 
-        Vector3 direction = GetCastDirection();
+        if (TryGetMouseGroundPoint(out Vector3 point))
+        {
+            SkillApproachController.For(gameObject).CastOrApproach(point, _fissureLength,
+                () => CastToward(point));
+            return;
+        }
+        CastToward(transform.position + GetCastDirection() * _fissureLength);
+    }
+
+    private void CastToward(Vector3 point)
+    {
+        if (Time.timeAsDouble < _cooldownEndTime || (_selfHealth != null && _selfHealth.IsDead) ||
+            (_abilityLock != null && _abilityLock.IsLocked)) return;
+        Vector3 direction = point - transform.position;
+        direction.y = 0f;
         if (direction.sqrMagnitude < 0.0001f) return;
+        direction.Normalize();
 
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
 

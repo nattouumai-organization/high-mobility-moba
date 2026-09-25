@@ -47,7 +47,13 @@ public class PlayerTargetSelector : MonoBehaviour
 
     private void HandleRightClick()
     {
-        if (_inputHub == null || !_inputHub.RightClickPressed) return;
+        if (_inputHub == null || !_inputHub.RightClickPressed ||
+            (_clickMovement != null && _clickMovement.IsIgnoringRightClick)) return;
+
+        // A held target click must not restart basic-attack selection while a skill
+        // is approaching its target. A fresh ground click is handled by the approach.
+        SkillApproachController approach = GetComponent<SkillApproachController>();
+        if (approach != null && approach.IsApproaching) return;
 
         if (TryGetTargetableUnderMouse(out Targetable targetable))
         {
@@ -116,6 +122,16 @@ public class PlayerTargetSelector : MonoBehaviour
     public void ClearTargetSelection()
     {
         ClearTarget();
+    }
+
+    /// <summary>A+左クリックで選んだ敵を、通常の右クリックと同じ攻撃経路へ渡す。</summary>
+    public void SelectAttackTarget(Targetable target)
+    {
+        if (target == null || target.IsDead || !target.isActiveAndEnabled ||
+            target.Classification == TargetClassification.Tower || IsSameTeam(target) ||
+            !OboroWController.CanBeTargetSelected(target, transform)) return;
+        SelectTarget(target);
+        _clickMovement?.StopMovement();
     }
 
     private void ClearTarget()

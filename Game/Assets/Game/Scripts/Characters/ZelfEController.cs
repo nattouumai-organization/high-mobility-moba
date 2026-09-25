@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// ゼルフE(方向ダッシュとダッシュ後ウェーブ)を管理する。
 /// Eのダメージ(ダッシュ経路・ウェーブとも)には発動ごとのSourceId("ZelfE#n")を付与する
-/// (連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用。phase7-runes-fix4)。
+/// (連撃ルーンの1スキル1カウント判定に使用)。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
@@ -63,7 +63,7 @@ public sealed class ZelfEController : MonoBehaviour
     // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
     private double _cooldownEndTime;
     // Eの発動回数と今回発動分のSourceId("ZelfE#n")。ダッシュ経路・ウェーブの全命中で共通。
-    // 連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用する(phase7-runes-fix4)。
+    // 連撃ルーンの1スキル1カウント判定に使用する。
     private int _eCastCount;
     private string _eCastSourceId;
     private bool _hitCharacterClassification;
@@ -217,6 +217,16 @@ public sealed class ZelfEController : MonoBehaviour
             return;
         }
 
+        SkillApproachController.For(gameObject).CastOrApproach(groundPoint, _dashDistance,
+            () => StartDashToward(groundPoint));
+    }
+
+    private void StartDashToward(Vector3 groundPoint)
+    {
+        if (Time.timeAsDouble < _cooldownEndTime || (_selfHealth != null && _selfHealth.IsDead) ||
+            (_crowdControl != null && _crowdControl.IsMovementBlocked) ||
+            (_abilityLock != null && _abilityLock.IsLocked)) return;
+
         Vector3 direction = groundPoint - transform.position;
         direction.y = 0f;
         if (direction.sqrMagnitude < _minCastDistance * _minCastDistance)
@@ -251,10 +261,11 @@ public sealed class ZelfEController : MonoBehaviour
         _hitTargets.Clear();
         _hitCharacterClassification = false;
         _isDashing = true;
+        MovementSkillSignal.Report(gameObject);
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
 
         // 今回のE発動を識別するSourceIdを発行する(ダッシュ経路・ウェーブの全命中で共通。
-        // 連撃ルーンの1スキル1カウント判定・追撃ルーンのE除外判定に使用)。
+        // 連撃ルーンの1スキル1カウント判定に使用。
         _eCastCount++;
         _eCastSourceId = $"ZelfE#{_eCastCount}";
 

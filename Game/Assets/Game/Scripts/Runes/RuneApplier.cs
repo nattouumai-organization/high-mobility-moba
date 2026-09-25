@@ -15,15 +15,19 @@ public class RuneApplier : MonoBehaviour
         {
             TeamMember tm = hero.GetComponent<TeamMember>();
             if (tm != null && tm.Team != Team.Blue) continue;
-            switch (rune)
-            {
-                case RuneType.Relentless:  if (!hero.GetComponent<RelentlessRune>())  hero.gameObject.AddComponent<RelentlessRune>();  break;
-                case RuneType.Indomitable: if (!hero.GetComponent<IndomitableRune>()) hero.gameObject.AddComponent<IndomitableRune>(); break;
-                case RuneType.Pursuit:     if (!hero.GetComponent<PursuitRune>())     hero.gameObject.AddComponent<PursuitRune>();     break;
-                case RuneType.Siege:       if (!hero.GetComponent<SiegeRune>())       hero.gameObject.AddComponent<SiegeRune>();       break;
-            }
-            // 発動確認用ログ: どのヒーローにどのルーンが付与されたか。
-            Debug.Log($"[ルーン] {hero.name} に {rune} を適用", hero);
+            ApplyTo(hero.gameObject, rune);
         }
+    }
+
+    public static void ApplyTo(GameObject hero, RuneType rune)
+    {
+        if (rune == RuneType.Relentless || rune == RuneType.AllForTesting)
+            if (!hero.GetComponent<RelentlessRune>()) hero.AddComponent<RelentlessRune>();
+        if (rune == RuneType.Indomitable || rune == RuneType.AllForTesting)
+            if (!hero.GetComponent<IndomitableRune>()) hero.AddComponent<IndomitableRune>();
+        if (rune == RuneType.Pursuit || rune == RuneType.AllForTesting)
+            if (!hero.GetComponent<PursuitRune>()) hero.AddComponent<PursuitRune>();
+        if (rune == RuneType.Siege || rune == RuneType.AllForTesting)
+            if (!hero.GetComponent<SiegeRune>()) hero.AddComponent<SiegeRune>();
     }
 }

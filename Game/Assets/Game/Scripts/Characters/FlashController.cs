@@ -6,7 +6,7 @@ using UnityEngine;
 /// 仕様: 移動距離400(=4.0 Unity units。換算: 射程100 = 1 Unity unit) / クールダウン55秒 / 壁は越えられない。
 /// カーソル地点が最大距離より遠い場合は、カーソル方向へ最大距離ぶんだけ移動する。
 /// Wall Layerに設定した壁が経路上にある場合は壁の手前で停止する(壁抜け不可)。
-/// Ground/TargetableのLayerMaskが未設定(=0)の場合、選択中キャラクターのQコントローラー(ZelfQController / VolbraakQController)の設定を流用する。
+/// Ground/TargetableのLayerMaskは共通設定のみを使用する。未設定の場合は共通レイヤー名から解決する。
 /// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
@@ -25,7 +25,7 @@ public sealed class FlashController : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float _deathCooldownReduction = 0.6f;
 
     [Header("Layers")]
-    // Ground/Targetableが未設定(=0)の場合、ZelfQControllerまたはVolbraakQControllerの設定を流用する。
+    // Ground/Targetableが未設定(=0)の場合、共通レイヤー名から解決する。
     [SerializeField] private LayerMask _groundLayer;
     // 壁として扱うレイヤー。未設定(=0)の場合は壁判定を行わない(現在のプロトタイプマップに壁はない)。
     [SerializeField] private LayerMask _wallLayer;
@@ -38,9 +38,6 @@ public sealed class FlashController : MonoBehaviour
     private AbilityLockController _abilityLock;
     private HealthController _selfHealth;
     private PlayerMouseFacing _mouseFacing;
-    private ZelfQController _qController;
-    private ZelfRController _rController;
-    private VolbraakQController _volbraakQController;
     private Camera _mainCamera;
     // クールダウン終了時刻。長時間起動でもfloat精度が落ちないよう、Time.timeAsDouble基準のdoubleで管理する(フェーズ1〜3見直し)。
     private double _cooldownEndTime;
@@ -58,39 +55,17 @@ public sealed class FlashController : MonoBehaviour
         _selfHealth = GetComponent<HealthController>();
         if (_selfHealth != null) _selfHealth.Died += OnSelfDied;
         _mouseFacing = GetComponent<PlayerMouseFacing>();
-        _qController = GetComponent<ZelfQController>();
-        _rController = GetComponent<ZelfRController>();
-        _volbraakQController = GetComponent<VolbraakQController>();
         _mainCamera = Camera.main;
-
-        ResolveLayerFallbacks();
+        _groundLayer = OboroCombatUtility.ResolveGroundLayer(_groundLayer);
+        _targetableLayer = OboroCombatUtility.ResolveTargetableLayer(_targetableLayer);
         if (_groundLayer.value == 0)
         {
-            Debug.LogWarning("フラッシュ: Ground Layerが未設定です。FlashControllerのInspectorでGround Layerを設定してください(ZelfQControllerと同じ設定)。", this);
+            Debug.LogWarning("フラッシュ: 共通Ground Layerが未設定です。FlashControllerのInspectorで設定してください。", this);
         }
 
         Debug.Log($"フラッシュ: 初期化しました(距離{_flashDistance} / CD{_cooldown}秒)。", this);
     }
 
-    // Ground/Targetableが未設定(=0)の場合、選択中キャラクターのQコントローラーの設定を流用する。
-    // PlayerCharacterApplierが選択キャラクター以外の固有スキルを起動時に削除するため、
-    // ゼルフ(ZelfQController)とヴォルブラーク(VolbraakQController)のどちらが残っていても流用できるようにする。
-    private void ResolveLayerFallbacks()
-    {
-        if (_qController == null) _qController = GetComponent<ZelfQController>();
-        if (_volbraakQController == null) _volbraakQController = GetComponent<VolbraakQController>();
-
-        if (_qController != null)
-        {
-            if (_groundLayer.value == 0) _groundLayer = _qController.GroundLayerMask;
-            if (_targetableLayer.value == 0) _targetableLayer = _qController.TargetableLayerMask;
-        }
-        if (_volbraakQController != null)
-        {
-            if (_groundLayer.value == 0) _groundLayer = _volbraakQController.GroundLayerMask;
-            if (_targetableLayer.value == 0) _targetableLayer = _volbraakQController.TargetableLayerMask;
-        }
-    }
 
     private void OnDestroy()
     {
@@ -137,14 +112,14 @@ public sealed class FlashController : MonoBehaviour
             Debug.Log("フラッシュ: 死亡中のため発動できません。", this);
             return;
         }
-        // レイヤー未設定の場合は流用を再試行し、それでも未設定なら設定案内を出す
+        // 共通レイヤー未設定の場合は名前から再解決し、それでも未設定なら設定案内を出す
         // (「マウスカーソルがGroundを指していない」という誤解を招くログと区別する)。
         if (_groundLayer.value == 0)
         {
-            ResolveLayerFallbacks();
+            _groundLayer = OboroCombatUtility.ResolveGroundLayer(_groundLayer);
             if (_groundLayer.value == 0)
             {
-                Debug.LogWarning("フラッシュ: Ground Layerが未設定のため発動できません。FlashControllerのInspectorでGround Layerを設定してください(ZelfQControllerと同じ設定)。", this);
+                Debug.LogWarning("フラッシュ: 共通Ground Layerが未設定のため発動できません。FlashControllerのInspectorで設定してください。", this);
                 return;
             }
         }
@@ -198,15 +173,16 @@ public sealed class FlashController : MonoBehaviour
     {
         _cooldownEndTime = Time.timeAsDouble + _cooldown;
 
-        // 進行中の移動・Q/Rの射程外自動接近を中止してから瞬間移動する。
+        // 進行中の通常移動・発動前のスキル自動接近を中止してから瞬間移動する。
         if (_clickMovement != null) _clickMovement.StopMovement();
-        if (_qController != null) _qController.CancelPendingApproach();
-        if (_rController != null) _rController.CancelPendingApproach();
+        foreach (MonoBehaviour component in GetComponents<MonoBehaviour>())
+            if (component is ICancelableSkillApproach approach) approach.CancelPendingApproach();
 
         bool controllerWasEnabled = _characterController.enabled;
         _characterController.enabled = false;
         transform.position = destination;
         ResolveOverlapBackward(direction);
+        MovementSkillSignal.Report(gameObject);
         _characterController.enabled = controllerWasEnabled;
 
         // 視点仕様: ブリンクした場合はブリンクした方向を向く。

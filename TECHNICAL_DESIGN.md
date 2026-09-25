@@ -93,6 +93,8 @@ TopDownCameraController
 
 ### Combat
 
+攻撃属性の将来設計: `DamageType.Normal/True` は防御力による軽減の種別として維持し、攻撃の分類は独立した複数フラグで表す。候補はスロウ、スネア、スタン、通常攻撃、スキル攻撃。複数属性を同時に持つ攻撃を許す。移動・シールド等のスキル自体の属性と、その共通処理は別途検討する。属性のデータ構造、付与先、各スキルへの対応、互換性は未決定であり、現時点では実装しない。
+
 ```text
 HealthComponent
 HealthController
@@ -113,6 +115,8 @@ CooldownController
 - 試作では `RespawnController`(Scripts/Combat)が死亡した対象の復活を管理する。死亡イベントを受けてRespawn Delay秒(SC_Prototypeでは1秒、Inspector設定)後に初期位置・初期向きへ戻し、HealthController.Revive()で全快する。Player・TrainingDummy・AttackDummyで共通利用し、将来のキャラクター・ミニオンにも再利用できる。
 
 ### Characters
+
+入力・射程外接近の現行方針: 手動Q/W/E/Rはキー解放時に発動し、自己中心の効果など選択地点のないスキルは射程外接近を行わない。対象・地点・方向を選ぶスキルは選択内容を保持して射程内まで移動し、Sまたは右クリックの新規指示で接近を中止する。移動スキルの発動後の移動はSで中断しない。共通FはQコントローラーのLayerMaskを流用せず、共通LayerMaskを使用する。以下の既存フェーズ別説明にあるFのQ設定流用や押下時発動の記述より、この方針を優先する。
 
 ```text
 CharacterController
@@ -170,7 +174,7 @@ VolbraakRController
 - `PlayerLayerMaskFallback` はPlayerCharacterApplierのAwakeから呼ばれる静的ヘルパー。Player配下の全コンポーネントの `_groundLayer` / `_targetableLayer` フィールドを調べ、未設定(Nothing)のものだけをレイヤー名(GroundLayer / TargetableLayer、無ければ6 / 7番)から自動補正する。Inspector設定済みの値は上書きせず、FlashControllerのWall Layerのような意図的な未設定フィールドは対象外。Prefab Variantへスキルコンポーネントを追加し直した際のLayerMask未設定によるスキル不発を防ぐ安全網。
 - Playerプレハブ構成(Prefabs/Characters/): `PF_Player_Base` がすべてのキャラクター共通のコンポーネント(移動・視点・ターゲット選択・通常攻撃・HP/復活・共通D・Fフラッシュ・PlayerInputHub・PlayerCharacterApplierなど)だけを持つ親プレハブ。各キャラクターは `PF_Player_Zelf`(ZelfPassiveHeal / ZelfQ/W/E/RControllerを追加)・`PF_Player_Volbraak`(VolbraakPassiveShield / VolbraakQ/W/E/RControllerを追加)・`PF_Player_Oboro`(OboroSkillInstallerからP/Q/W/E/Rを構成)のようにPrefab Variantとして作成し、CharacterData(Data/Characters/)のPlayer Prefabへ設定する。新キャラクターの追加手順: CharacterData作成 → PF_Player_BaseからPrefab Variant作成 → 固有スキルコンポーネントを追加(LayerMaskなどのInspector設定も忘れずに) → CharacterDataへVariantとFallbackを設定 → キャラクター選択画面の一覧へ登録。
 - `VolbraakPassiveShield`(Scripts/Characters)はヴォルブラークP(初撃無効化)を管理する。IIncomingDamageModifierとしてHealthControllerからHPへ適用する直前に呼び出され、一定時間(Recharge Duration、既定10秒)被弾しないとシールドが展開され、次に受ける攻撃1回をダメージ種別(Normal / True)を問わず完全無効化する(ダメージ0)。シールドは消費まで永続し、ミニオン(TargetClassification.Minion)の攻撃では剥がれない(無効化もされず通常どおり受ける)。タワー(Tower分類)の攻撃も1回無効化するがPを消費する(タワー本体はフェーズ5実装予定。攻撃者のTargetable分類で判定するため実装後そのまま機能する)。攻撃者不明(null)のダメージは無効化の対象。被弾(実際にHPが減るダメージ)があるたびに無被弾タイマーをリセットする(ミニオンからの被弾も含む)。シールド展開中はPlayerの周囲へLineRendererのリングを実行時生成で表示し(Inspectorで無効化可能)、死亡中は再展開せず復活時は展開済みで復活する。
-- `VolbraakQController`(Scripts/Characters)はヴォルブラークQ(地面叩きと亀裂)を管理する。Qキーでマウスカーソル方向へ地面を叩き、前方の帯状範囲(長さ4×幅1.6、Inspector設定)へ範囲ダメージ(基礎25+AD×0.8)を与える。叩いた場所には亀裂が残り(既定4秒)、亀裂上の敵(Tower分類を除く)へCrowdControlController.ApplySlow経由でスロウ(既定35%)を短い持続で掛け直しながら継続付与する(複数スロウは最も強い1つだけが有効になるLoL方式)。同時に複数の亀裂は存在せず、再発動時は古い亀裂が即時消滅する。移動を伴わないためスネア中も使用でき、スタン中・死亡中などは行動ロックにより使用不可。自身の死亡時は展開中の亀裂を即時終了する。亀裂はLineRendererの枠+ジグザグ線をシーン直下へ実行時生成して表示し(地面に固定)、NormalCastではQキー押下中に方向線のみを表示する。GroundとTargetableのLayerMaskはInspectorで設定し(ZelfQControllerと同じ設定)、FlashControllerがレイヤー未設定時に流用できるようGroundLayerMask/TargetableLayerMaskを公開プロパティとして提供する。
+- `VolbraakQController`(Scripts/Characters)はヴォルブラークQ(地面叩きと亀裂)を管理する。Qキーでマウスカーソル方向へ地面を叩き、前方の帯状範囲(長さ4×幅1.6、Inspector設定)へ範囲ダメージ(基礎25+AD×0.8)を与える。叩いた場所には亀裂が残り(既定4秒)、亀裂上の敵(Tower分類を除く)へCrowdControlController.ApplySlow経由でスロウ(既定35%)を短い持続で掛け直しながら継続付与する(複数スロウは最も強い1つだけが有効になるLoL方式)。同時に複数の亀裂は存在せず、再発動時は古い亀裂が即時消滅する。移動を伴わないためスネア中も使用でき、スタン中・死亡中などは行動ロックにより使用不可。自身の死亡時は展開中の亀裂を即時終了する。亀裂はLineRendererの枠+ジグザグ線をシーン直下へ実行時生成して表示し(地面に固定)、NormalCastではQキー押下中に方向線のみを表示する。GroundとTargetableのLayerMaskはInspectorで設定し(ZelfQControllerと同じ設定)、GroundLayerMask/TargetableLayerMaskはゼルフ系コンポーネント向けの読み取り専用プロパティとして提供する。共通Fは独立したLayerMaskを使用する。
 - `VolbraakWController`(Scripts/Characters)はヴォルブラークW(シールドと時限爆発)を管理する。Wキーで即時発動(対象・方向指定なしの自己バフのためプレビューなし)し、HPシールド(基礎80+AD×0.8、発動時のADでスナップショット)を獲得する。IIncomingDamageModifierとしてダメージ種別(Normal / True)を問わず吸収し、通常ダメージはAR軽減式(×100/(100+AR))を適用したHP換算値でシールドを消費する(吸収しきれない分だけHPへ通す)。ヴォルブラークPのシールド展開中にミニオン以外から攻撃を受けた場合はWでは吸収せずPの初撃無効化を優先する(コンポーネントの適用順に依存しない)。発動から一定時間後(既定3秒)に自動爆発し、周囲(半径2.5)の対象へ範囲ダメージ(基礎40+AD×0.9)を与える(手動爆発なし。シールドが途中で割れても爆発は発生する)。爆発で実際に与えたダメージ×回復率(Character/Tower/TrainingDummy 5%・Minion 2.5%、Inspector設定)を自身へ回復する。移動を伴わないためスネア中も使用でき、スタン中・死亡中などは行動ロックにより使用不可(展開済みシールド・爆発の進行はロック中も継続)。自身の死亡時はシールド・爆発を中止する(爆発しない)。シールド中はPlayerの周囲へ青系リングを、爆発時は爆発半径のリングを短時間表示する(LineRenderer実行時生成)。TargetableのLayerMaskはInspectorで設定する(ZelfQControllerと同じ設定)。クールダウンは既定12秒でTime.timeAsDouble基準。
 - `VolbraakEController`(Scripts/Characters)はヴォルブラークE(突進とスタン)を管理する。NormalCastではEキー押下中に方向線(長さ=突進距離)のみを表示し、離した瞬間にマウスカーソル方向へ突進する(距離5.5・0.6秒。CharacterControllerを一時無効化して直接移動・地面追従・終了時のめり込み解消はZelfEControllerと同じ方式)。当たったTargetable(自身を除く)へダメージ(基礎40+AD×0.7)とスタン(既定1秒)を与え、突進はそこで停止する(敵を突進方向へ少し押し出してヴォルブラークは敵の手前に止まる。Tower分類と共通Dに弾かれた相手は押し出さない)。スタンはCrowdControlController.ApplyStun経由で適用し、戻り値がtrue(共通Dによる無効化)の場合はダメージも適用しない(「共通Dで弾かれた場合は両方不発」)。Tower分類にはスタンを掛けずダメージのみ与える。移動スキルのためスネア中・スタン中は使用不可。突進中はAbilityLockControllerへロック(理由: VolbraakEDash)を追加して通常攻撃・他スキルの入力を禁止し、死亡時は突進を即時中断してロックを解除する。突進の軌跡はTrailRendererで表示する。GroundとTargetableのLayerMaskはInspectorで設定する(ZelfQControllerと同じ設定)。クールダウンは既定12秒でTime.timeAsDouble基準。
 - `VolbraakRController`(Scripts/Characters)はヴォルブラークR(鎖)を管理する。NormalCastではRキー押下中に方向線(長さ=鎖の射程)のみを表示し、離した瞬間にマウスカーソル方向へ鎖を飛ばす(射程6・先端速度18・命中半径0.6、Inspector設定)。鎖は最初に当たった敵ヒーロー(Character/TrainingDummy分類)だけを判定し、ミニオン・タワーはすり抜ける。命中した敵は拘束(既定3秒)され、ヴォルブラークから一定距離(既定4)以上離れられない(境界を越えた分だけ毎フレーム引き戻す。相手のCharacterControllerが有効ならMove、無効ならTransform直接移動)。対象が共通Dの無効化ウィンドウ中の場合は拘束が不発になる(クールダウンは消費。「Dで鎖を弾かれても反射は付与」のため、反射ウィンドウは共通Dブロック時にも付与する)。移動を伴わないためスネア中も使用でき、スタン中・E突進中・死亡中は行動ロックにより使用不可。鎖の命中時に反射ウィンドウ(持続時間は拘束と同じ)を開始し、ウィンドウ中に敵ヒーロー(Character/TrainingDummy分類)から受けたダメージの実ダメージ量を、HealthControllerのDamageTaken通知経由で攻撃者へ確定ダメージ(True)として自動反射する(反射倍率はInspector設定・既定1)。ミニオン・タワー・設置物・自己ダメージ・攻撃者不明のダメージは反射しない。反射で与えるダメージには反射フラグ(DamageContext.IsReflected)を付け、反射フラグ付きのダメージは再反射しない(GAME_DESIGN 12章「反射は再反射しない」。ミラー戦などで反射同士が無限にループするのを防ぐ)。自身の死亡時は鎖・拘束・反射ウィンドウを即時終了し(死亡の瞬間の致死ダメージまでは反射)、デス時は残りクールダウンを60%短縮する(GAME_DESIGN 7章)。鎖はLineRendererを実行時生成して表示する(飛行中は本体→先端、拘束中は本体→対象)。IsTetherActive / TetherTarget / TetherRemainingDuration / IsReflectActiveをpublic APIとして公開する。GroundとTargetableのLayerMaskはInspectorで設定する(ZelfQControllerと同じ設定)。クールダウンは既定90秒でTime.timeAsDouble基準。
@@ -415,11 +419,11 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 ### phase7-runes: ルーンシステム + 選択画面
 
-- `RuneType` enum: None/Relentless/Indomitable/Pursuit/Siege。
+- `RuneType` enum: None/Relentless/Indomitable/Pursuit/Siege/AllForTesting（最後はルーン動作確認用）。
 - `RuneSelectionManager`: DontDestroyOnLoadシングルトン。CharacterSelectionManagerと同様の設計。
 - `RelentlessRune`: HealthController.DamageTakenサブスクリプション。3秒リングバッファ。
 - `IndomitableRune`: 追加シールドAbsorbWithShield公開メソッド(将来HealthController御山用)。
-- `PursuitRune`: PlayerInputHub.EPressedThisFrame/FPressedThisFrameでE/Fを検出。
+- `PursuitRune`: `MovementSkillSignal`で成立した自己移動スキルまたはFを検出し、1.25秒以内の敵ヒーローへの最初の命中で1回発動する。
 - `SiegeRune`: TowerController向けstatic GetMultiplierメソッド。
 - `RuneSelectionUI/RuneHoverHandler`: Unity UGUIでプロシージャル生成。
 
@@ -460,7 +464,7 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 - 敵チャンピオン(Character分類)だけを対象指定し、既定射程4.0外では既存Q/Rと同じ方式で自動接近する。TeamMemberのないTrainingDummyもClassificationをCharacterへ変更した場合はテスト用敵チャンピオンとして許可する。右クリック、死亡、対象無効化、CCで接近を中止する。
 - 発動地点へ両者から見える帰還リングを生成し、対象の後方0.8へ移動する。`通常攻撃 + 20 + AD×0.40`を1回の通常ダメージとして与え、背後条件を満たす敵ヒーローならPも同じダメージへ合算する。
 - 0.65秒の帰還待機中は`AbilityLockController`へ`OboroEReturn`ロックを追加する。待機中にスタンまたはスネアを受けた場合は開始地点へ戻らず現在地点に残る。既定CD10秒。
-- `PursuitRune`へ`OboroE#`のSourceId除外を追加し、E自身のダメージでは追撃を発動せず、E後の次の別命中までウィンドウを維持する。
+- 追撃ルーンはE自身の命中も含め、成立した自己移動スキル後の敵ヒーローへの最初の命中で発動する。旧`OboroE#`除外処理は廃止した。
 
 ### R：低HP処刑
 

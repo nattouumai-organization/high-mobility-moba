@@ -5,4 +5,5 @@ public enum RuneType
     Indomitable = 2,
     Pursuit = 3,
     Siege = 4,
+    AllForTesting = 5,
 }

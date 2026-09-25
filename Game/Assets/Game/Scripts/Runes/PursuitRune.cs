@@ -3,13 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// 追撃ルーン。E/F後1.25秒以内の次の敵命中で追加ダメージとスロウを与える。
-/// ZelfE / VolbraakE / OboroE自身のダメージでは発動せず、E後の次の別命中までウィンドウを維持する。
+/// 追撃ルーン。実際に成立した移動スキルの後1.25秒以内に敵ヒーローへ命中した場合に発動する。
+/// 移動スキル自身の命中も含め、最初に成立した敵ヒーローへの命中で1回だけ発動する。
 /// </summary>
 public class PursuitRune : MonoBehaviour
 {
     private CharacterStats _stats;
-    private PlayerInputHub _input;
+    private MovementSkillSignal _movementSkills;
     private float _cdEnd = -1f;
     private bool _win;
     private float _winEnd;
@@ -20,18 +20,14 @@ public class PursuitRune : MonoBehaviour
     private void Awake()
     {
         _stats = GetComponent<CharacterStats>();
-        _input = GetComponent<PlayerInputHub>();
+        _movementSkills = GetComponent<MovementSkillSignal>();
+        if (_movementSkills == null) _movementSkills = gameObject.AddComponent<MovementSkillSignal>();
+        _movementSkills.Used += OnMovementSkillUsed;
+        Scan();
     }
 
     private void Update()
     {
-        if (_input != null && (_input.EPressedThisFrame || _input.FPressedThisFrame))
-        {
-            _win = true;
-            _winEnd = Time.time + 1.25f;
-            if (Time.time < _cdEnd) Debug.Log($"[ルーン/追撃] E/F押下 (CD中あと {_cdEnd - Time.time:F1}秒)", this);
-            else Debug.Log("[ルーン/追撃] 発動ウィンドウ開始 (1.25秒以内の命中で発動)", this);
-        }
         if (_win && Time.time >= _winEnd) _win = false;
         _scanTimer -= Time.deltaTime;
         if (_scanTimer <= 0f) { _scanTimer = 1f; Scan(); }
@@ -39,7 +35,15 @@ public class PursuitRune : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_movementSkills != null) _movementSkills.Used -= OnMovementSkillUsed;
         foreach (var pair in _subs) if (pair.Key) pair.Key.DamageTaken -= pair.Value;
+    }
+
+    private void OnMovementSkillUsed()
+    {
+        _win = true;
+        _winEnd = Time.time + 1.25f;
+        Scan();
     }
 
     private void Scan()
@@ -49,7 +53,7 @@ public class PursuitRune : MonoBehaviour
             if (!health || health.gameObject == gameObject || _subs.ContainsKey(health)) continue;
             Action<DamageContext, float> handler = (context, _) =>
             {
-                if (IsMe(context.Attacker)) Hit(health, context);
+                if (IsMe(context.Attacker)) Hit(health);
             };
             health.DamageTaken += handler;
             _subs[health] = handler;
@@ -61,32 +65,19 @@ public class PursuitRune : MonoBehaviour
         return attacker && (attacker == transform || attacker.IsChildOf(transform));
     }
 
-    private static bool IsESkillDamage(string sourceId)
+    private void Hit(HealthController target)
     {
-        return !string.IsNullOrEmpty(sourceId) &&
-               (sourceId.StartsWith("ZelfE#", StringComparison.Ordinal) ||
-                sourceId.StartsWith("VolbraakE#", StringComparison.Ordinal) ||
-                sourceId.StartsWith("OboroE#", StringComparison.Ordinal) ||
-                sourceId.StartsWith("RinesE#", StringComparison.Ordinal));
-    }
-
-    private void Hit(HealthController target, DamageContext context)
-    {
-        if (!_win || Time.time < _cdEnd) return;
-        if (IsESkillDamage(context.SourceId))
-        {
-            Debug.Log("[ルーン/追撃] E自身のダメージのため発動しません (E使用後の次の命中で発動)", this);
-            return;
-        }
-
+        if (!_win || Time.time >= _winEnd || Time.time < _cdEnd) return;
+        Targetable targetable = target != null ? target.GetComponentInParent<Targetable>() : null;
+        if (!OboroCombatUtility.IsEnemyChampion(transform, targetable)) return;
         _win = false;
         _cdEnd = Time.time + 12f;
         if (_stats == null || !target) return;
         float damage = 40f + _stats.CurrentAttackDamage * 0.30f;
         target.TakeDamage(damage, transform, DamageType.Normal);
-        CharacterStats targetStats = target.GetComponent<CharacterStats>();
         CrowdControlController cc = target.GetComponent<CrowdControlController>();
-        if (cc != null && targetStats != null) cc.ApplySlow(-(targetStats.BaseMoveSpeed * 0.15f), 0.5f);
+        if (cc == null) cc = target.gameObject.AddComponent<CrowdControlController>();
+        cc.ApplySlowToCurrentSpeed(0.85f, 0.5f);
         Debug.Log($"[ルーン/追撃] 発動！ {target.name} へ {damage:F1} ダメージ + 15%スロウ (0.5秒) / CD 12秒", this);
     }
 }

@@ -13,7 +13,7 @@ using UnityEngine;
 /// - 対象フィールドはprivateのため、各コントローラーを改変せずに済むようReflectionで補正する
 ///   (ゲームロジックの書き換えではなく、Inspector設定漏れの救済に限定して使用する)。
 /// PlayerCharacterApplier(DefaultExecutionOrder(-100))から呼ばれるため、各スキルコントローラーのAwake
-/// (ZelfE/ZelfW/FlashControllerによるZelfQ設定の流用など)より先に補正が完了する。
+/// (ZelfE/ZelfWなどによるZelfQ設定の流用)より先に補正が完了する。
 /// </summary>
 public static class PlayerLayerMaskFallback
 {

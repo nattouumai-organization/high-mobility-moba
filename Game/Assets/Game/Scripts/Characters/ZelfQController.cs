@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
 [RequireComponent(typeof(PlayerTargetSelector))]
-public sealed class ZelfQController : MonoBehaviour
+public sealed class ZelfQController : MonoBehaviour, ICancelableSkillApproach
 {
     [Header("References")]
     [SerializeField] private CharacterController _characterController;
@@ -239,6 +239,7 @@ public sealed class ZelfQController : MonoBehaviour
     {
         if (!CanCastAt(target, true) || !IsInRange(target)) return;
         BlinkTo(target);
+        MovementSkillSignal.Report(gameObject);
         StopMovementAfterQCast();
 
         HealthController health = GetHealth(target);

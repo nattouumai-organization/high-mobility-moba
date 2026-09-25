@@ -49,6 +49,8 @@ public class PlayerBasicAttackController : MonoBehaviour
         _oboroWController = GetComponent<OboroWController>();
         _rinesSkills = GetComponent<RinesSkillController>();
         _lieselotteSkills = GetComponent<LieselotteSkillController>();
+        if (GetComponent<PlayerAttackMoveCommand>() == null)
+            gameObject.AddComponent<PlayerAttackMoveCommand>();
     }
 
     private void Update()

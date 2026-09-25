@@ -136,6 +136,14 @@ public class CrowdControlController : MonoBehaviour
         return ApplyHardCC(HardCcType.Stun, duration, attacker);
     }
 
+    /// <summary>共通Dの反撃専用。相手側のDを再発動させず、ダメージなしでスタンを付与する。</summary>
+    public void ApplyForcedStun(float duration)
+    {
+        if (duration <= 0f || (_health != null && _health.IsDead)) return;
+        BeginStun(duration);
+        StatusApplied?.Invoke(this);
+    }
+
     /// <summary>スネアを適用する。共通Dに無効化された場合はtrueを返す(呼び元はダメージも適用しないこと)。</summary>
     public bool ApplySnare(float duration, Transform attacker)
     {
@@ -199,6 +207,17 @@ public class CrowdControlController : MonoBehaviour
         _slows.Add(new SlowEffect { Percent = Mathf.Clamp(slowPercent, 0f, 99f), EndTime = Time.time + duration });
         RefreshSlow();
         if (withLog) Debug.Log($"CrowdControl: スロウを受けました({slowPercent:F0}% / {duration:F2}秒)。", this);
+    }
+
+    /// <summary>現在の移動速度を基準に倍率を掛けるスロウ。追撃ルーンは命中時の速度の85%を目標にする。</summary>
+    public void ApplySlowToCurrentSpeed(float multiplier, float duration)
+    {
+        if (_stats == null || duration <= 0f || multiplier >= 1f || multiplier < 0f) return;
+        float baseSpeed = _stats.BaseMoveSpeed;
+        if (baseSpeed <= 0f) return;
+        float additionalReduction = _stats.CurrentMoveSpeed * (1f - multiplier);
+        float totalReduction = -_appliedSlowBonus + additionalReduction;
+        ApplySlow(totalReduction / baseSpeed * 100f, duration);
     }
 
     private void BeginStun(float duration)

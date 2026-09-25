@@ -17,6 +17,8 @@ public sealed class RinesSkillController : MonoBehaviour
     private PlayerInputHub _input;
     private HeroSkillUpgrades _upgrades;
     private RinesSkillVisuals _visuals;
+    private SkillRangeIndicator _qPreview;
+    private SkillRangeIndicator _rPreview;
     private Camera _camera;
     private double _qCooldownEndTime;
     private double _wCooldownEndTime;
@@ -72,6 +74,7 @@ public sealed class RinesSkillController : MonoBehaviour
 
     private void OnDisable()
     {
+        HidePreviews();
         CancelPending();
         EndE();
         if (_visuals != null) _visuals.HideAll();
@@ -86,6 +89,7 @@ public sealed class RinesSkillController : MonoBehaviour
         if (OboroCombatUtility.IsMatchEnded || (_health != null && _health.IsDead) ||
             (_cc != null && _cc.IsStunned))
         {
+            HidePreviews();
             CancelPending();
             EndE();
             return;
@@ -106,11 +110,45 @@ public sealed class RinesSkillController : MonoBehaviour
             }
         }
 
-        if (_input == null || (_lock != null && _lock.IsLocked)) return;
-        if (_input.QPressedThisFrame) CastQ();
-        if (_input.WPressedThisFrame) CastW();
-        if (_input.EPressedThisFrame) CastE();
-        if (_input.RPressedThisFrame) CastR();
+        if (_input == null || (_lock != null && _lock.IsLocked))
+        {
+            HidePreviews();
+            return;
+        }
+        UpdatePreviews();
+        if (_input.QReleasedThisFrame) CastQ();
+        if (_input.WReleasedThisFrame) CastW();
+        if (_input.EReleasedThisFrame) CastE();
+        if (_input.RReleasedThisFrame) CastR();
+    }
+
+    private void UpdatePreviews()
+    {
+        if (_input.QPressed && !_isEActive && (_qPending || QRemainingCooldown <= 0f))
+        {
+            if (_qPreview == null) _qPreview = SkillRangeIndicator.Create(transform, "Rines Q Range");
+            _qPreview.ShowCircle(_skillData.QRange, new Color(0.45f, 0.85f, 1f), 0.05f);
+            if (TryAimPoint(out Vector3 point))
+                _qPreview.ShowPointMarker(point, _skillData.QRadius, new Color(0.45f, 0.85f, 1f));
+            else _qPreview.HidePointMarker();
+        }
+        else if (_qPreview != null) _qPreview.HideAll();
+
+        if (_input.RPressed && !_isEActive && !_rPending && RRemainingCooldown <= 0f)
+        {
+            if (_rPreview == null) _rPreview = SkillRangeIndicator.Create(transform, "Rines R Range");
+            _rPreview.ShowCircle(_skillData.RRange, new Color(1f, 0.7f, 0.25f), 0.05f);
+            if (TryAimPoint(out Vector3 point))
+                _rPreview.ShowPointMarker(point, _skillData.RRadius, new Color(1f, 0.7f, 0.25f));
+            else _rPreview.HidePointMarker();
+        }
+        else if (_rPreview != null) _rPreview.HideAll();
+    }
+
+    private void HidePreviews()
+    {
+        if (_qPreview != null) _qPreview.HideAll();
+        if (_rPreview != null) _rPreview.HideAll();
     }
 
     private void OnDied()
@@ -140,13 +178,12 @@ public sealed class RinesSkillController : MonoBehaviour
         ClearMarker(ref _rMarker);
     }
 
-    private bool TryCastPoint(float range, out Vector3 point)
+    private bool TryAimPoint(out Vector3 point)
     {
         point = Vector3.zero;
         if (!OboroCombatUtility.TryGetMouseGroundPoint(_input, ref _camera, _groundLayer, out point))
             return false;
-        Vector3 delta = OboroCombatUtility.Flatten(point - transform.position);
-        return delta.sqrMagnitude <= range * range;
+        return true;
     }
 
     private void CastQ()
@@ -163,10 +200,18 @@ public sealed class RinesSkillController : MonoBehaviour
                 HeroSkillSlot.Q, HardCcType.Snare, _skillData.QSnare, "RinesQ");
             return;
         }
-        if (now < _qCooldownEndTime || !TryCastPoint(_skillData.QRange, out Vector3 castPoint)) return;
-        _qCooldownEndTime = now + _skillData.QCooldown;
+        if (now < _qCooldownEndTime || !TryAimPoint(out Vector3 castPoint)) return;
+        SkillApproachController.For(gameObject).CastOrApproach(castPoint, _skillData.QRange,
+            () => PlaceQ(castPoint));
+    }
+
+    private void PlaceQ(Vector3 castPoint)
+    {
+        if (_skillData == null || _isEActive || Time.timeAsDouble < _qCooldownEndTime || _qPending ||
+            (_health != null && _health.IsDead) || (_cc != null && _cc.IsStunned)) return;
+        _qCooldownEndTime = Time.timeAsDouble + _skillData.QCooldown;
         _qPoint = castPoint;
-        _qStarted = now;
+        _qStarted = Time.timeAsDouble;
         _qPending = true;
         _qMarker = MakeMarker("Rines Q warning", castPoint, _skillData.QRadius);
     }
@@ -238,7 +283,16 @@ public sealed class RinesSkillController : MonoBehaviour
     private void CastR()
     {
         if (_isEActive || _rPending || Time.timeAsDouble < _rCooldownEndTime ||
-            !TryCastPoint(_skillData.RRange, out Vector3 point)) return;
+            !TryAimPoint(out Vector3 point)) return;
+        SkillApproachController.For(gameObject).CastOrApproach(point, _skillData.RRange,
+            () => PlaceR(point));
+    }
+
+    private void PlaceR(Vector3 point)
+    {
+        if (_skillData == null || _isEActive || _rPending ||
+            Time.timeAsDouble < _rCooldownEndTime ||
+            (_health != null && _health.IsDead) || (_cc != null && _cc.IsStunned)) return;
         _rCooldownEndTime = Time.timeAsDouble + _skillData.RCooldown;
         _sequence++;
         _rPoint = point;
@@ -260,10 +314,8 @@ public sealed class RinesSkillController : MonoBehaviour
                     HardCcType.Stun, _skillData.RStun, "RinesR");
             else
             {
-                CommonDController d = target.GetComponent<CommonDController>();
-                if (d == null || !d.TryBlockHardCC(transform))
-                    DealDamage(target, _skillData.RBaseDamage, _skillData.RAdRatio, HeroSkillSlot.R,
-                        false, "RinesR");
+                DealDamage(target, _skillData.RBaseDamage, _skillData.RAdRatio, HeroSkillSlot.R,
+                    false, "RinesR");
             }
         }
     }

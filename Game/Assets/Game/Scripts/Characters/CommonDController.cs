@@ -6,7 +6,7 @@ using UnityEngine;
 /// Dキー押下で0.20秒の無効化ウィンドウを開始し、ウィンドウ中に受けた「最初のハードCC」を1回だけ無効化する。
 /// クールダウンは34秒。
 /// スキル指定方式はSkillTargetingType.NoTarget(無指定)。反応スキルのためSkillCastModeの対象外とし、押した瞬間に即発動する。
-/// 成功時: 攻撃者へ45 + ADの30%の通常ダメージのカウンターを与え、短時間MSが10%上がる。追加スタン・スネアは与えない。
+/// 成功時: 攻撃者を強制スタンさせ、短時間MSが10%上がる。反撃ダメージはない。
 /// 失敗時(無効化できずにウィンドウが終了)は何も起きない(仕様変更 2026-07-23: 硬直などのペナルティなし。クールダウンのみ消費)。
 /// デス時は残りクールダウンを60%短縮する(GAME_DESIGN.md 7章)。
 /// スタン中・W発動中・Eダッシュ中・死亡中などの行動ロック中(AbilityLockController.IsLocked)は発動できない。
@@ -21,11 +21,9 @@ public class CommonDController : MonoBehaviour
     // クールダウン(秒)。GAME_DESIGN.md: 34秒。
     [SerializeField, Min(0f)] private float _cooldown = 34f;
 
-    [Header("Counter Attack (成功時)")]
-    // カウンターの固定ダメージ。GAME_DESIGN.md: 45。
-    [SerializeField, Min(0f)] private float _counterBaseDamage = 45f;
-    // カウンターのAD倍率。GAME_DESIGN.md: ADの30%。
-    [SerializeField, Min(0f)] private float _counterAdRatio = 0.3f;
+    [Header("Counter Stun (成功時)")]
+    // 初期プロトタイプ値。対象のDでも防げない強制スタン。
+    [SerializeField, Min(0f)] private float _counterStunDuration = 0.75f;
     // 成功時のMS上昇率(%)。GAME_DESIGN.md: 10%。
     [SerializeField, Min(0f)] private float _msBoostPercent = 10f;
     // MS上昇の持続時間(秒)。仕様は「短時間」のためInspectorで調整する。
@@ -166,39 +164,27 @@ public class CommonDController : MonoBehaviour
         _hasBlockedThisWindow = true;
         _isWindowActive = false;
         Debug.Log("共通D: ハードCCを無効化しました。", this);
-        PerformCounterAttack(attacker);
+        ApplyCounterStun(attacker);
         ApplyMsBoost();
         CounterSucceeded?.Invoke(attacker);
         return true;
     }
 
-    // 成功時のカウンター攻撃: 攻撃者へ45 + ADの30%の通常ダメージを与える。
-    // 仕様どおり、成功しても追加のスタンやスネアは与えない(ダメージのみ)。
-    private void PerformCounterAttack(Transform attacker)
+    // 反撃CCはDの判定を再入させない。ダメージは与えない。
+    private void ApplyCounterStun(Transform attacker)
     {
         if (attacker == null)
         {
-            Debug.Log("共通D: 攻撃者が不明のため、カウンター攻撃は発生しません。", this);
+            Debug.Log("共通D: 攻撃者が不明のため、強制スタンは発生しません。", this);
             return;
         }
 
         HealthController attackerHealth = attacker.GetComponentInParent<HealthController>();
-        if (attackerHealth == null)
-        {
-            Debug.Log("共通D: 攻撃者にHPがないため、カウンター攻撃は発生しません。", this);
-            return;
-        }
-
-        float attackDamage = _characterStats != null ? _characterStats.CurrentAttackDamage : 0f;
-        float damage = _counterBaseDamage + attackDamage * _counterAdRatio;
-        float actualDamage = attackerHealth.TakeDamage(damage, transform);
-        Debug.Log($"共通D: カウンター攻撃({damage:F1}ダメージ)を与えました。", this);
-
-        if (actualDamage > 0f)
-        {
-            Targetable targetable = attacker.GetComponentInParent<Targetable>();
-            if (targetable != null) targetable.PlayHitFlash();
-        }
+        if (attackerHealth == null) return;
+        CrowdControlController crowdControl = attackerHealth.GetComponent<CrowdControlController>();
+        if (crowdControl == null)
+            crowdControl = attackerHealth.gameObject.AddComponent<CrowdControlController>();
+        crowdControl.ApplyForcedStun(_counterStunDuration);
     }
 
     // 成功時のMS上昇: 基礎MS(BaseMoveSpeed)の10%をフラット量へ換算して加算する(ゼルフRのMS上昇と同じ基準。フェーズ1〜3見直しで統一)。

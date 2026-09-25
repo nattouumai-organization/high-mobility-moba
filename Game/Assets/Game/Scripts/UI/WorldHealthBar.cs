@@ -246,7 +246,10 @@ public class WorldHealthBar : MonoBehaviour
 
     private void EnsureFillSprite()
     {
-        if (_fillImage != null && _fillImage.sprite == null) _fillImage.sprite = GetSharedFillSprite();
+        // The built-in rounded UI sprite has transparent horizontal padding. A filled
+        // image clips that padding too, making a 10% execute marker look smaller.
+        if (_fillImage != null && _fillImage.type == Image.Type.Filled)
+            _fillImage.sprite = GetSharedFillSprite();
     }
 
     private static Sprite GetSharedFillSprite()
@@ -355,7 +358,7 @@ public class WorldHealthBar : MonoBehaviour
     private void CreateExecuteMarker(float ratio)
     {
         GameObject markerObject = new GameObject("Oboro R Execute Threshold", typeof(RectTransform));
-        markerObject.transform.SetParent(_fillImage.rectTransform.parent, false);
+        markerObject.transform.SetParent(_fillImage.rectTransform, false);
         _oboroExecuteMarker = markerObject.AddComponent<Image>();
         _oboroExecuteMarker.sprite = GetSharedFillSprite();
         _oboroExecuteMarker.raycastTarget = false;
@@ -366,27 +369,12 @@ public class WorldHealthBar : MonoBehaviour
     {
         if (_oboroExecuteMarker == null || _fillImage == null) return;
         _oboroMarkerRatio = ratio;
-        RectTransform fill = _fillImage.rectTransform;
         RectTransform marker = _oboroExecuteMarker.rectTransform;
-
-        if (Mathf.Abs(fill.anchorMax.x - fill.anchorMin.x) > 0.0001f)
-        {
-            float anchorX = Mathf.Lerp(fill.anchorMin.x, fill.anchorMax.x, ratio);
-            marker.anchorMin = new Vector2(anchorX, fill.anchorMin.y);
-            marker.anchorMax = new Vector2(anchorX, fill.anchorMax.y);
-            marker.pivot = new Vector2(0.5f, fill.pivot.y);
-            marker.anchoredPosition = Vector2.zero;
-            marker.offsetMin = new Vector2(-2f, fill.offsetMin.y);
-            marker.offsetMax = new Vector2(2f, fill.offsetMax.y);
-        }
-        else
-        {
-            marker.anchorMin = marker.anchorMax = fill.anchorMin;
-            marker.pivot = new Vector2(0.5f, fill.pivot.y);
-            float left = fill.anchoredPosition.x - fill.sizeDelta.x * fill.pivot.x;
-            marker.anchoredPosition = new Vector2(left + fill.sizeDelta.x * ratio, fill.anchoredPosition.y);
-            marker.sizeDelta = new Vector2(4f, Mathf.Max(1f, fill.sizeDelta.y));
-        }
+        marker.anchorMin = new Vector2(ratio, 0f);
+        marker.anchorMax = new Vector2(ratio, 1f);
+        marker.pivot = new Vector2(0.5f, 0.5f);
+        marker.anchoredPosition = Vector2.zero;
+        marker.sizeDelta = new Vector2(2f, 0f);
         marker.SetAsLastSibling();
     }
 

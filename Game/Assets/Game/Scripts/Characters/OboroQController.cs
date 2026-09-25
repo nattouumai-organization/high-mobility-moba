@@ -11,7 +11,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
-public sealed class OboroQController : MonoBehaviour
+public sealed class OboroQController : MonoBehaviour, ICancelableSkillApproach
 {
     [Header("Projectile")]
     [SerializeField, Min(0.1f)] private float _projectileRange = 7f;
@@ -29,7 +29,7 @@ public sealed class OboroQController : MonoBehaviour
     [SerializeField, Min(0.1f)] private float _stockRechargeTime = 8f;
 
     [Header("Cast")]
-    [SerializeField] private SkillCastMode _castMode = SkillCastMode.QuickCast;
+    [SerializeField] private SkillCastMode _castMode = SkillCastMode.NormalCast;
     [SerializeField] private LayerMask _groundLayer;
     [SerializeField] private LayerMask _targetableLayer;
 
@@ -188,11 +188,34 @@ public sealed class OboroQController : MonoBehaviour
             Debug.Log("朧 Q: ストックがありません。", this);
             return;
         }
+        if (OboroCombatUtility.TryGetMouseGroundPoint(_inputHub, ref _mainCamera,
+            _groundLayer, out Vector3 point))
+        {
+            SkillApproachController.For(gameObject).CastOrApproach(point, _projectileRange,
+                () => FireToward(point));
+            return;
+        }
         if (!TryGetCastDirection(out Vector3 direction))
         {
             Debug.Log("朧 Q: 発射方向を決定できません。", this);
             return;
         }
+
+        Fire(direction);
+    }
+
+    private void FireToward(Vector3 point)
+    {
+        Vector3 direction = OboroCombatUtility.Flatten(point - transform.position);
+        if (direction.sqrMagnitude < 0.0001f) return;
+        Fire(direction.normalized);
+    }
+
+    private void Fire(Vector3 direction)
+    {
+        if (_currentCharges <= 0 || (_selfHealth != null && _selfHealth.IsDead) ||
+            (_crowdControl != null && _crowdControl.IsMovementBlocked) ||
+            (_abilityLock != null && _abilityLock.IsLocked)) return;
 
         _wController?.BreakStealth("Q発動");
         ConsumeCharge();
@@ -324,6 +347,7 @@ public sealed class OboroQController : MonoBehaviour
         Vector3 before = transform.position;
         if (_clickMovement != null) _clickMovement.StopMovement();
         OboroCombatUtility.Teleport(transform, _characterController, destination, _groundLayer);
+        MovementSkillSignal.Report(gameObject);
         Vector3 teleportDirection = OboroCombatUtility.Flatten(transform.position - before);
         if (teleportDirection.sqrMagnitude > 0.0001f)
         {

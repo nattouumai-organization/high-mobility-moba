@@ -36,6 +36,24 @@ public sealed class RinesWAndVisualTests
     }
 
     [Test]
+    public void R_OuterHitDoesNotConsumeCommonD()
+    {
+        Targetable enemy = CreateTarget("Outer enemy", Team.Red,
+            TargetClassification.Character, 1f);
+        CommonDController d = enemy.gameObject.AddComponent<CommonDController>();
+        SetField(d, "_isWindowActive", true);
+        SetField(d, "_windowEndTime", Time.time + 1f);
+        SetField(_rines, "_rPoint", Vector3.zero);
+        SetField(_rines, "_rPending", true);
+        float before = enemy.Health.CurrentHealth;
+
+        Invoke(_rines, "ResolveR");
+
+        Assert.That(enemy.Health.CurrentHealth, Is.LessThan(before));
+        Assert.That(d.IsWindowActive, Is.True);
+    }
+
+    [Test]
     public void W_HitsEnemyPlayerInRangeAndShowsImpact()
     {
         Targetable enemy = CreateTarget("Enemy", Team.Red, TargetClassification.Character, 1.5f);

@@ -110,7 +110,7 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
             if (_outline != null) _outline.enabled = _isOutlineRevealed;
 
             // W再発動、共通D、Fも「スキル使用」として透明化を解除する。
-            if (_inputHub != null && _inputHub.WPressedThisFrame)
+            if (_inputHub != null && _inputHub.WReleasedThisFrame)
             {
                 Deactivate("W再発動", restoreRenderers: true);
                 return;
@@ -127,7 +127,7 @@ public sealed class OboroWController : MonoBehaviour, IIncomingDamageModifier
         _isInsideEnemyTowerRange = false;
         if (_outline != null) _outline.enabled = false;
 
-        if (_inputHub != null && _inputHub.WPressedThisFrame)
+        if (_inputHub != null && _inputHub.WReleasedThisFrame)
         {
             TryActivate();
         }

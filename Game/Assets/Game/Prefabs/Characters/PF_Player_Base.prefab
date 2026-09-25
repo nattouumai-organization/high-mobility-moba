@@ -592,8 +592,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CommonDController
   _invulnerabilityDuration: 0.2
   _cooldown: 34
-  _counterBaseDamage: 45
-  _counterAdRatio: 0.3
+  _counterStunDuration: 0.75
   _msBoostPercent: 10
   _msBoostDuration: 1.5
   _deathCooldownReduction: 0.6

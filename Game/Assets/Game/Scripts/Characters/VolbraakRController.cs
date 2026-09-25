@@ -223,6 +223,15 @@ public sealed class VolbraakRController : MonoBehaviour
             return;
         }
 
+        SkillApproachController.For(gameObject).CastOrApproach(groundPoint, _chainRange,
+            () => StartChainToward(groundPoint));
+    }
+
+    private void StartChainToward(Vector3 groundPoint)
+    {
+        if (Time.timeAsDouble < _cooldownEndTime || (_selfHealth != null && _selfHealth.IsDead) ||
+            (_abilityLock != null && _abilityLock.IsLocked)) return;
+
         Vector3 direction = groundPoint - transform.position;
         direction.y = 0f;
         if (direction.sqrMagnitude < _minCastDistance * _minCastDistance)

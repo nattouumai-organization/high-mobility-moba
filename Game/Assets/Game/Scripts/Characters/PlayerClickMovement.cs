@@ -30,8 +30,6 @@ public class PlayerClickMovement : MonoBehaviour
     // 同じPlayer上のターゲット選択(任意)。存在する場合、Targetable対象の右クリック時は移動しない。
     private PlayerTargetSelector _targetSelector;
 
-    private ZelfQController _qController;
-    private ZelfRController _rController;
     private LieselotteSkillController _lieselotteSkills;
     private PlayerInputHub _inputHub;
 
@@ -44,6 +42,8 @@ public class PlayerClickMovement : MonoBehaviour
     private Camera _mainCamera;
     private Vector3 _destination;
     private bool _hasDestination;
+    private bool _ignoreRightClickUntilReleased;
+    public bool IsIgnoringRightClick => _ignoreRightClickUntilReleased;
 
     private void Awake()
     {
@@ -53,8 +53,6 @@ public class PlayerClickMovement : MonoBehaviour
         _inputHub = GetComponent<PlayerInputHub>();
         if (_inputHub == null) _inputHub = gameObject.AddComponent<PlayerInputHub>();
         _mainCamera = Camera.main;
-        _qController = GetComponent<ZelfQController>();
-        _rController = GetComponent<ZelfRController>();
         _lieselotteSkills = GetComponent<LieselotteSkillController>();
         _crowdControl = GetComponent<CrowdControlController>();
         _mouseFacing = GetComponent<PlayerMouseFacing>();
@@ -70,6 +68,9 @@ public class PlayerClickMovement : MonoBehaviour
     private void Update()
     {
         HandleStopCommand();
+
+        if (_inputHub != null && !_inputHub.RightClickPressed)
+            _ignoreRightClickUntilReleased = false;
 
         UpdateDestinationFromRightClick();
 
@@ -109,7 +110,7 @@ public class PlayerClickMovement : MonoBehaviour
     {
         // 長押し中は常にカーソル下の地点へ移動する仕様のため、
         // 押した瞬間だけでなく、右ボタンが押されている間は毎フレーム移動先を更新する。
-        if (_inputHub == null || !_inputHub.RightClickPressed)
+        if (_inputHub == null || !_inputHub.RightClickPressed || _ignoreRightClickUntilReleased)
         {
             return;
         }
@@ -182,7 +183,8 @@ public class PlayerClickMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// 停止コマンド(Sキー): 進行中の移動を中断し、ターゲット選択とQ/Rの自動接近も解除して、その場で停止する。
+    /// 停止コマンド(Sキー): 進行中の通常移動、ターゲット選択、発動前のスキル自動接近を解除する。
+    /// 発動済みの突進・ブリンク・帰還は各スキルが進行させるため中断しない。
     /// (ターゲット解除により通常攻撃の自動接近・継続攻撃も停止する)
     /// </summary>
     private void HandleStopCommand()
@@ -190,8 +192,9 @@ public class PlayerClickMovement : MonoBehaviour
         if (_inputHub == null || !_inputHub.SPressedThisFrame) return;
 
         StopMovement();
+        _ignoreRightClickUntilReleased = true;
         if (_targetSelector != null) _targetSelector.ClearTargetSelection();
-        if (_qController != null) _qController.CancelPendingApproach();
-        if (_rController != null) _rController.CancelPendingApproach();
+        foreach (MonoBehaviour component in GetComponents<MonoBehaviour>())
+            if (component is ICancelableSkillApproach approach) approach.CancelPendingApproach();
     }
 }

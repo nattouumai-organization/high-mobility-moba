@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Player入力の一元管理(InputAction)。Q/W/E/R・停止コマンド(S)・共通D・F(フラッシュ)・
+/// Player入力の一元管理(InputAction)。Q/W/E/R・攻撃指示(A+左クリック)・停止(S)・共通D/F・
 /// カメラ操作(Space: プレイヤー中心 / Y: カメラモード切替)・右クリック・マウス座標を公開する。
 /// 各コントローラーのAwakeからget-or-addで自動追加されるため、Inspector設定は不要。
 /// 将来のキーコンフィグ・ゲームパッド対応は、このクラスのバインディング変更のみで行う。
@@ -18,11 +18,13 @@ public sealed class PlayerInputHub : MonoBehaviour
     private InputAction _eAction;
     private InputAction _rAction;
     private InputAction _sAction;
+    private InputAction _aAction;
     private InputAction _dAction;
     private InputAction _fAction;
     private InputAction _cameraCenterAction;
     private InputAction _cameraLockToggleAction;
     private InputAction _rightClickAction;
+    private InputAction _leftClickAction;
     private InputAction _mousePositionAction;
     private InputAction _upgradeModifierAction;
 
@@ -61,6 +63,8 @@ public sealed class PlayerInputHub : MonoBehaviour
 
     // --- 停止コマンド(S) ---
     public bool SPressedThisFrame => _sAction != null && _sAction.WasPressedThisFrame();
+    public bool APressed => _aAction != null && _aAction.IsPressed();
+    public bool LeftClickPressedThisFrame => _leftClickAction != null && _leftClickAction.WasPressedThisFrame();
 
     // --- 共通D(カウンター) ---
     public bool DPressedThisFrame => _dAction != null && _dAction.WasPressedThisFrame();
@@ -101,11 +105,13 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction.Enable();
         _rAction.Enable();
         _sAction.Enable();
+        _aAction.Enable();
         _dAction.Enable();
         _fAction.Enable();
         _cameraCenterAction.Enable();
         _cameraLockToggleAction.Enable();
         _rightClickAction.Enable();
+        _leftClickAction.Enable();
         _mousePositionAction.Enable();
         _upgradeModifierAction.Enable();
     }
@@ -117,11 +123,13 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction?.Disable();
         _rAction?.Disable();
         _sAction?.Disable();
+        _aAction?.Disable();
         _dAction?.Disable();
         _fAction?.Disable();
         _cameraCenterAction?.Disable();
         _cameraLockToggleAction?.Disable();
         _rightClickAction?.Disable();
+        _leftClickAction?.Disable();
         _mousePositionAction?.Disable();
         _upgradeModifierAction?.Disable();
     }
@@ -133,11 +141,13 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction?.Dispose();
         _rAction?.Dispose();
         _sAction?.Dispose();
+        _aAction?.Dispose();
         _dAction?.Dispose();
         _fAction?.Dispose();
         _cameraCenterAction?.Dispose();
         _cameraLockToggleAction?.Dispose();
         _rightClickAction?.Dispose();
+        _leftClickAction?.Dispose();
         _mousePositionAction?.Dispose();
         _upgradeModifierAction?.Dispose();
     }
@@ -153,11 +163,13 @@ public sealed class PlayerInputHub : MonoBehaviour
         _eAction = new InputAction("SkillE", InputActionType.Button, "<Keyboard>/e");
         _rAction = new InputAction("SkillR", InputActionType.Button, "<Keyboard>/r");
         _sAction = new InputAction("StopCommand", InputActionType.Button, "<Keyboard>/s");
+        _aAction = new InputAction("AttackMove", InputActionType.Button, "<Keyboard>/a");
         _dAction = new InputAction("CommonD", InputActionType.Button, "<Keyboard>/d");
         _fAction = new InputAction("Flash", InputActionType.Button, "<Keyboard>/f");
         _cameraCenterAction = new InputAction("CameraCenter", InputActionType.Button, "<Keyboard>/space");
         _cameraLockToggleAction = new InputAction("CameraLockToggle", InputActionType.Button, "<Keyboard>/y");
         _rightClickAction = new InputAction("RightClick", InputActionType.Button, "<Mouse>/rightButton");
+        _leftClickAction = new InputAction("LeftClick", InputActionType.Button, "<Mouse>/leftButton");
         _mousePositionAction = new InputAction("MousePosition", InputActionType.Value, "<Mouse>/position");
         _upgradeModifierAction = new InputAction("UpgradeModifier", InputActionType.Button, "<Keyboard>/leftCtrl");
         _upgradeModifierAction.AddBinding("<Keyboard>/rightCtrl");

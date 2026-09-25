@@ -10,7 +10,7 @@ using UnityEngine;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(CharacterController))]
 [RequireComponent(typeof(CharacterStats))]
-public sealed class OboroEController : MonoBehaviour
+public sealed class OboroEController : MonoBehaviour, ICancelableSkillApproach
 {
     private const string AbilityLockReason = "OboroEReturn";
 
@@ -296,6 +296,7 @@ public sealed class OboroEController : MonoBehaviour
 
         Vector3 destination = target.transform.position - targetForward.normalized * _behindOffset;
         OboroCombatUtility.Teleport(transform, _characterController, destination, _groundLayer);
+        MovementSkillSignal.Report(gameObject);
         FaceTarget(target);
         PerformAttack(target);
         Debug.Log($"朧 E: {target.name}の真後ろへ移動し、帰還待機を開始しました。", this);

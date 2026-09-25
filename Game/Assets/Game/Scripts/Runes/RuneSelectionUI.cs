@@ -24,14 +24,15 @@ public class RuneSelectionUI : MonoBehaviour
         public Image Frame;
     }
 
-    private readonly IconView[] _icons = new IconView[4];
+    private readonly IconView[] _icons = new IconView[5];
     private GameObject _tooltip;
     private Text _ttTitle;
     private Text _ttBody;
     private Text _confirmLbl;
 
     private static readonly RuneType[] Order =
-        { RuneType.Relentless, RuneType.Indomitable, RuneType.Pursuit, RuneType.Siege };
+        { RuneType.Relentless, RuneType.Indomitable, RuneType.Pursuit, RuneType.Siege,
+          RuneType.AllForTesting };
 
     private static string Disp(RuneType r) => r switch
     {
@@ -39,6 +40,7 @@ public class RuneSelectionUI : MonoBehaviour
         RuneType.Indomitable => "不屈",
         RuneType.Pursuit     => "追撃",
         RuneType.Siege       => "攻城",
+        RuneType.AllForTesting => "全装備",
         _ => "?"
     };
 
@@ -52,6 +54,8 @@ public class RuneSelectionUI : MonoBehaviour
             "EまたはFの後1.25秒以内に敵ヒーローへ命中\n\n効果: 40 + AD x 30%のダメージ\n15%スロウ (0.5秒)\n\nCD: 12秒",
         RuneType.Siege =>
             "味方ミニオンが敵タワー射程内にいる\n\n効果: タワーへのダメージ +12%\n\nCD: なし (パッシブ)",
+        RuneType.AllForTesting =>
+            "テスト用: 連撃・不屈・追撃・攻城をすべて装備\n\n各ルーンの発動時はConsoleへ表示",
         _ => ""
     };
 
@@ -61,6 +65,7 @@ public class RuneSelectionUI : MonoBehaviour
         RuneType.Indomitable => new Color(0.3f, 0.75f, 1f, 1f),
         RuneType.Pursuit     => new Color(0.5f, 1f, 0.45f, 1f),
         RuneType.Siege       => new Color(1f, 0.85f, 0.25f, 1f),
+        RuneType.AllForTesting => new Color(0.85f, 0.5f, 1f, 1f),
         _ => Color.gray
     };
 

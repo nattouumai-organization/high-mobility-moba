@@ -338,6 +338,51 @@ public sealed class LieselotteTests
     }
 
     [Test]
+    public void Q_SelectedTargetApproachesThenDealsDamageInsideRange()
+    {
+        GameObject owner = new GameObject("Lieselotte Q owner");
+        GameObject victim = new GameObject("Lieselotte Q victim");
+        try
+        {
+            owner.AddComponent<CharacterStats>().SetCharacterData(
+                AssetDatabase.LoadAssetAtPath<CharacterData>(DataPath));
+            owner.AddComponent<HealthController>();
+            owner.AddComponent<TeamMember>().SetTeam(Team.Blue);
+            PlayerTargetSelector selector = owner.AddComponent<PlayerTargetSelector>();
+            LieselotteSkillController skills = owner.AddComponent<LieselotteSkillController>();
+            SetField(skills, "_skillData", AssetDatabase.LoadAssetAtPath<LieselotteSkillData>(SkillPath));
+            EnsureAwake(skills);
+
+            victim.transform.position = new Vector3(4f, 0f, 0f);
+            victim.AddComponent<SphereCollider>().radius = 0.5f;
+            HealthController health = victim.AddComponent<HealthController>();
+            victim.AddComponent<TeamMember>().SetTeam(Team.Red);
+            Targetable target = victim.AddComponent<Targetable>();
+            EnsureAwake(target);
+            SetField(selector, "_currentTarget", target);
+
+            typeof(LieselotteSkillController).GetMethod("CastQ",
+                BindingFlags.Instance | BindingFlags.NonPublic).Invoke(skills, null);
+            SkillApproachController approach = owner.GetComponent<SkillApproachController>();
+            Assert.That(approach, Is.Not.Null);
+            Assert.That(approach.IsApproaching, Is.True);
+            float before = health.CurrentHealth;
+
+            owner.transform.position = new Vector3(2.1f, 0f, 0f);
+            typeof(SkillApproachController).GetMethod("Update",
+                BindingFlags.Instance | BindingFlags.NonPublic).Invoke(approach, null);
+            Assert.That(approach.IsApproaching, Is.False);
+            Assert.That(health.CurrentHealth, Is.LessThan(before));
+            Assert.That(skills.QRemainingCooldown, Is.GreaterThan(0f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(owner);
+            Object.DestroyImmediate(victim);
+        }
+    }
+
+    [Test]
     public void PlaceholderVisuals_ShowAndClearWPoolAndStealWithoutSharedMaterial()
     {
         GameObject owner = new GameObject("Lieselotte visuals");

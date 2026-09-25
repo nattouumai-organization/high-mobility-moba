@@ -4,6 +4,7 @@ using NUnit.Framework;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public sealed class CrowdControlHealthBarTests
 {
@@ -44,6 +45,38 @@ public sealed class CrowdControlHealthBarTests
         foreach (GameObject item in _created)
             if (item != null) Object.DestroyImmediate(item);
         _created.Clear();
+    }
+
+    [Test]
+    public void FilledHealthBar_UsesOpaqueSpriteAcrossTheEntireExecuteScale()
+    {
+        GameObject barObject = new GameObject("Sprite test bar", typeof(RectTransform), typeof(Canvas));
+        _created.Add(barObject);
+        WorldHealthBar spriteBar = barObject.AddComponent<WorldHealthBar>();
+        GameObject fillObject = new GameObject("Fill", typeof(RectTransform), typeof(CanvasRenderer));
+        _created.Add(fillObject);
+        fillObject.transform.SetParent(barObject.transform, false);
+        Image fill = fillObject.AddComponent<Image>();
+        fill.type = Image.Type.Filled;
+        Texture2D paddedTexture = new Texture2D(4, 1);
+        Sprite paddedSprite = Sprite.Create(paddedTexture, new Rect(0, 0, 4, 1), Vector2.one * 0.5f);
+        try
+        {
+            fill.sprite = paddedSprite;
+            spriteBar.InitializeRuntime(_health, fill);
+            Assert.That(fill.sprite.texture, Is.EqualTo(Texture2D.whiteTexture));
+            Assert.That(fill.sprite.rect.width, Is.EqualTo(fill.sprite.texture.width));
+            Invoke(spriteBar, "CreateExecuteMarker", 0.1f);
+            Image marker = (Image)GetField(spriteBar, "_oboroExecuteMarker");
+            Assert.That(marker.rectTransform.parent, Is.EqualTo(fill.rectTransform));
+            Assert.That(marker.rectTransform.anchorMin.x, Is.EqualTo(0.1f).Within(0.0001f));
+            Assert.That(marker.rectTransform.sizeDelta.x, Is.EqualTo(2f));
+        }
+        finally
+        {
+            Object.DestroyImmediate(paddedSprite);
+            Object.DestroyImmediate(paddedTexture);
+        }
     }
 
     [Test]
