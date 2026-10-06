@@ -82,3 +82,7 @@ crashlytics-build.properties
 /Game/[Bb]uilds/
 /Game/[Ll]ogs/
 /Game/[Uu]serSettings/
+
+# Python tools cache
+__pycache__/
+*.pyc

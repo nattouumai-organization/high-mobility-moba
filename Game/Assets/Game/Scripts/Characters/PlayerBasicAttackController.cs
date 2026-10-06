@@ -164,7 +164,8 @@ public class PlayerBasicAttackController : MonoBehaviour
             }
 
             float actualDamage = targetHealth.TakeDamage(rawDamage, transform, DamageType.Normal,
-                isBasicAttack: true, sourceId: sourceId);
+                isBasicAttack: true, sourceId: sourceId,
+                attackAttributes: SkillAttribute.BasicAttack);
             if (actualDamage > 0f)
             {
                 CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);

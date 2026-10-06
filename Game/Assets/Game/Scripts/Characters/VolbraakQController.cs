@@ -301,7 +301,8 @@ public sealed class VolbraakQController : MonoBehaviour
             HealthController health = target.Health != null ? target.Health : target.GetComponent<HealthController>();
             if (health == null || health.IsDead) continue;
 
-            float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: sourceId);
+            float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: sourceId,
+                attackAttributes: SkillAttributeCatalog.DamageOf("Volbraak", HeroSkillSlot.Q));
             if (actualDamage <= 0f) continue;
             target.PlayHitFlash();
             CombatTextManager.ShowDamageDealt(target.transform.position, actualDamage);

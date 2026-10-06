@@ -347,7 +347,8 @@ public sealed class RinesSkillController : MonoBehaviour
         float raw = RinesRules.Damage(baseDamage, adRatio, _stats.CurrentAttackDamage, rank,
             passive, _skillData.PassiveMultiplier, _skillData.RankDamageStep);
         float actual = targetHealth.TakeDamage(raw, transform, DamageType.Normal,
-            sourceId: $"{source}#{_sequence}");
+            sourceId: $"{source}#{_sequence}",
+            attackAttributes: SkillAttributeCatalog.DamageOf("Rines", slot));
         if (actual <= 0f) return;
         target.PlayHitFlash();
         CombatTextManager.ShowDamageDealt(target.transform.position, actual);

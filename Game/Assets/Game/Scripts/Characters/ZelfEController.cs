@@ -395,7 +395,8 @@ public sealed class ZelfEController : MonoBehaviour
     private void ApplyDamage(Targetable target, HealthController health)
     {
         float damage = _baseDamage + _characterStats.CurrentAttackDamage * _adRatio;
-        float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _eCastSourceId);
+        float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _eCastSourceId,
+            attackAttributes: SkillAttributeCatalog.DamageOf("Zelf", HeroSkillSlot.E));
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

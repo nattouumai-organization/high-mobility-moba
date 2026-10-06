@@ -13,7 +13,7 @@ using UnityEngine.UI;
 /// - 同一ヒーローへの連続攻撃で威力+25%/発(最大+200%)。攻撃が2秒間途切れるとリセット。
 /// - 受けるダメージ(IIncomingDamageModifier):
 ///   1. 同一チームからのダメージは0(味方のタワーは殴れない)。
-///   2. 通常攻撃(DamageContext.IsBasicAttack)以外のダメージは0(スキルでは攻撃できない)。
+///   2. 通常攻撃判定(DamageContext.IsBasicAttack)以外のダメージは0。リーゼロッテQは通常攻撃判定。
 ///   3. 攻撃者の周囲8以内に攻撃側チームのミニオンがいない場合、確定ダメージは無効・通常ダメージは90%軽減。
 ///   4. 最後にAR60で通常ダメージを軽減(CharacterStatsを持たないため自前で適用)。
 /// - 頭上にワールド空間のHPバーを実行時生成する(WorldHealthBarを再利用)。
@@ -55,6 +55,10 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private HealthController _health;
     private GameObject _healthBarRoot;
     private float _attackCooldown;
+    private float _targetRefreshTimer;
+    private HealthController _currentTarget;
+    private bool _currentTargetIsHero;
+    private WorldHealthBar _currentTargetBar;
     private Transform _lastHeroTarget;
     private int _consecutiveHits;
     private float _consecutiveResetTimer;
@@ -118,15 +122,18 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     private void OnEnable()
     {
         Towers.Add(this);
+        _targetRefreshTimer = 0f;
     }
 
     private void OnDisable()
     {
         Towers.Remove(this);
+        SetCurrentTarget(null, false);
     }
 
     private void OnDestroy()
     {
+        SetCurrentTarget(null, false);
         if (_health != null)
         {
             _health.Died -= HandleDied;
@@ -227,6 +234,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
     {
         if (_isDestroyed || _health == null || _health.IsDead)
         {
+            SetCurrentTarget(null, false);
             return;
         }
 
@@ -257,21 +265,46 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _attackCooldown -= Time.deltaTime;
-        if (_attackCooldown > 0f)
+        _targetRefreshTimer -= Time.deltaTime;
+        if (_targetRefreshTimer <= 0f || _attackCooldown <= 0f ||
+            (_currentTarget != null && (_currentTarget.IsDead || !IsWithinAttackRange(_currentTarget.transform))))
         {
-            return;
+            _targetRefreshTimer = RetargetCooldown;
+            HealthController selected = AcquireTarget(out bool selectedIsHero);
+            SetCurrentTarget(selected, selectedIsHero);
         }
 
-        HealthController target = AcquireTarget(out bool isHero);
-        if (target == null)
+        if (_attackCooldown > 0f) return;
+        if (_currentTarget == null)
         {
             // ターゲットがいない間は短い間隔で再索敵する。
             _attackCooldown = RetargetCooldown;
             return;
         }
 
-        Attack(target, isHero);
+        Attack(_currentTarget, _currentTargetIsHero);
+        if (_currentTarget.IsDead) SetCurrentTarget(null, false);
         _attackCooldown = 1f / AttacksPerSecond;
+    }
+
+    private void SetCurrentTarget(HealthController target, bool isHero)
+    {
+        if (_currentTarget == target && _currentTargetIsHero == isHero)
+        {
+            // 死亡時にバーが表示を解除した後、復活した対象を再び狙う場合も再登録する。
+            if (_currentTargetBar != null) _currentTargetBar.SetTowerTargeted(this, true);
+            return;
+        }
+
+        if (_currentTargetBar != null) _currentTargetBar.SetTowerTargeted(this, false);
+        _currentTarget = target;
+        _currentTargetIsHero = isHero;
+        _currentTargetBar = null;
+        if (!isHero || target == null) return;
+        Targetable targetable = target.GetComponent<Targetable>();
+        if (targetable == null || targetable.Classification != TargetClassification.Character) return;
+        _currentTargetBar = target.GetComponentInChildren<WorldHealthBar>(true);
+        if (_currentTargetBar != null) _currentTargetBar.SetTowerTargeted(this, true);
     }
 
     // 射程内の敵を探す。優先順位: アグロ中の敵ヒーロー > 敵ミニオン > 敵ヒーロー(最も低い)。構造物は狙わない。
@@ -421,6 +454,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
 
         _aggroHero = context.Attacker;
         _aggroHeroHealth = attackerHealth;
+        _targetRefreshTimer = 0f;
     }
 
     private void ClearAggro()
@@ -503,7 +537,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
             }
         }
 
-        // タワーは通常攻撃でのみダメージを受ける(ゼルフW/Eなどのスキル・反射は無効)。
+        // タワーは通常攻撃判定でのみダメージを受ける(リーゼロッテQを含む)。
         if (!context.IsBasicAttack)
         {
             return 0f;
@@ -584,6 +618,7 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         }
 
         _isDestroyed = true;
+        SetCurrentTarget(null, false);
 
         // タワー破壊の追加報酬(攻撃側のみ)。
         PointsManager.AddPoints(_team.Opponent(), DestroyAttackerPoints, "tower destroyed");

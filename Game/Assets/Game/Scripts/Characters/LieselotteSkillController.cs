@@ -7,6 +7,7 @@ using UnityEngine;
 public sealed class LieselotteSkillController : MonoBehaviour
 {
     private const string RLock = "LieselotteRDash";
+    private const int PassiveStacksToEmpower = 3;
 
     [SerializeField] private LieselotteSkillData _skillData;
     [SerializeField] private LayerMask _groundLayer;
@@ -110,7 +111,7 @@ public sealed class LieselotteSkillController : MonoBehaviour
         if (_input.QReleasedThisFrame) CastQ();
         if (_input.EReleasedThisFrame) CastE();
         if (_input.RReleasedThisFrame) CastR();
-        // WはPの3打目で自動発動するパッシブ効果。
+        // WはPの3スタック後の4打目で自動発動するパッシブ効果。
     }
 
     private void UpdatePreviews()
@@ -149,23 +150,24 @@ public sealed class LieselotteSkillController : MonoBehaviour
         if (_rPreview != null) _rPreview.HideAll();
     }
 
-    /// <summary>通常攻撃のダメージ計算前に呼ぶ。3打目のみ追加ダメージを返す。</summary>
+    /// <summary>通常攻撃のダメージ計算前に呼ぶ。3スタック済みの対象への4打目に追加ダメージを返す。</summary>
     public float PassiveBonusFor(Targetable target)
     {
         if (_skillData == null || !OboroCombatUtility.IsEnemyChampion(transform, target)) return 0f;
-        int next = target == _stackTarget && Time.time < _stackExpiry ? _stacks + 1 : 1;
-        return next >= 3 ? _skillData.PassiveBaseDamage +
+        bool ready = target == _stackTarget && Time.time < _stackExpiry &&
+            _stacks >= PassiveStacksToEmpower;
+        return ready ? _skillData.PassiveBaseDamage +
             _stats.CurrentAttackDamage * _skillData.PassiveAdRatio : 0f;
     }
 
-    /// <summary>実際にHPを減らした通常攻撃だけをスタックへ数える。</summary>
+    /// <summary>実際にHPを減らした通常攻撃とQをスタックへ数える。</summary>
     public void NotifyBasicAttackHit(Targetable target)
     {
-        if (_skillData == null || !OboroCombatUtility.IsEnemyChampion(transform, target)) return;
+        if (_skillData == null || !OboroCombatUtility.IsEnemyChampion(transform, target, false)) return;
         _stacks = target == _stackTarget && Time.time < _stackExpiry ? _stacks + 1 : 1;
         _stackTarget = target;
         _stackExpiry = Time.time + _skillData.PassiveStackSeconds;
-        if (_stacks < 3) return;
+        if (_stacks <= PassiveStacksToEmpower) return;
         _stacks = 0;
         _stackTarget = null;
         _empowerExpiry = Time.time + _skillData.PassiveEmpowerSeconds;
@@ -174,6 +176,14 @@ public sealed class LieselotteSkillController : MonoBehaviour
     }
 
     private bool IsQTarget(Targetable target)
+    {
+        return OboroCombatUtility.IsEnemy(transform, target, false) &&
+            (target.Classification == TargetClassification.Character ||
+             target.Classification == TargetClassification.Minion ||
+             target.Classification == TargetClassification.Tower);
+    }
+
+    private bool IsPoolTarget(Targetable target)
     {
         return OboroCombatUtility.IsEnemy(transform, target, false) &&
             (target.Classification == TargetClassification.Character ||
@@ -204,14 +214,19 @@ public sealed class LieselotteSkillController : MonoBehaviour
         _eCooldownEndTime = System.Math.Max(Time.timeAsDouble,
             _eCooldownEndTime - _skillData.ECooldownReductionOnQ);
         _sequence++;
-        float raw = Damage(_skillData.QBaseDamage, _skillData.QAdRatio, HeroSkillSlot.Q);
+        bool champion = OboroCombatUtility.IsEnemyChampion(transform, target);
+        float raw = Damage(_skillData.QBaseDamage, _skillData.QAdRatio, HeroSkillSlot.Q) +
+            PassiveBonusFor(target);
         float actual = targetHealth.TakeDamage(raw, transform, DamageType.Normal,
-            sourceId: $"LieselotteQ#{_sequence}");
+            isBasicAttack: true,
+            sourceId: $"LieselotteQ#{_sequence}",
+            attackAttributes: SkillAttributeCatalog.DamageOf("Lieselotte", HeroSkillSlot.Q));
         _visuals.ShowQ(target.transform);
         if (actual <= 0f) return;
-        float healPercent = target.Classification == TargetClassification.Minion
-            ? _skillData.QMinionHealPercent : _skillData.QHeroHealPercent;
-        if (Time.time < _empowerExpiry)
+        if (champion) NotifyBasicAttackHit(target);
+        float healPercent = champion ? _skillData.QHeroHealPercent :
+            target.Classification == TargetClassification.Minion ? _skillData.QMinionHealPercent : 0f;
+        if (champion && Time.time < _empowerExpiry)
         {
             healPercent *= _skillData.QEmpoweredHealMultiplier;
             _empowerExpiry = 0f;
@@ -297,7 +312,7 @@ public sealed class LieselotteSkillController : MonoBehaviour
                 _skillData.EPoolRadius + 0.7f, _targetableLayer, QueryTriggerInteraction.Ignore))
             {
                 Targetable target = collider.GetComponentInParent<Targetable>();
-                if (!IsQTarget(target) || !_eHit.Add(target)) continue;
+                if (!IsPoolTarget(target) || !_eHit.Add(target)) continue;
                 Vector3 flat = OboroCombatUtility.Flatten(target.GetClosestPoint(pool.Position) -
                     pool.Position);
                 if (flat.sqrMagnitude > _skillData.EPoolRadius * _skillData.EPoolRadius)
@@ -312,7 +327,8 @@ public sealed class LieselotteSkillController : MonoBehaviour
                 if (health == null) continue;
                 float actual = health.TakeDamage(Damage(_skillData.EBaseDamage,
                     _skillData.EAdRatio, HeroSkillSlot.E), transform, DamageType.Normal,
-                    sourceId: $"LieselotteE#{_eSequence}");
+                    sourceId: $"LieselotteE#{_eSequence}",
+                    attackAttributes: SkillAttributeCatalog.DamageOf("Lieselotte", HeroSkillSlot.E));
                 if (actual > 0f) CombatTextManager.ShowDamageDealt(target.transform.position, actual);
                 target.PlayHitFlash();
             }

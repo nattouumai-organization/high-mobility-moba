@@ -95,6 +95,31 @@ public sealed class CrowdControlHealthBarTests
     }
 
     [Test]
+    public void StatusIcons_AreDistinctSpritesAndFollowStunAndSnare()
+    {
+        Image stunIcon = _bar.transform.Find("Stun Status Icon").GetComponent<Image>();
+        Image snareIcon = _bar.transform.Find("Snare Status Icon").GetComponent<Image>();
+        Assert.That(stunIcon.sprite, Is.Not.Null);
+        Assert.That(snareIcon.sprite, Is.Not.Null);
+        Assert.That(stunIcon.sprite, Is.Not.EqualTo(snareIcon.sprite));
+        Assert.That(stunIcon.enabled || snareIcon.enabled, Is.False);
+
+        _cc.ApplyStun(0.5f, null);
+        Refresh();
+        Assert.That(stunIcon.enabled, Is.True);
+        Assert.That(snareIcon.enabled, Is.False);
+
+        _cc.ApplySnare(0.5f, null);
+        Refresh();
+        Assert.That(stunIcon.enabled && snareIcon.enabled, Is.True);
+        Assert.That(stunIcon.rectTransform.anchoredPosition.y,
+            Is.GreaterThan(snareIcon.rectTransform.anchoredPosition.y));
+
+        _health.TakeDamage(1000f);
+        Assert.That(stunIcon.enabled || snareIcon.enabled, Is.False);
+    }
+
+    [Test]
     public void Snare_ReapplicationExtendsDisplayUntilActualEnd()
     {
         _cc.ApplySnare(0.1f, null);
@@ -298,6 +323,73 @@ public sealed class CrowdControlHealthBarTests
         _health.Revive();
         Refresh();
         Assert.That(_bar.IsStunLabelVisible || _bar.IsSnareLabelVisible, Is.False);
+    }
+
+    [Test]
+    public void TowerWarning_TracksCurrentHeroTargetBetweenAttacksAndClearsWhenOutOfRange()
+    {
+        GameObject towerObject = new GameObject("Blue tower");
+        _created.Add(towerObject);
+        HealthController towerHealth = towerObject.AddComponent<HealthController>();
+        TowerController tower = towerObject.AddComponent<TowerController>();
+        SetField(tower, "_health", towerHealth);
+        SetField(tower, "_team", Team.Blue);
+        SetField(tower, "_attackCooldown", 10f);
+
+        Invoke(tower, "Update");
+        Assert.That(_bar.IsTowerWarningVisible, Is.True);
+        RectTransform warning = _bar.transform.Find("Tower Target Warning") as RectTransform;
+        Assert.That(warning, Is.Not.Null);
+        Assert.That(warning.GetComponent<Image>().sprite, Is.Not.Null);
+        Assert.That(warning.anchoredPosition.y, Is.GreaterThan(172f));
+
+        _enemy.transform.position = new Vector3(20f, 0f, 0f);
+        Invoke(tower, "Update");
+        Assert.That(_bar.IsTowerWarningVisible, Is.False);
+
+        _enemy.transform.position = Vector3.zero;
+        SetField(tower, "_targetRefreshTimer", 0f);
+        Invoke(tower, "Update");
+        Assert.That(_bar.IsTowerWarningVisible, Is.True);
+        tower.enabled = false;
+        Invoke(tower, "OnDisable");
+        Assert.That(_bar.IsTowerWarningVisible, Is.False);
+    }
+
+    [Test]
+    public void TowerWarning_MultipleTowersAndDeathDoNotLeaveStaleIcon()
+    {
+        GameObject firstObject = new GameObject("First tower");
+        GameObject secondObject = new GameObject("Second tower");
+        _created.Add(firstObject);
+        _created.Add(secondObject);
+        TowerController first = firstObject.AddComponent<TowerController>();
+        TowerController second = secondObject.AddComponent<TowerController>();
+
+        _bar.SetTowerTargeted(first, true);
+        _bar.SetTowerTargeted(second, true);
+        _bar.SetTowerTargeted(first, false);
+        Assert.That(_bar.IsTowerWarningVisible, Is.True);
+
+        _health.TakeDamage(1000f);
+        Assert.That(_bar.IsTowerWarningVisible, Is.False);
+        _health.Revive();
+        Assert.That(_bar.IsTowerWarningVisible, Is.False);
+        _bar.SetTowerTargeted(second, true);
+        Assert.That(_bar.IsTowerWarningVisible, Is.True);
+        _bar.SetTowerTargeted(second, false);
+        Assert.That(_bar.IsTowerWarningVisible, Is.False);
+    }
+
+    [Test]
+    public void TowerWarning_MinionClassificationDoesNotShowIcon()
+    {
+        GameObject towerObject = new GameObject("Tower");
+        _created.Add(towerObject);
+        TowerController tower = towerObject.AddComponent<TowerController>();
+        _enemy.GetComponent<Targetable>().InitializeRuntime(TargetClassification.Minion, null);
+        _bar.SetTowerTargeted(tower, true);
+        Assert.That(_bar.IsTowerWarningVisible, Is.False);
     }
 
     private void TextPositionIsAboveSnare()

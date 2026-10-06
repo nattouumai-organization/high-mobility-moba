@@ -396,7 +396,8 @@ public sealed class VolbraakEController : MonoBehaviour
         }
 
         float damage = _baseDamage + (_characterStats != null ? _characterStats.CurrentAttackDamage : 0f) * _adRatio;
-        float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _eCastSourceId);
+        float actualDamage = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _eCastSourceId,
+            attackAttributes: SkillAttributeCatalog.DamageOf("Volbraak", HeroSkillSlot.E));
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

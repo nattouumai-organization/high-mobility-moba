@@ -157,13 +157,16 @@ public class HealthController : MonoBehaviour
     /// <param name="attacker">攻撃者のTransform。取得できない場合はnull(前方判定による軽減は行われない)。</param>
     /// <param name="damageType">ダメージ種別。既定は通常ダメージ(Normal)。確定ダメージ(True)はARでは軽減されない。</param>
     /// <param name="isReflected">反射によるダメージかどうか。DamageContext.IsReflectedへ引き継がれ、反射ダメージの再反射防止(ヴォルブラークR)に使用する。既定はfalse。</param>
-    /// <param name="isBasicAttack">通常攻撃によるダメージかどうか。DamageContext.IsBasicAttackへ引き継がれ、タワー・本拠地の「通常攻撃のみ被弾」判定に使用する。既定はfalse。</param>
+    /// <param name="isBasicAttack">通常攻撃判定かどうか。リーゼロッテQもtrueとしてタワーの被弾判定に渡す。既定はfalse。</param>
     /// <param name="sourceId">ダメージ発生源ID(例: "ZelfW#3")。DamageContext.SourceIdとして軽減判定(IIncomingDamageModifier)と被ダメージ通知(DamageTaken)の両方へ引き継がれる。1回のスキル発動で発生した多段ヒット・複数対象ダメージは同じIDを共有する(連撃ルーンの1スキル1カウント判定などに使用)。既定はnull。</param>
+    /// <param name="attackAttributes">攻撃分類。防御計算や建造物のIsBasicAttack判定とは独立した通知用メタデータ。</param>
     /// <returns>
     /// 実際に減少したHP量(実ダメージ)。軽減後のダメージが基準で、残りHPを超えた過剰ダメージ分は含まない。
     /// 死亡済み・無効な値の場合は0を返す。
     /// </returns>
-    public float TakeDamage(float damage, Transform attacker, DamageType damageType = DamageType.Normal, bool isReflected = false, bool isBasicAttack = false, string sourceId = null)
+    public float TakeDamage(float damage, Transform attacker, DamageType damageType = DamageType.Normal,
+        bool isReflected = false, bool isBasicAttack = false, string sourceId = null,
+        SkillAttribute attackAttributes = SkillAttribute.None)
     {
         if (_isDead || damage <= 0f)
         {
@@ -171,7 +174,9 @@ public class HealthController : MonoBehaviour
         }
 
         // 受けたダメージごとに、HPへ適用する直前の軽減判定(ゼルフWなど)を行う。
-        float modifiedDamage = ApplyIncomingDamageModifiers(new DamageContext(attacker, damageType, damage, isReflected, isBasicAttack, sourceId), damage);
+        DamageContext context = new DamageContext(attacker, damageType, damage, isReflected,
+            isBasicAttack, sourceId, attackAttributes);
+        float modifiedDamage = ApplyIncomingDamageModifiers(context, damage);
         if (modifiedDamage <= 0f)
         {
             return 0f;
@@ -197,7 +202,7 @@ public class HealthController : MonoBehaviour
         // 死亡処理より前に通知するため、死亡の瞬間の致死ダメージも通知対象になる。
         if (actualDamage > 0f)
         {
-            DamageTaken?.Invoke(new DamageContext(attacker, damageType, damage, isReflected, isBasicAttack, sourceId), actualDamage);
+            DamageTaken?.Invoke(context, actualDamage);
         }
 
         if (_currentHealth <= 0f)

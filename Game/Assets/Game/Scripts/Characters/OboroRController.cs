@@ -259,7 +259,8 @@ public sealed class OboroRController : MonoBehaviour, ICancelableSkillApproach
         // 最大HPの10%分の確定ダメージ。閾値以下なら通常は致死だが、シールド/軽減が吸収すれば生存できる。
         float executeDamage = health.MaxHealth * _executeDamageMaxHealthRatio;
         float actualDamage = health.TakeDamage(executeDamage, transform, DamageType.True,
-            sourceId: $"OboroR#{_castSequence}");
+            sourceId: $"OboroR#{_castSequence}",
+            attackAttributes: SkillAttributeCatalog.DamageOf("Oboro", HeroSkillSlot.R));
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

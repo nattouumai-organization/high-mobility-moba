@@ -93,7 +93,7 @@ TopDownCameraController
 
 ### Combat
 
-攻撃属性の将来設計: `DamageType.Normal/True` は防御力による軽減の種別として維持し、攻撃の分類は独立した複数フラグで表す。候補はスロウ、スネア、スタン、通常攻撃、スキル攻撃。複数属性を同時に持つ攻撃を許す。移動・シールド等のスキル自体の属性と、その共通処理は別途検討する。属性のデータ構造、付与先、各スキルへの対応、互換性は未決定であり、現時点では実装しない。
+`SkillAttributeCatalog`は5キャラクターの通常攻撃・P/Q/W/E/Rについて、攻撃、CC、移動、自己効果と`SkillTargetingType`を共通の読み取り情報として提供する。複数属性をフラグで表す。`DamageContext.AttackAttributes`には実際のダメージに対応する攻撃分類だけを渡し、`DamageType.Normal/True`の防御計算および既存の`IsBasicAttack`による建造物判定は変更しない。CCフラグはスキルで起こり得る効果で、実際のCC付与は既存コントローラーが担当する。
 
 ```text
 HealthComponent
@@ -333,7 +333,7 @@ TASKS.md / CHANGELOG.mdなどのMarkdown文書は手動で更新する。Unity E
 
 ### 構造物のダメージルール(DamageContext.IsBasicAttack)
 
-- DamageContextにIsBasicAttackフラグを追加。通常攻撃(ヒーローAA・タワー・ミニオン)のみisBasicAttack: trueでTakeDamageを呼ぶ。
+- DamageContextにIsBasicAttackフラグを追加。通常攻撃(ヒーローAA・タワー・ミニオン)とリーゼロッテQはisBasicAttack: trueでTakeDamageを呼ぶ。
 - タワー: 同一チームからのダメージ0 / 通常攻撃以外は0 / 攻撃者周囲8以内に味方ミニオン不在なら確定無効・通常90%軽減 / AR60。
 - 第2タワー: 自チームの第1タワー破壊まで完全無敵 / 同一チームダメージ0 / 通常攻撃のみ / AR60。
 - NexusControllerは旧シーン・Prefab互換用として残すが、MapBuilderから生成せず勝敗処理にも使用しない。

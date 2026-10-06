@@ -444,7 +444,9 @@ public sealed class VolbraakRController : MonoBehaviour
             : attackerTargetable.GetComponent<HealthController>();
         if (attackerHealth == null || attackerHealth.IsDead) return;
 
-        float reflected = attackerHealth.TakeDamage(actualDamage * _reflectRatio, transform, DamageType.True, isReflected: true);
+        float reflected = attackerHealth.TakeDamage(actualDamage * _reflectRatio, transform,
+            DamageType.True, isReflected: true,
+            attackAttributes: SkillAttributeCatalog.DamageOf("Volbraak", HeroSkillSlot.R));
         if (reflected > 0f)
         {
             attackerTargetable.PlayHitFlash();

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,12 +25,18 @@ public class WorldHealthBar : MonoBehaviour
     private Image _snareBackdrop;
     private Text _stunLabel;
     private Text _snareLabel;
+    private Image _stunIcon;
+    private Image _snareIcon;
+    private readonly HashSet<TowerController> _targetingTowers = new HashSet<TowerController>();
+    private GameObject _towerWarning;
     private bool _started;
     private static Sprite _sharedFillSprite;
 
     public bool IsStunLabelVisible => isActiveAndEnabled && _stunLabel != null && _stunLabel.enabled &&
         _canvas != null && _canvas.enabled;
     public bool IsSnareLabelVisible => isActiveAndEnabled && _snareLabel != null && _snareLabel.enabled &&
+        _canvas != null && _canvas.enabled;
+    public bool IsTowerWarningVisible => _towerWarning != null && _towerWarning.activeInHierarchy &&
         _canvas != null && _canvas.enabled;
 
     private void Awake()
@@ -48,6 +55,7 @@ public class WorldHealthBar : MonoBehaviour
         Subscribe();
         if (_started) InitializeCrowdControlLabels();
         UpdateCrowdControlLabels();
+        UpdateTowerWarning();
     }
 
     private void OnDisable()
@@ -56,6 +64,7 @@ public class WorldHealthBar : MonoBehaviour
         CrowdControlController.Created -= HandleCrowdControlEvent;
         CrowdControlController.StatusApplied -= HandleCrowdControlEvent;
         HideCrowdControlLabels();
+        if (_towerWarning != null) _towerWarning.SetActive(false);
     }
 
     private void Subscribe()
@@ -96,10 +105,17 @@ public class WorldHealthBar : MonoBehaviour
         if (_snareBackdrop != null) Destroy(_snareBackdrop.gameObject);
         if (_stunLabel != null) Destroy(_stunLabel.gameObject);
         if (_snareLabel != null) Destroy(_snareLabel.gameObject);
+        if (_stunIcon != null) Destroy(_stunIcon.gameObject);
+        if (_snareIcon != null) Destroy(_snareIcon.gameObject);
         _stunBackdrop = null;
         _snareBackdrop = null;
         _stunLabel = null;
         _snareLabel = null;
+        _stunIcon = null;
+        _snareIcon = null;
+        _targetingTowers.Clear();
+        if (_towerWarning != null) Destroy(_towerWarning);
+        _towerWarning = null;
 
         if (_healthController != null && isActiveAndEnabled)
         {
@@ -158,9 +174,9 @@ public class WorldHealthBar : MonoBehaviour
 
         Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         _stunLabel = CreateStatusLabel("Stun Status", "スタン", new Color(1f, 0.65f, 0.2f),
-            font, out _stunBackdrop);
+            font, Resources.Load<Sprite>("UI/StatusIcons/Stun"), out _stunBackdrop, out _stunIcon);
         _snareLabel = CreateStatusLabel("Snare Status", "スネア", new Color(0.45f, 0.9f, 1f),
-            font, out _snareBackdrop);
+            font, Resources.Load<Sprite>("UI/StatusIcons/Snare"), out _snareBackdrop, out _snareIcon);
         UpdateCrowdControlLabels();
     }
 
@@ -174,14 +190,14 @@ public class WorldHealthBar : MonoBehaviour
     }
 
     private Text CreateStatusLabel(string objectName, string text, Color color, Font font,
-        out Image backdrop)
+        Sprite iconSprite, out Image backdrop, out Image icon)
     {
         GameObject backdropObject = new GameObject(objectName + " Backdrop", typeof(RectTransform));
         backdropObject.transform.SetParent(transform, false);
         RectTransform backdropRect = (RectTransform)backdropObject.transform;
         backdropRect.anchorMin = backdropRect.anchorMax = new Vector2(0.5f, 1f);
         backdropRect.pivot = new Vector2(0.5f, 0f);
-        backdropRect.sizeDelta = new Vector2(190f, 68f);
+        backdropRect.sizeDelta = new Vector2(290f, 68f);
         backdrop = backdropObject.AddComponent<Image>();
         backdrop.color = new Color(0f, 0f, 0f, 0.72f);
         backdrop.raycastTarget = false;
@@ -192,7 +208,7 @@ public class WorldHealthBar : MonoBehaviour
         RectTransform rect = (RectTransform)labelObject.transform;
         rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
         rect.pivot = new Vector2(0.5f, 0f);
-        rect.sizeDelta = new Vector2(210f, 68f);
+        rect.sizeDelta = new Vector2(200f, 68f);
         Text label = labelObject.AddComponent<Text>();
         label.font = font;
         label.fontSize = 56;
@@ -207,6 +223,17 @@ public class WorldHealthBar : MonoBehaviour
         outline.effectColor = Color.black;
         outline.effectDistance = new Vector2(2f, -2f);
         label.enabled = false;
+
+        GameObject iconObject = new GameObject(objectName + " Icon", typeof(RectTransform));
+        iconObject.transform.SetParent(transform, false);
+        RectTransform iconRect = (RectTransform)iconObject.transform;
+        iconRect.anchorMin = iconRect.anchorMax = new Vector2(0.5f, 1f);
+        iconRect.pivot = new Vector2(0.5f, 0f);
+        iconRect.sizeDelta = new Vector2(56f, 56f);
+        icon = iconObject.AddComponent<Image>();
+        icon.sprite = iconSprite;
+        icon.raycastTarget = false;
+        icon.enabled = false;
         return label;
     }
 
@@ -220,19 +247,23 @@ public class WorldHealthBar : MonoBehaviour
         bool snared = visible && _crowdControl.IsSnared;
         _stunLabel.enabled = stunned;
         _snareLabel.enabled = snared;
+        _stunIcon.enabled = stunned;
+        _snareIcon.enabled = snared;
         _stunBackdrop.enabled = stunned;
         _snareBackdrop.enabled = snared;
         if (stunned)
         {
             Vector2 position = new Vector2(0f, snared ? 104f : 34f);
-            _stunLabel.rectTransform.anchoredPosition = position;
+            _stunLabel.rectTransform.anchoredPosition = position + new Vector2(28f, 0f);
             _stunBackdrop.rectTransform.anchoredPosition = position;
+            _stunIcon.rectTransform.anchoredPosition = position + new Vector2(-105f, 6f);
         }
         if (snared)
         {
             Vector2 position = new Vector2(0f, 34f);
-            _snareLabel.rectTransform.anchoredPosition = position;
+            _snareLabel.rectTransform.anchoredPosition = position + new Vector2(28f, 0f);
             _snareBackdrop.rectTransform.anchoredPosition = position;
+            _snareIcon.rectTransform.anchoredPosition = position + new Vector2(-105f, 6f);
         }
     }
 
@@ -240,8 +271,49 @@ public class WorldHealthBar : MonoBehaviour
     {
         if (_stunLabel != null) _stunLabel.enabled = false;
         if (_snareLabel != null) _snareLabel.enabled = false;
+        if (_stunIcon != null) _stunIcon.enabled = false;
+        if (_snareIcon != null) _snareIcon.enabled = false;
         if (_stunBackdrop != null) _stunBackdrop.enabled = false;
         if (_snareBackdrop != null) _snareBackdrop.enabled = false;
+    }
+
+    /// <summary>タワーの現在の標的だけに警告を表示する。複数タワーから同時に狙われても維持する。</summary>
+    public void SetTowerTargeted(TowerController tower, bool targeted)
+    {
+        if (tower == null) return;
+        if (targeted) _targetingTowers.Add(tower);
+        else _targetingTowers.Remove(tower);
+        UpdateTowerWarning();
+    }
+
+    private void UpdateTowerWarning()
+    {
+        bool visible = _targetingTowers.Count > 0 && isActiveAndEnabled &&
+            _canvas != null && _canvas.enabled && _healthController != null &&
+            !_healthController.IsDead;
+        if (visible)
+        {
+            Targetable target = _healthController.GetComponent<Targetable>();
+            visible = target != null && target.Classification == TargetClassification.Character;
+        }
+        if (visible && _towerWarning == null) CreateTowerWarning();
+        if (_towerWarning != null && _towerWarning.activeSelf != visible)
+            _towerWarning.SetActive(visible);
+    }
+
+    private void CreateTowerWarning()
+    {
+        _towerWarning = new GameObject("Tower Target Warning", typeof(RectTransform));
+        _towerWarning.transform.SetParent(transform, false);
+        RectTransform root = (RectTransform)_towerWarning.transform;
+        root.anchorMin = root.anchorMax = new Vector2(0.5f, 1f);
+        root.pivot = new Vector2(0.5f, 0.5f);
+        root.anchoredPosition = new Vector2(0f, 210f);
+        root.sizeDelta = new Vector2(68f, 68f);
+
+        Image icon = _towerWarning.AddComponent<Image>();
+        icon.sprite = Resources.Load<Sprite>("UI/StatusIcons/TowerTarget");
+        icon.raycastTarget = false;
     }
 
     private void EnsureFillSprite()
@@ -398,6 +470,8 @@ public class WorldHealthBar : MonoBehaviour
     {
         if (_canvas != null) _canvas.enabled = false;
         HideCrowdControlLabels();
+        _targetingTowers.Clear();
+        UpdateTowerWarning();
     }
 
     private void HandleRevived()
@@ -406,5 +480,6 @@ public class WorldHealthBar : MonoBehaviour
         if (_healthController != null)
             HandleHealthChanged(_healthController.CurrentHealth, _healthController.MaxHealth);
         UpdateCrowdControlLabels();
+        UpdateTowerWarning();
     }
 }

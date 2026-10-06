@@ -243,7 +243,8 @@ public sealed class ZelfQController : MonoBehaviour, ICancelableSkillApproach
         StopMovementAfterQCast();
 
         HealthController health = GetHealth(target);
-        float actualDamage = health.TakeDamage(_baseDamage + _characterStats.CurrentAttackDamage * _adRatio, transform);
+        float actualDamage = health.TakeDamage(_baseDamage + _characterStats.CurrentAttackDamage * _adRatio,
+            transform, attackAttributes: SkillAttributeCatalog.DamageOf("Zelf", HeroSkillSlot.Q));
         if (actualDamage > 0f)
         {
             target.PlayHitFlash();

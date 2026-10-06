@@ -1,6 +1,5 @@
 /// <summary>
-/// スキルの指定方式。フェーズ3以降のスキル実装で共通語彙として使用する。
-/// 現行スキルの分類: Q=UnitTarget(対象指定) / W=DirectionTarget(方向指定・前方軽減の向き) / E=DirectionTarget(方向指定) / R=UnitTarget(対象指定)。
+/// スキルの指定方式。キャラクター別の指定方式はSkillAttributeCatalogで定義する。
 /// </summary>
 public enum SkillTargetingType
 {

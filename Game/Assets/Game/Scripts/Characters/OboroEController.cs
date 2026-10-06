@@ -314,7 +314,8 @@ public sealed class OboroEController : MonoBehaviour, ICancelableSkillApproach
         if (passiveTriggered) rawDamage += passiveBonus;
 
         float actualDamage = targetHealth.TakeDamage(rawDamage, transform, DamageType.Normal,
-            isBasicAttack: true, sourceId: $"OboroE#{_castSequence}");
+            isBasicAttack: true, sourceId: $"OboroE#{_castSequence}",
+            attackAttributes: SkillAttributeCatalog.DamageOf("Oboro", HeroSkillSlot.E));
         if (actualDamage <= 0f) return;
 
         target.PlayHitFlash();

@@ -85,9 +85,10 @@ public static class OboroCombatUtility
     /// E/R用の敵チャンピオン判定。通常のヒーローは敵TeamMemberを必須とし、
     /// TeamMemberのないテスト対象はClassificationをCharacterへ変更した場合だけ許可する。
     /// </summary>
-    public static bool IsEnemyChampion(Transform owner, Targetable target)
+    public static bool IsEnemyChampion(Transform owner, Targetable target, bool requireAlive = true)
     {
-        if (!IsAlive(target) || target.Classification != TargetClassification.Character || IsOwner(owner, target))
+        if (target == null || (requireAlive && !IsAlive(target)) ||
+            target.Classification != TargetClassification.Character || IsOwner(owner, target))
         {
             return false;
         }

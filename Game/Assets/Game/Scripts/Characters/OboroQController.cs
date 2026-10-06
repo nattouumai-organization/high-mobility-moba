@@ -308,7 +308,8 @@ public sealed class OboroQController : MonoBehaviour, ICancelableSkillApproach
 
                 HealthController targetHealth = OboroCombatUtility.GetHealth(candidate);
                 float actualDamage = targetHealth != null
-                    ? targetHealth.TakeDamage(rawDamage, transform, DamageType.Normal, sourceId: sourceId)
+                    ? targetHealth.TakeDamage(rawDamage, transform, DamageType.Normal, sourceId: sourceId,
+                        attackAttributes: SkillAttributeCatalog.DamageOf("Oboro", HeroSkillSlot.Q))
                     : 0f;
                 if (actualDamage > 0f)
                 {

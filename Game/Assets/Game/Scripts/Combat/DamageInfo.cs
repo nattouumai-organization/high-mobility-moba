@@ -34,7 +34,7 @@ public readonly struct DamageContext
     /// <summary>反射によるダメージかどうか(ヴォルブラークRの反射など)。反射フラグ付きのダメージは再反射されない。</summary>
     public readonly bool IsReflected;
 
-    /// <summary>通常攻撃によるダメージかどうか。タワー・本拠地は通常攻撃のみダメージを受ける(フェーズ5)。</summary>
+    /// <summary>通常攻撃判定かどうか。リーゼロッテQも通常攻撃判定としてタワーに命中する。</summary>
     public readonly bool IsBasicAttack;
 
     /// <summary>
@@ -43,7 +43,11 @@ public readonly struct DamageContext
     /// </summary>
     public readonly string SourceId;
 
-    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false, bool isBasicAttack = false, string sourceId = null)
+    /// <summary>スキル表に基づく攻撃分類。DamageTypeと既存のIsBasicAttack判定には影響しない。</summary>
+    public readonly SkillAttribute AttackAttributes;
+
+    public DamageContext(Transform attacker, DamageType type, float baseAmount, bool isReflected = false,
+        bool isBasicAttack = false, string sourceId = null, SkillAttribute attackAttributes = SkillAttribute.None)
     {
         Attacker = attacker;
         Type = type;
@@ -51,6 +55,8 @@ public readonly struct DamageContext
         IsReflected = isReflected;
         IsBasicAttack = isBasicAttack;
         SourceId = sourceId;
+        AttackAttributes = attackAttributes == SkillAttribute.None && isBasicAttack
+            ? SkillAttribute.BasicAttack : attackAttributes;
     }
 }
 

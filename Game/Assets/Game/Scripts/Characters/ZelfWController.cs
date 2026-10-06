@@ -283,7 +283,8 @@ public sealed class ZelfWController : MonoBehaviour, IIncomingDamageModifier
             HealthController health = target.Health != null ? target.Health : target.GetComponent<HealthController>();
             if (health == null || health.IsDead) continue;
 
-            float actual = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _wCastSourceId);
+            float actual = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: _wCastSourceId,
+                attackAttributes: SkillAttributeCatalog.DamageOf("Zelf", HeroSkillSlot.W));
             if (actual <= 0f) continue;
 
             target.PlayHitFlash();

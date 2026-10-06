@@ -338,7 +338,8 @@ public sealed class VolbraakWController : MonoBehaviour, IIncomingDamageModifier
                     continue;
                 }
 
-                float actual = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: sourceId);
+                float actual = health.TakeDamage(damage, transform, DamageType.Normal, sourceId: sourceId,
+                    attackAttributes: SkillAttributeCatalog.DamageOf("Volbraak", HeroSkillSlot.W));
                 if (actual <= 0f)
                 {
                     continue;
