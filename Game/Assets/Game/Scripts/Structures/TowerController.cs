@@ -504,6 +504,11 @@ public class TowerController : MonoBehaviour, IIncomingDamageModifier
         {
             _lastHeroTarget = null;
             _consecutiveHits = 0;
+            MinionController minion = target.GetComponent<MinionController>();
+            if (minion != null)
+            {
+                damage = minion.GetTowerDamageBeforeArmor();
+            }
         }
 
         // タワーの攻撃は通常攻撃扱い(将来ミニオン以外へのルール拡張に備えてフラグを明示)。

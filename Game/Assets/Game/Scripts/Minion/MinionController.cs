@@ -4,8 +4,8 @@ using UnityEngine.UI;
 
 /// <summary>
 /// レーンを進軍するミニオン(GAME_DESIGN.md 3章)。GameManagerがウェーブごとにSpawnで生成する。
-/// - 近接: HP420/AD18/AS0.85/射程1.75、遠隔: HP290/AD22/AS0.70/射程5。移動速度3.3。
-/// - ウェーブレベルで強化: 近接 HP+20/AD+1.5/AR+1、遠隔 HP+14/AD+1.5/AR+0.5。
+/// - 近接: HP275/AD20/AS0.85/射程1.75、遠隔: HP145/AD24/AS0.70/射程5。移動速度3.3。
+/// - ウェーブレベルで強化: 近接 HP+18/AD+2/AR+1、遠隔 HP+12/AD+2/AR+0.5。
 /// - 索敵範囲7以内の最も近い敵(TeamMemberを持つ対象)を狙う。無敵状態の本拠地は狙わない。
 /// - 敵がいない間はレーン進行方向へ進軍する(レーン中心線への引き寄せ付き)。
 /// - ミニオン同士が重ならないよう、毎フレームの最後に分離処理(近すぎるミニオンを押し離す)を行う。
@@ -56,6 +56,7 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
     private const float ProximityPointRange = 12f;
     private const int ProximityPoints = 2;
     private const int LastHitBonusPoints = 3;
+    private const float TowerLastHitHealth = 15f;
 
     private static readonly List<MinionController> Active = new List<MinionController>();
 
@@ -96,6 +97,19 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
 
     /// <summary>死亡済みかどうか。</summary>
     public bool IsDead => _health == null || _health.IsDead;
+
+    /// <summary>タワーの通常攻撃がARで軽減された後、近接2発・遠隔1発でHP15を残す元ダメージ。</summary>
+    public float GetTowerDamageBeforeArmor()
+    {
+        if (_health == null)
+        {
+            return 0f;
+        }
+
+        int hitsToLastHit = _type == MinionType.Melee ? 2 : 1;
+        float effectiveDamage = (_health.MaxHealth - TowerLastHitHealth) / hitsToLastHit;
+        return effectiveDamage * (100f + _armor) / 100f;
+    }
 
     /// <summary>
     /// ミニオンを生成する。カプセルのプリミティブに必要なコンポーネントを付与して初期化する。
@@ -142,8 +156,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         float maxHealth;
         if (type == MinionType.Melee)
         {
-            maxHealth = 420f + 20f * waveLevel;
-            _attackDamage = 18f + 1.5f * waveLevel;
+            maxHealth = 275f + 18f * waveLevel;
+            _attackDamage = 20f + 2f * waveLevel;
             _attackInterval = 1f / 0.85f;
             _attackRange = 1.75f;
             _armor = 1f * waveLevel;
@@ -151,8 +165,8 @@ public class MinionController : MonoBehaviour, IIncomingDamageModifier
         }
         else
         {
-            maxHealth = 290f + 14f * waveLevel;
-            _attackDamage = 22f + 1.5f * waveLevel;
+            maxHealth = 145f + 12f * waveLevel;
+            _attackDamage = 24f + 2f * waveLevel;
             _attackInterval = 1f / 0.70f;
             _attackRange = 5f;
             _armor = 0.5f * waveLevel;
